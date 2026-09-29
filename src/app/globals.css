@@ -1,0 +1,101 @@
+@import url('https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Outfit:wght@400;500;600;700;800&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --font-bangla: 'Hind Siliguri', 'Plus Jakarta Sans', sans-serif;
+  --bg-natural: #fafbf7;
+  --text-natural: #1a2e22;
+  --card-natural: #ffffff;
+  --border-natural: #e8efe9;
+}
+
+.dark {
+  --bg-natural: #0b1710;
+  --text-natural: #e6f0e9;
+  --card-natural: #122319;
+  --border-natural: #1f382a;
+}
+
+body {
+  font-family: 'Hind Siliguri', 'Plus Jakarta Sans', 'Outfit', system-ui, sans-serif;
+  background-color: var(--bg-natural);
+  color: var(--text-natural);
+  overflow-x: hidden;
+  letter-spacing: -0.01em;
+}
+
+/* Custom Smooth Organic Scrollbar */
+::-webkit-scrollbar {
+  width: 7px;
+  height: 7px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.03);
+}
+
+.dark ::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+::-webkit-scrollbar-thumb {
+  background: #15803d;
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #0b5e39;
+}
+
+/* Typography polish */
+h1, h2, h3, h4, h5, h6 {
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  letter-spacing: -0.02em;
+}
+
+/* Natural glass cards */
+.natural-glass {
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(22, 101, 52, 0.08);
+}
+
+.dark .natural-glass {
+  background: rgba(18, 35, 25, 0.85);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(74, 222, 128, 0.12);
+}
+
+/* Organic Shimmer Animation */
+@keyframes naturalShimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.animate-shimmer {
+  background: linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.2) 50%, rgba(255,255,255,0) 100%);
+  background-size: 200% 100%;
+  animation: naturalShimmer 2.5s infinite;
+}
+
+/* Subtle glow */
+@keyframes organicGlow {
+  0%, 100% {
+    box-shadow: 0 4px 20px -2px rgba(22, 163, 74, 0.15);
+  }
+  50% {
+    box-shadow: 0 8px 30px 2px rgba(22, 163, 74, 0.3);
+  }
+}
+
+.hover-glow:hover {
+  animation: organicGlow 2s infinite ease-in-out;
+}
+
