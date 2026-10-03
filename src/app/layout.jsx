@@ -9,6 +9,7 @@ import FastOrderModal from '@/components/FastOrderModal';
 import MobileBottomNav from '@/components/MobileBottomNav';
 import ToastNotification from '@/components/ToastNotification';
 import PopupMessage from '@/components/PopupMessage';
+import FloatingCartButton from '@/components/FloatingCartButton';
 
 export const metadata = {
   title: 'ইহসান অনলাইন শপ (Ihsan Online Shop) - ১০০% খাঁটি ও নিরাপদ অর্গানিক খাদ্য',
@@ -24,6 +25,7 @@ export default function RootLayout({ children }) {
             <SmoothScroll>
               <ToastNotification />
               <PopupMessage />
+              <FloatingCartButton />
               <Header />
               <main className="flex-1">{children}</main>
               <Footer />

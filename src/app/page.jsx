@@ -1,6 +1,5 @@
 import React from 'react';
 import HeroSlider from '@/components/HeroSlider';
-import CategoryNav from '@/components/CategoryNav';
 import TrustBadges from '@/components/TrustBadges';
 import ProductSection from '@/components/ProductSection';
 import HomePromoBanner from '@/components/HomePromoBanner';
@@ -11,47 +10,46 @@ export const revalidate = 0; // Dynamic data
 
 export default async function HomePage() {
   const [productsRes, categoriesRes, bannersRes, reviewsRes] = await Promise.all([
-    getProducts({ limit: 30 }),
+    getProducts({ limit: 50 }),
     getCategories(),
     getBanners(),
     getReviews('all')
   ]);
 
   const products = productsRes?.data || [];
-  const categories = categoriesRes?.data || [];
   const banners = bannersRes?.data || [];
   const reviews = reviewsRes?.data || [];
 
-  const featuredProducts = products.filter((p) => p.isFeatured);
-  const honeyProducts = products.filter((p) => p.categorySlug === 'honey');
-  const oilAndGheeProducts = products.filter((p) => p.categorySlug === 'oil' || p.categorySlug === 'ghee');
-  const nutsAndDates = products.filter((p) => p.categorySlug === 'dates' || p.categorySlug === 'nuts-seeds');
+  const honeyProducts = products.filter(
+    (p) => p.category_id === 1 || p.categorySlug?.includes('honey') || p.category?.includes('মধু') || p.name?.includes('মধু')
+  );
+  const oilAndGheeProducts = products.filter(
+    (p) => p.category_id === 2 || p.category_id === 3 || p.categorySlug?.includes('oil') || p.categorySlug?.includes('ghee') || p.category?.includes('তেল') || p.category?.includes('ঘি') || p.name?.includes('তেল') || p.name?.includes('ঘি')
+  );
+  const nutsAndDates = products.filter(
+    (p) => p.category_id === 4 || p.category_id === 5 || p.categorySlug?.includes('dates') || p.categorySlug?.includes('nuts') || p.categorySlug?.includes('spices') || p.category?.includes('খেজুর') || p.category?.includes('বাদাম') || p.name?.includes('খেজুর') || p.name?.includes('বাদাম') || p.name?.includes('চিয়া')
+  );
 
   return (
     <div className="space-y-6 sm:space-y-10 pb-12">
-      {/* Category Horizontal Nav */}
-      <CategoryNav categories={categories} />
-
+      
       {/* Hero Slider */}
       <HeroSlider banners={banners} />
 
       {/* Trust Badges */}
       <TrustBadges />
 
-      {/* Featured / Best Sellers */}
+      {/* 🌟 POPULAR & ALL BEST SELLING PRODUCTS (Clean View + "Go to All Products Page" button) */}
       <ProductSection
         title="জনপ্রিয় ও সেরা বিক্রিত পণ্যসমূহ"
         titleEn="Popular & Best Selling Products"
-        subtitle="আমাদের গ্রাহকদের সবচেয়ে পছন্দের ১০০% খাঁটি ও নির্ভেজাল পণ্য"
+        subtitle="আমাদের গ্রাহকদের সবচেয়ে পছন্দের ১০০% খাঁটি ও স্বাস্থ্যকর অর্গানিক খাদ্যপণ্য"
         subtitleEn="Our customer-favorite 100% pure & organic essentials"
         badge="বেস্ট সেলার্স"
         badgeEn="BEST SELLERS"
-        products={featuredProducts.length > 0 ? featuredProducts : products.slice(0, 4)}
+        products={products}
         viewAllLink="/products"
       />
-
-      {/* Promo Banner / Brand Highlight */}
-      <HomePromoBanner />
 
       {/* Honey Collection */}
       {honeyProducts.length > 0 && (
@@ -63,7 +61,7 @@ export default async function HomePage() {
           badge="১০০% পিউর হানি"
           badgeEn="100% PURE HONEY"
           products={honeyProducts}
-          viewAllLink="/products?category=honey"
+          viewAllLink="/products?category=pure-honey"
         />
       )}
 
@@ -77,7 +75,7 @@ export default async function HomePage() {
           badge="খাঁটি স্বাদ"
           badgeEn="PURE TASTE"
           products={oilAndGheeProducts}
-          viewAllLink="/products?category=oil"
+          viewAllLink="/products?category=mustard-oil"
         />
       )}
 
@@ -91,13 +89,15 @@ export default async function HomePage() {
           badge="সুপারফুড"
           badgeEn="SUPERFOODS"
           products={nutsAndDates}
-          viewAllLink="/products?category=nuts-seeds"
+          viewAllLink="/products?category=dates-nuts"
         />
       )}
+
+      {/* Promo Banner / Brand Highlight (Right above Customer Feedback) */}
+      <HomePromoBanner />
 
       {/* Customer Reviews & Social Proof */}
       <HomeReviews reviews={reviews} />
     </div>
   );
 }
-

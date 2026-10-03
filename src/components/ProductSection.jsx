@@ -46,9 +46,9 @@ export default function ProductSection({
         {viewAllLink && (
           <Link
             href={viewAllLink}
-            className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-bold text-brand-800 dark:text-emerald-400 hover:text-emerald-600 dark:hover:text-emerald-300 group transition-colors flex-shrink-0"
+            className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-brand-900 via-emerald-800 to-teal-800 hover:from-brand-800 hover:to-teal-700 text-white rounded-2xl text-xs sm:text-sm font-black shadow-md shadow-brand-950/15 transition-all transform active:scale-95 group flex-shrink-0"
           >
-            <span>{isBangla ? 'সবগুলো দেখুন' : 'View All'}</span>
+            <span>{isBangla ? 'সকল পণ্য পেজে যান (Go to All Products)' : 'Go to All Products Page'}</span>
             <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
           </Link>
         )}

@@ -55,6 +55,26 @@ export const getUsers = async (params = {}) => {
   }
 };
 
+export const createUser = async (data) => {
+  try {
+    const res = await apiClient.post('/users', data);
+    return res.data;
+  } catch (error) {
+    console.error('Create user error:', error);
+    return { success: false, message: error.response?.data?.message || 'Failed to create user in MongoDB' };
+  }
+};
+
+export const deleteUser = async (id) => {
+  try {
+    const res = await apiClient.delete(`/users/${id}`);
+    return res.data;
+  } catch (error) {
+    console.error('Delete user error:', error);
+    return { success: false, message: error.response?.data?.message || 'Failed to delete user' };
+  }
+};
+
 export const updateUserStatus = async (id, status) => {
   try {
     const res = await apiClient.patch(`/users/${id}/status`, { status });
@@ -74,6 +94,38 @@ export const updateUserRole = async (id, role) => {
     const user = mockUsers.find((u) => u.id === Number(id));
     if (user) user.role = role;
     return { success: true, message: `User role updated to ${role}` };
+  }
+};
+
+export const updateUserProfile = async (profileData) => {
+  try {
+    const res = await apiClient.put('/users/profile', profileData);
+    return res.data;
+  } catch (error) {
+    console.error('updateUserProfile error:', error);
+    return { 
+      success: false, 
+      message: error.response?.data?.message || 'Failed to update profile' 
+    };
+  }
+};
+
+// Online / Offline tracking
+export const sendHeartbeat = async (userData) => {
+  try {
+    const res = await apiClient.post('/users/heartbeat', userData);
+    return res.data;
+  } catch (error) {
+    return { success: false };
+  }
+};
+
+export const sendUserOffline = async (userData) => {
+  try {
+    const res = await apiClient.post('/users/offline', userData);
+    return res.data;
+  } catch (error) {
+    return { success: false };
   }
 };
 
@@ -97,6 +149,26 @@ export const updateSellerStatus = async (id, status) => {
     const seller = mockSellers.find((s) => s.id === Number(id));
     if (seller) seller.status = status;
     return { success: true, message: `Seller status updated to ${status}` };
+  }
+};
+
+export const getSellerProfile = async (identifier) => {
+  try {
+    const res = await apiClient.get(`/sellers/profile/${encodeURIComponent(identifier)}`);
+    return res.data;
+  } catch (error) {
+    console.error('getSellerProfile error:', error);
+    return { success: false, message: 'Failed to fetch seller profile' };
+  }
+};
+
+export const updateSellerProfile = async (profileData) => {
+  try {
+    const res = await apiClient.put('/sellers/profile', profileData);
+    return res.data;
+  } catch (error) {
+    console.error('updateSellerProfile error:', error);
+    return { success: false, message: error.response?.data?.message || 'Failed to update seller profile' };
   }
 };
 
@@ -242,14 +314,16 @@ export const getOrders = async (params = {}) => {
   }
 };
 
-export const updateOrderStatus = async (id, status) => {
+export const updateOrderStatus = async (id, statusOrData) => {
   try {
-    const res = await apiClient.patch(`/orders/${id}/status`, { status });
+    const payload = typeof statusOrData === 'string' ? { status: statusOrData } : statusOrData;
+    const res = await apiClient.patch(`/orders/${id}/status`, payload);
     return res.data;
   } catch (error) {
+    console.error('Update order status error:', error);
     const ord = mockOrders.find((o) => o.id === Number(id) || o.orderId === id || o._id === id);
-    if (ord) ord.status = status;
-    return { success: true, message: `Order status updated to ${status}` };
+    if (ord) ord.status = typeof statusOrData === 'string' ? statusOrData : statusOrData.status;
+    return { success: true, message: 'Order status updated' };
   }
 };
 
@@ -400,6 +474,19 @@ export const createSupportTicket = async (ticketData) => {
 };
 
 // 9. Reviews API
+export const checkReviewEligibility = async (productId, params = {}) => {
+  try {
+    const res = await apiClient.get(`/reviews/eligibility/${productId}`, { params });
+    return res.data;
+  } catch (error) {
+    return {
+      success: false,
+      isVerifiedBuyer: false,
+      message: error.response?.data?.message || 'ভেরিফিকেশন চেক করতে সমস্যা হয়েছে'
+    };
+  }
+};
+
 export const getReviews = async (productId = 'all') => {
   try {
     const res = await apiClient.get(`/reviews/${productId}`);
@@ -416,24 +503,24 @@ export const submitReview = async (reviewData) => {
     const res = await apiClient.post('/reviews', reviewData);
     return res.data;
   } catch (error) {
-    const newR = {
-      id: mockReviews.length + 1,
-      ...reviewData,
-      seller_reply: null,
-      created_at: new Date().toISOString(),
+    if (error.response?.data) {
+      return error.response.data;
+    }
+    return {
+      success: false,
+      message: 'শুধুমাত্র পণ্যটি ক্রয় এবং সফল ডেলিভারি (Delivered) সম্পন্নকারী গ্রাহকরাই ভেরিফাইড রিভিউ দিতে পারবেন।'
     };
-    mockReviews.unshift(newR);
-    return { success: true, data: newR, message: 'Review submitted successfully' };
   }
 };
 
-export const replyReview = async (reviewId, replyText) => {
+export const replyReview = async (reviewId, replyData) => {
   try {
-    const res = await apiClient.post(`/reviews/${reviewId}/reply`, { replyText });
+    const payload = typeof replyData === 'string' ? { replyText: replyData } : replyData;
+    const res = await apiClient.post(`/reviews/${reviewId}/reply`, payload);
     return res.data;
   } catch (error) {
     const r = mockReviews.find((rev) => rev.id === Number(reviewId));
-    if (r) r.seller_reply = replyText;
+    if (r) r.seller_reply = typeof replyData === 'string' ? replyData : replyData.replyText;
     return { success: true, message: 'Reply posted' };
   }
 };
@@ -543,16 +630,11 @@ export const registerUser = async (data) => {
     const res = await apiClient.post('/auth/register', data);
     return res.data;
   } catch (error) {
-    const user = {
-      id: mockUsers.length + 1,
-      name: data.name,
-      phone: data.phone,
-      email: data.email || `${data.phone}@user.com`,
-      role: 'customer',
-      avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=200&q=80',
+    console.error('Register API error:', error);
+    return {
+      success: false,
+      message: error.response?.data?.message || (error.message ? `Server error: ${error.message}` : 'রেজিস্ট্রেশন করতে সমস্যা হয়েছে, পুনরায় চেষ্টা করুন।')
     };
-    mockUsers.push(user);
-    return { success: true, token: 'mock-jwt-token-12345', user };
   }
 };
 
@@ -561,21 +643,25 @@ export const loginUser = async (data) => {
     const res = await apiClient.post('/auth/login', data);
     return res.data;
   } catch (error) {
-    if (data.phone === '01700000000' && data.password === 'admin123') {
+    const loginId = (data.identifier || data.email || data.phone || '').trim().toLowerCase();
+    if ((loginId === '01700000000' || loginId === 'admin@ihsan.com' || loginId === 'admin@ghorerbazar.com') && data.password === 'admin123') {
       return {
         success: true,
         token: 'mock-admin-token-7788',
-        user: { id: 1, name: 'Admin Moderator', phone: '01700000000', role: 'admin' },
+        user: { id: 1, name: 'Admin Moderator', email: 'admin@ihsan.com', phone: '01700000000', role: 'admin', avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80' },
       };
     }
-    const found = mockUsers.find((u) => u.phone === data.phone);
+    const found = mockUsers.find((u) => 
+      (u.phone && u.phone === loginId) || 
+      (u.email && u.email.toLowerCase() === loginId)
+    );
     if (found) {
       return { success: true, token: 'mock-user-token-9900', user: found };
     }
     return {
       success: true,
       token: 'mock-user-token-9900',
-      user: { id: 2, name: 'Md. Ariful Islam', phone: data.phone, role: 'customer' },
+      user: { id: 2, name: 'Md. Ariful Islam', email: data.email || `${loginId}@example.com`, phone: data.phone || loginId, role: 'customer', avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=200&q=80' },
     };
   }
 };

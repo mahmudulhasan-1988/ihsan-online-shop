@@ -4,8 +4,9 @@ import React, { Suspense } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { useThemeLanguage } from '@/context/ThemeLanguageContext';
+import { Store, ChevronDown } from 'lucide-react';
 
-function CategoryNavInner({ categories = [] }) {
+function CategoryNavInner({ categories = [], sellers = [], selectedSeller = 'all', onSelectSeller }) {
   const searchParams = useSearchParams();
   const currentCategory = searchParams.get('category') || 'all';
   const { isBangla } = useThemeLanguage();
@@ -27,8 +28,10 @@ function CategoryNavInner({ categories = [] }) {
 
   return (
     <div className="bg-white/95 dark:bg-[#0d1c13]/95 backdrop-blur-md border-b border-[#e7eee8] dark:border-[#1c3927] py-2.5 sm:py-3 shadow-sm sticky top-[62px] sm:top-[74px] z-30 transition-colors duration-300">
-      <div className="max-w-7xl mx-auto px-4">
-        <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none no-scrollbar">
+      <div className="max-w-7xl mx-auto px-4 flex items-center justify-between gap-3">
+        
+        {/* Category Buttons Carousel */}
+        <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none no-scrollbar flex-1 min-w-0">
           {displayCategories.map((cat) => {
             const isActive = currentCategory === cat.slug;
             const catName = isBangla ? cat.name : (cat.nameEn || cat.name);
@@ -48,6 +51,30 @@ function CategoryNavInner({ categories = [] }) {
             );
           })}
         </div>
+
+        {/* 🏪 Seller Dropdown Filter Beside Categories */}
+        {sellers && sellers.length > 0 && onSelectSeller && (
+          <div className="relative flex-shrink-0 pl-2 border-l border-gray-200 dark:border-emerald-900/60">
+            <div className="flex items-center gap-1.5 bg-amber-50 dark:bg-[#14291d] border border-amber-300 dark:border-amber-800/80 rounded-2xl px-3 py-1.5 shadow-sm">
+              <Store className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+              <select
+                value={selectedSeller}
+                onChange={(e) => onSelectSeller(e.target.value)}
+                className="bg-transparent text-xs font-bold text-amber-950 dark:text-amber-200 focus:outline-none cursor-pointer pr-1"
+              >
+                <option value="all">
+                  {isBangla ? 'সকল সেলার (All Sellers)' : 'All Sellers'}
+                </option>
+                {sellers.map((s) => (
+                  <option key={s.id || s.name} value={s.name || s.shop_name}>
+                    🏪 {s.shop_name || s.name} ({s.productCount || 0} টি)
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+        )}
+
       </div>
     </div>
   );
@@ -60,4 +87,3 @@ export default function CategoryNav(props) {
     </Suspense>
   );
 }
-

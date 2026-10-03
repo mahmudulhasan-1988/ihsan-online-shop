@@ -25,14 +25,14 @@ import { placeOrder } from '@/lib/api';
 
 export default function FastOrderModal() {
   const router = useRouter();
-  const { fastOrderData, closeFastOrder, showToast } = useCart();
+  const { fastOrderData, closeFastOrder, showToast, user } = useCart();
   const { isBangla } = useThemeLanguage();
   const { isOpen, product, variant } = fastOrderData;
 
   const [quantity, setQuantity] = useState(1);
   const [selectedVariant, setSelectedVariant] = useState(null);
-  const [customerName, setCustomerName] = useState('');
-  const [customerPhone, setCustomerPhone] = useState('');
+  const [customerName, setCustomerName] = useState(user?.name || '');
+  const [customerPhone, setCustomerPhone] = useState(user?.phone || '');
   const [deliveryAddress, setDeliveryAddress] = useState('');
   const [deliveryZone, setDeliveryZone] = useState('inside_dhaka'); // inside_dhaka or outside_dhaka
   const [paymentMethod, setPaymentMethod] = useState('cod'); // cod or bkash
@@ -44,8 +44,12 @@ export default function FastOrderModal() {
     if (product) {
       setQuantity(1);
       setSelectedVariant(variant || (product.variants && product.variants.length > 0 ? product.variants[0] : null));
+      if (user) {
+        if (!customerName) setCustomerName(user.name || '');
+        if (!customerPhone) setCustomerPhone(user.phone || '');
+      }
     }
-  }, [product, variant]);
+  }, [product, variant, user]);
 
   // Lock background scroll when modal is active
   useEffect(() => {
@@ -71,8 +75,23 @@ export default function FastOrderModal() {
     ? Math.round(((regularPrice - unitPrice) / regularPrice) * 100)
     : product.discountPercentage || 0;
 
+  const stock = product ? (product.stock_quantity !== undefined ? Number(product.stock_quantity) : (product.stock !== undefined ? Number(product.stock) : 50)) : 50;
+
+  const handleIncreaseQty = () => {
+    if (quantity + 1 > stock) {
+      showToast(isBangla ? `দুঃখিত, এই পণ্যের সর্বোচ্চ ${stock} টি স্টক অবশিষ্ট আছে!` : `Sorry, only ${stock} pcs left in stock!`, 'error');
+      return;
+    }
+    setQuantity((q) => q + 1);
+  };
+
   const handleSubmitOrder = async (e) => {
     e.preventDefault();
+
+    if (quantity > stock) {
+      showToast(isBangla ? `দুঃখিত, এই পণ্যের সর্বোচ্চ ${stock} টি স্টক অবশিষ্ট আছে!` : `Sorry, only ${stock} pcs left in stock!`, 'error');
+      return;
+    }
 
     if (!customerName.trim()) {
       showToast(isBangla ? 'দয়া করে আপনার নাম লিখুন' : 'Please enter your name', 'error');
@@ -90,9 +109,14 @@ export default function FastOrderModal() {
     setIsSubmitting(true);
 
     try {
+      const currentUserId = user?.id || user?._id || user?.userId || null;
       const orderPayload = {
+        userId: currentUserId,
+        user_id: currentUserId,
         customerName: customerName.trim(),
         customerPhone: customerPhone.trim(),
+        customerEmail: (user?.email || '').trim().toLowerCase(),
+        customerAvatar: user?.avatar || '',
         deliveryAddress: deliveryAddress.trim(),
         deliveryZone,
         deliveryCharge,
@@ -258,7 +282,7 @@ export default function FastOrderModal() {
                     <span className="px-3 text-xs font-extrabold text-gray-900 dark:text-emerald-100">{quantity}</span>
                     <button
                       type="button"
-                      onClick={() => setQuantity((q) => q + 1)}
+                      onClick={handleIncreaseQty}
                       className="px-3 py-1 text-gray-600 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 font-black text-sm"
                     >
                       +

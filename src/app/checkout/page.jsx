@@ -20,16 +20,23 @@ import { placeOrder } from '@/lib/api';
 
 export default function CheckoutPage() {
   const router = useRouter();
-  const { cart, subtotal, clearCart, updateQuantity, removeFromCart, showToast } = useCart();
+  const { cart, subtotal, clearCart, updateQuantity, removeFromCart, showToast, user } = useCart();
   const { isBangla } = useThemeLanguage();
 
-  const [customerName, setCustomerName] = useState('');
-  const [customerPhone, setCustomerPhone] = useState('');
+  const [customerName, setCustomerName] = useState(user?.name || '');
+  const [customerPhone, setCustomerPhone] = useState(user?.phone || '');
   const [deliveryAddress, setDeliveryAddress] = useState('');
   const [deliveryZone, setDeliveryZone] = useState('inside_dhaka'); // inside_dhaka | outside_dhaka
   const [paymentMethod, setPaymentMethod] = useState('cod');
   const [notes, setNotes] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  React.useEffect(() => {
+    if (user) {
+      if (!customerName) setCustomerName(user.name || '');
+      if (!customerPhone) setCustomerPhone(user.phone || '');
+    }
+  }, [user]);
 
   if (cart.length === 0) {
     return (
@@ -78,9 +85,14 @@ export default function CheckoutPage() {
     setIsSubmitting(true);
 
     try {
+      const currentUserId = user?.id || user?._id || user?.userId || null;
       const orderData = {
+        userId: currentUserId,
+        user_id: currentUserId,
         customerName: customerName.trim(),
         customerPhone: customerPhone.trim(),
+        customerEmail: (user?.email || '').trim().toLowerCase(),
+        customerAvatar: user?.avatar || '',
         deliveryAddress: deliveryAddress.trim(),
         deliveryZone,
         deliveryCharge,
