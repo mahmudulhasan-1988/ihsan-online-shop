@@ -50,7 +50,8 @@ import {
   History,
   Star,
   Send,
-  CheckCircle
+  CheckCircle,
+  ChevronDown
 } from 'lucide-react';
 import { 
   getStats, 
