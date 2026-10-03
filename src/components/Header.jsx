@@ -18,11 +18,19 @@ import {
   Sparkles,
   ShieldCheck,
   Bell,
-  CheckCheck
+  CheckCheck,
+  Trash2
 } from 'lucide-react';
 import { useCart } from '@/context/CartContext';
 import { useThemeLanguage } from '@/context/ThemeLanguageContext';
-import { getProducts, getNotifications, markNotificationAsRead, markAllNotificationsAsRead } from '@/lib/api';
+import {
+  getProducts,
+  getNotifications,
+  markNotificationAsRead,
+  markAllNotificationsAsRead,
+  deleteNotification,
+  clearAllNotifications
+} from '@/lib/api';
 import Image from 'next/image';
 
 export default function Header() {
@@ -51,8 +59,13 @@ export default function Header() {
       const userId = user?.id || user?._id;
       const res = await getNotifications({ role, userId });
       if (res?.success && Array.isArray(res.data)) {
-        setNotifications(res.data);
-        setUnreadNotifCount(res.unreadCount ?? res.data.filter(n => !n.is_read).length);
+        let filtered = res.data;
+        // For Customer or Guest: ONLY show Product and Offer notifications, NEVER show order alerts
+        if (role !== 'admin' && role !== 'seller') {
+          filtered = filtered.filter(n => n.type === 'product' || n.type === 'offer' || n.type === 'announcement' || n.type === 'discount');
+        }
+        setNotifications(filtered);
+        setUnreadNotifCount(filtered.filter(n => !n.is_read).length);
       }
     } catch (e) {
       // silent
@@ -98,7 +111,30 @@ export default function Header() {
       setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
       setUnreadNotifCount(0);
     } catch (e) {
-      // silent
+      setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
+      setUnreadNotifCount(0);
+    }
+  };
+
+  const handleClearAll = async () => {
+    try {
+      await clearAllNotifications({ role: user?.role || 'customer', userId: user?.id || user?._id });
+      setNotifications([]);
+      setUnreadNotifCount(0);
+    } catch (e) {
+      setNotifications([]);
+      setUnreadNotifCount(0);
+    }
+  };
+
+  const handleDeleteSingle = async (e, notifId) => {
+    e.stopPropagation();
+    try {
+      await deleteNotification(notifId);
+      setNotifications(prev => prev.filter(n => n.id !== notifId && n._id !== notifId));
+      setUnreadNotifCount(prev => Math.max(0, prev - 1));
+    } catch (err) {
+      setNotifications(prev => prev.filter(n => n.id !== notifId && n._id !== notifId));
     }
   };
 
@@ -429,7 +465,7 @@ export default function Header() {
                 <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-white dark:bg-[#112419] rounded-3xl shadow-2xl border border-gray-200/80 dark:border-[#244530] overflow-hidden z-50 animate-in fade-in slide-in-from-top-2 duration-200">
                   
                   {/* Header */}
-                  <div className="p-4 bg-gradient-to-r from-brand-950 via-brand-900 to-emerald-950 text-white flex items-center justify-between">
+                  <div className="p-3.5 bg-gradient-to-r from-brand-950 via-brand-900 to-emerald-950 text-white flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <span className="text-lg">🔔</span>
                       <div>
@@ -441,32 +477,49 @@ export default function Header() {
                             ? (isBangla ? 'অ্যাডমিন অর্ডার ও সিস্টেম এলার্ট' : 'Admin Order & System Alerts')
                             : user?.role === 'seller'
                             ? (isBangla ? 'সেলার স্টোর ও অর্ডার নোটিফিকেশন' : 'Seller Store & Order Alerts')
-                            : (isBangla ? 'অফার, ডিসকাউন্ট ও অর্ডার আপডেট' : 'Offers, Discounts & Order Updates')}
+                            : (isBangla ? 'অফার, ডিসকাউন্ট ও নতুন প্রোডাক্ট' : 'Offers, Discounts & New Products')}
                         </p>
                       </div>
                     </div>
 
-                    {unreadNotifCount > 0 && (
-                      <button
-                        onClick={handleMarkAllRead}
-                        className="text-[10px] bg-white/15 hover:bg-white/25 px-2.5 py-1 rounded-xl font-bold transition-colors flex items-center gap-1"
-                      >
-                        <CheckCheck className="w-3 h-3" />
-                        <span>{isBangla ? 'সব পঠিত' : 'Mark all read'}</span>
-                      </button>
+                    {notifications.length > 0 && (
+                      <div className="flex items-center gap-1.5">
+                        {unreadNotifCount > 0 && (
+                          <button
+                            onClick={handleMarkAllRead}
+                            className="text-[10px] bg-white/15 hover:bg-white/25 px-2 py-1 rounded-lg font-bold transition-colors flex items-center gap-1 text-emerald-100 hover:text-white"
+                            title={isBangla ? 'সব পঠিত হিসেবে চিহ্নিত করুন' : 'Mark all as read'}
+                          >
+                            <CheckCheck className="w-3 h-3" />
+                            <span>{isBangla ? 'পঠিত' : 'Read'}</span>
+                          </button>
+                        )}
+                        <button
+                          onClick={handleClearAll}
+                          className="text-[10px] bg-red-500/20 hover:bg-red-500/30 text-red-200 hover:text-white px-2 py-1 rounded-lg font-bold transition-colors flex items-center gap-1 border border-red-500/30"
+                          title={isBangla ? 'সব নোটিফিকেশন মুছে ফেলুন' : 'Clear all notifications'}
+                        >
+                          <Trash2 className="w-3 h-3" />
+                          <span>{isBangla ? 'মুছুন' : 'Clear'}</span>
+                        </button>
+                      </div>
                     )}
                   </div>
 
-                  {/* Notification Items List */}
-                  <div className="max-h-80 overflow-y-auto divide-y divide-gray-100 dark:divide-emerald-950/60 p-1">
+                  {/* Notification Items List - Smooth Mouse Scrollable */}
+                  <div 
+                    tabIndex={0}
+                    className="max-h-[340px] overflow-y-auto overscroll-contain focus:outline-none divide-y divide-gray-100 dark:divide-emerald-950/60 p-1.5 space-y-1"
+                    style={{ scrollbarWidth: 'thin' }}
+                  >
                     {notifications.length === 0 ? (
-                      <div className="py-8 text-center text-gray-400 space-y-2">
-                        <span className="text-3xl">🎉</span>
-                        <p className="text-xs font-bold text-gray-600 dark:text-emerald-200">
-                          {isBangla ? 'কোনো নতুন নোটিফিকেশন নেই' : 'No new notifications'}
+                      <div className="py-10 text-center text-gray-400 space-y-2">
+                        <span className="text-3xl block animate-pulse">🎉</span>
+                        <p className="text-xs font-bold text-gray-700 dark:text-emerald-200">
+                          {isBangla ? 'কোনো নোটিফিকেশন নেই' : 'No notifications'}
                         </p>
                         <p className="text-[10px] text-gray-400">
-                          {isBangla ? 'নতুন অর্ডার বা অফার আসলে এখানে দেখতে পাবেন।' : 'New orders or offers will appear here.'}
+                          {isBangla ? 'নতুন নোটিফিকেশন আসলে এখানে দেখতে পাবেন।' : 'New notifications will appear here.'}
                         </p>
                       </div>
                     ) : (
@@ -478,19 +531,19 @@ export default function Header() {
                           <div
                             key={n.id || n._id}
                             onClick={() => handleMarkRead(n.id || n._id, targetLink)}
-                            className={`p-3 rounded-2xl cursor-pointer transition-all flex items-start gap-3 hover:bg-emerald-50/80 dark:hover:bg-emerald-950/40 ${
-                              !n.is_read ? 'bg-amber-50/50 dark:bg-black/30' : ''
+                            className={`group relative p-2.5 rounded-2xl cursor-pointer transition-all flex items-start gap-2.5 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 border border-transparent hover:border-emerald-200/50 dark:hover:border-emerald-800/40 ${
+                              !n.is_read ? 'bg-amber-50/70 dark:bg-emerald-950/30 font-medium' : 'bg-transparent'
                             }`}
                           >
                             {/* Icon */}
-                            <div className={`w-9 h-9 rounded-xl flex items-center justify-center text-base flex-shrink-0 shadow-sm ${
-                              isOrder ? 'bg-amber-100 dark:bg-amber-950 text-amber-600' : 'bg-emerald-100 dark:bg-emerald-950 text-emerald-600'
+                            <div className={`w-8 h-8 rounded-xl flex items-center justify-center text-sm flex-shrink-0 shadow-sm ${
+                              isOrder ? 'bg-amber-100 dark:bg-amber-950/80 text-amber-600' : 'bg-emerald-100 dark:bg-emerald-950/80 text-emerald-600'
                             }`}>
                               {isOrder ? '📦' : '🎁'}
                             </div>
 
                             {/* Content */}
-                            <div className="flex-1 min-w-0">
+                            <div className="flex-1 min-w-0 pr-4">
                               <div className="flex items-center justify-between gap-1">
                                 <h5 className="text-xs font-bold text-gray-900 dark:text-emerald-100 truncate">
                                   {isBangla ? n.title : (n.title_en || n.title)}
@@ -502,15 +555,24 @@ export default function Header() {
                               <p className="text-[11px] text-gray-600 dark:text-gray-300 line-clamp-2 mt-0.5 leading-snug">
                                 {isBangla ? n.message : (n.message_en || n.message)}
                               </p>
-                              <div className="flex items-center justify-between mt-1.5 text-[10px] text-gray-400">
+                              <div className="flex items-center justify-between mt-1 text-[10px] text-gray-400">
                                 <span>
                                   {n.created_at ? new Date(n.created_at).toLocaleTimeString(isBangla ? 'bn-BD' : 'en-US', { hour: '2-digit', minute: '2-digit' }) : 'সবেমাত্র'}
                                 </span>
                                 <span className="font-bold text-brand-900 dark:text-emerald-400 hover:underline">
-                                  {isBangla ? 'বিস্তারিত দেখুন →' : 'View Details →'}
+                                  {isBangla ? 'দেখুন →' : 'View →'}
                                 </span>
                               </div>
                             </div>
+
+                            {/* Delete single notification button */}
+                            <button
+                              onClick={(e) => handleDeleteSingle(e, n.id || n._id)}
+                              className="opacity-0 group-hover:opacity-100 p-1 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/50 transition-opacity absolute right-2 top-2"
+                              title={isBangla ? 'মুছে ফেলুন' : 'Delete'}
+                            >
+                              <X className="w-3.5 h-3.5" />
+                            </button>
                           </div>
                         );
                       })
@@ -553,7 +615,7 @@ export default function Header() {
             {/* Cart Drawer Trigger Button */}
             <button
               onClick={openCartDrawer}
-              className="flex items-center gap-2.5 bg-gradient-to-r from-brand-800 to-emerald-900 dark:from-emerald-700 dark:to-teal-800 hover:from-brand-900 hover:to-emerald-950 text-white px-3.5 sm:px-4 py-2 sm:py-2.5 rounded-2xl shadow-md hover:shadow-lg transition-all transform active:scale-95 border border-emerald-600/30"
+              className="flex items-center gap-2 bg-gradient-to-r from-brand-800 to-emerald-900 dark:from-emerald-700 dark:to-teal-800 hover:from-brand-900 hover:to-emerald-950 text-white px-3 sm:px-3.5 py-2 sm:py-2.5 rounded-2xl shadow-md hover:shadow-lg transition-all transform active:scale-95 border border-emerald-600/30"
               aria-label="Open Cart"
             >
               <div className="relative">
@@ -564,12 +626,8 @@ export default function Header() {
                   </span>
                 )}
               </div>
-              <div className="hidden md:flex flex-col text-left leading-tight">
-                <span className="text-[10px] text-emerald-200">{t('cart')}</span>
-                <span className="text-xs font-extrabold">৳ {subtotal}</span>
-              </div>
+              <span className="text-xs font-extrabold tracking-tight">৳ {subtotal}</span>
             </button>
-
           </div>
         </div>
 

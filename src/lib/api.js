@@ -420,6 +420,24 @@ export const markAllNotificationsAsRead = async (filter = {}) => {
   }
 };
 
+export const deleteNotification = async (id) => {
+  try {
+    const res = await apiClient.delete(`/notifications/${id}`);
+    return res.data;
+  } catch (error) {
+    return { success: false };
+  }
+};
+
+export const clearAllNotifications = async (filter = {}) => {
+  try {
+    const res = await apiClient.delete('/notifications/clear-all', { data: filter });
+    return res.data;
+  } catch (error) {
+    return { success: false };
+  }
+};
+
 export const getSupportTickets = async (params = {}) => {
   try {
     const res = await apiClient.get('/support-tickets', { params });

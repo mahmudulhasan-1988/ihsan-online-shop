@@ -192,8 +192,8 @@ export default function AdminDashboardPage() {
   });
   const [isUploadingUserImg, setIsUploadingUserImg] = useState(false);
 
-  const loadAllData = async () => {
-    setLoading(true);
+  const loadAllData = async (showLoading = false) => {
+    if (showLoading) setLoading(true);
     try {
       const [
         statsRes,
@@ -249,28 +249,17 @@ export default function AdminDashboardPage() {
     } catch (err) {
       console.error('Error loading admin data', err);
     } finally {
-      setLoading(false);
+      if (showLoading) setLoading(false);
     }
   };
 
   useEffect(() => {
-    loadAllData();
+    loadAllData(true); // First load with initial loader
 
-    // Auto Data Refresh every 10 seconds for real-time live sync (Orders, Users, Sellers)
-    const interval = setInterval(async () => {
-      try {
-        const [ordersRes, usersRes, sellersRes] = await Promise.all([
-          getOrders(),
-          getUsers(),
-          getSellers()
-        ]);
-        if (ordersRes?.data) setOrdersList(ordersRes.data);
-        if (usersRes?.data) setUsersList(usersRes.data);
-        if (sellersRes?.data) setSellersList(sellersRes.data);
-      } catch (e) {
-        // silent
-      }
-    }, 10000);
+    // Silent background auto-sync every 8 seconds without page flicker or loading spinner
+    const interval = setInterval(() => {
+      loadAllData(false);
+    }, 8000);
 
     return () => clearInterval(interval);
   }, []);
@@ -2181,23 +2170,54 @@ export default function AdminDashboardPage() {
                                 )}
                               </td>
 
-                              {/* 4. Ordered Items Preview with Seller / Shop Name */}
+                              {/* 4. Ordered Items Preview with Dynamic Seller / Shop Name */}
                               <td className="p-3.5">
-                                <div className="space-y-1.5 max-w-[220px]">
-                                  {order.items?.map((it, idx) => (
-                                    <div key={idx} className="text-[11px] p-1.5 rounded-xl bg-gray-50 dark:bg-black/30 border border-gray-100 dark:border-emerald-950/60 space-y-0.5">
-                                      <div className="flex items-center justify-between gap-1.5 text-gray-800 dark:text-emerald-200">
-                                        <span className="font-bold truncate">• {it.name || it.name_bn}</span>
-                                        <span className="font-black text-brand-900 dark:text-white shrink-0 px-1 py-0.2 bg-emerald-100 dark:bg-emerald-900/40 rounded text-[10px]">×{it.quantity}</span>
+                                <div className="space-y-1.5 max-w-[230px]">
+                                  {order.items?.map((it, idx) => {
+                                    const matchedProd = productsList.find(p => 
+                                      (p.id && (p.id === it.productId || p.id === it.id || p.id === it._id)) ||
+                                      (p._id && (p._id === it.productId || p._id === it.id || p._id === it._id)) ||
+                                      (p.name && (p.name === it.name || p.name_bn === it.name))
+                                    );
+
+                                    const sId = it.seller_id || it.sellerId || matchedProd?.seller_id || matchedProd?.sellerId;
+                                    const matchedSeller = sellersList.find(s => 
+                                      (s.id && String(s.id) === String(sId)) || 
+                                      (s._id && String(s._id) === String(sId)) ||
+                                      (s.email && s.email === (it.seller_email || matchedProd?.seller_email))
+                                    );
+
+                                    const sellerDisplayName = 
+                                      it.seller_name || 
+                                      it.seller_name_bn || 
+                                      it.shop_name || 
+                                      it.shop_name_bn || 
+                                      matchedProd?.seller_name_bn || 
+                                      matchedProd?.seller_name || 
+                                      matchedProd?.shop_name || 
+                                      matchedSeller?.shop_name || 
+                                      matchedSeller?.seller_name || 
+                                      (matchedProd?.category?.includes('Tech') || matchedProd?.categorySlug?.includes('accessories') ? 'Tech Accessories Hub' :
+                                       matchedProd?.category?.includes('Fashion') || matchedProd?.categorySlug === 'fashion' ? 'Sadia Organic Fashion' :
+                                       matchedProd?.category?.includes('Cake') || matchedProd?.categorySlug === 'bakery-cake' ? 'Dhaka Bakery & Cake' :
+                                       matchedProd?.categorySlug === 'ghee' ? 'Sirajganj Pure Dairy' :
+                                       'সুন্দরবন পিউর ফার্মস');
+
+                                    return (
+                                      <div key={idx} className="text-[11px] p-1.5 rounded-xl bg-gray-50 dark:bg-black/30 border border-gray-100 dark:border-emerald-950/60 space-y-0.5">
+                                        <div className="flex items-center justify-between gap-1.5 text-gray-800 dark:text-emerald-200">
+                                          <span className="font-bold truncate">• {it.name || it.name_bn}</span>
+                                          <span className="font-black text-brand-900 dark:text-white shrink-0 px-1 py-0.2 bg-emerald-100 dark:bg-emerald-900/40 rounded text-[10px]">×{it.quantity}</span>
+                                        </div>
+                                        <div className="flex items-center justify-between text-[10px] text-gray-400 gap-1">
+                                          <span>{it.weight || it.unit || 'Std'}</span>
+                                          <span className="text-amber-800 dark:text-amber-400 font-bold truncate">
+                                            🏪 {sellerDisplayName}
+                                          </span>
+                                        </div>
                                       </div>
-                                      <div className="flex items-center justify-between text-[10px] text-gray-400 gap-1">
-                                        <span>{it.weight || it.unit || 'Std'}</span>
-                                        <span className="text-amber-800 dark:text-amber-400 font-bold truncate">
-                                          🏪 {it.seller_name || it.seller_name_bn || it.shop_name || it.shop_name_bn || 'সুন্দরবন ন্যাচারাল'}
-                                        </span>
-                                      </div>
-                                    </div>
-                                  ))}
+                                    );
+                                  })}
                                 </div>
                               </td>
 
