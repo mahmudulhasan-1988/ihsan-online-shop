@@ -342,6 +342,26 @@ export default function Header() {
               )}
             </div>
 
+            {/* Cart Drawer Trigger Button */}
+            <button
+              onClick={openCartDrawer}
+              className="flex items-center gap-2.5 bg-gradient-to-r from-brand-800 to-emerald-900 dark:from-emerald-700 dark:to-teal-800 hover:from-brand-900 hover:to-emerald-950 text-white px-3.5 sm:px-4 py-2 sm:py-2.5 rounded-2xl shadow-md hover:shadow-lg transition-all transform active:scale-95 border border-emerald-600/30"
+              aria-label="Open Cart"
+            >
+              <div className="relative">
+                <ShoppingBag className="w-5 h-5" />
+                {totalItems > 0 && (
+                  <span className="absolute -top-2 -right-2 bg-secondary text-brand-950 text-[10px] font-black w-4 h-4 rounded-full flex items-center justify-center shadow">
+                    {totalItems}
+                  </span>
+                )}
+              </div>
+              <div className="hidden md:flex flex-col text-left leading-tight">
+                <span className="text-[10px] text-emerald-200">{t('cart')}</span>
+                <span className="text-xs font-extrabold">৳ {subtotal}</span>
+              </div>
+            </button>
+
           </div>
         </div>
 
