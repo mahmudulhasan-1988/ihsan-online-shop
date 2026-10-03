@@ -16,11 +16,13 @@ import {
   Moon,
   Globe,
   Sparkles,
-  ShieldCheck
+  ShieldCheck,
+  Bell,
+  CheckCheck
 } from 'lucide-react';
 import { useCart } from '@/context/CartContext';
 import { useThemeLanguage } from '@/context/ThemeLanguageContext';
-import { getProducts } from '@/lib/api';
+import { getProducts, getNotifications, markNotificationAsRead, markAllNotificationsAsRead } from '@/lib/api';
 import Image from 'next/image';
 
 export default function Header() {
@@ -35,6 +37,70 @@ export default function Header() {
   const [showSearchDropdown, setShowSearchDropdown] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const searchRef = useRef(null);
+
+  // 🔔 Notifications State
+  const [notifications, setNotifications] = useState([]);
+  const [unreadNotifCount, setUnreadNotifCount] = useState(0);
+  const [isNotifOpen, setIsNotifOpen] = useState(false);
+  const notifRef = useRef(null);
+
+  // Load and Auto-refresh Notifications
+  const loadNotifications = async () => {
+    try {
+      const role = user?.role || 'customer';
+      const userId = user?.id || user?._id;
+      const res = await getNotifications({ role, userId });
+      if (res?.success && Array.isArray(res.data)) {
+        setNotifications(res.data);
+        setUnreadNotifCount(res.unreadCount ?? res.data.filter(n => !n.is_read).length);
+      }
+    } catch (e) {
+      // silent
+    }
+  };
+
+  useEffect(() => {
+    loadNotifications();
+    const notifInterval = setInterval(() => {
+      loadNotifications();
+    }, 12000);
+    return () => clearInterval(notifInterval);
+  }, [user]);
+
+  // Click outside to close notification menu
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (notifRef.current && !notifRef.current.contains(event.target)) {
+        setIsNotifOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const handleMarkRead = async (notifId, link) => {
+    try {
+      await markNotificationAsRead(notifId);
+      setNotifications(prev => prev.map(n => (n.id === notifId || n._id === notifId) ? { ...n, is_read: true } : n));
+      setUnreadNotifCount(prev => Math.max(0, prev - 1));
+      if (link) {
+        setIsNotifOpen(false);
+        router.push(link);
+      }
+    } catch (e) {
+      // silent
+    }
+  };
+
+  const handleMarkAllRead = async () => {
+    try {
+      await markAllNotificationsAsRead({ role: user?.role || 'customer', userId: user?.id || user?._id });
+      setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
+      setUnreadNotifCount(0);
+    } catch (e) {
+      // silent
+    }
+  };
 
   // Live search debounce
   useEffect(() => {
@@ -339,6 +405,148 @@ export default function Header() {
                   <User className="w-5 h-5 text-brand-800 dark:text-emerald-400" />
                   <span className="hidden sm:inline">{isBangla ? 'লগইন / রেজিস্টার' : 'Login / Register'}</span>
                 </Link>
+              )}
+            </div>
+
+            {/* 🔔 Role-Aware Interactive Notification Bell */}
+            <div className="relative" ref={notifRef}>
+              <button
+                onClick={() => setIsNotifOpen(!isNotifOpen)}
+                className="relative p-2.5 sm:p-2.5 rounded-2xl bg-gray-50 dark:bg-[#14291d] text-gray-700 dark:text-emerald-300 border border-gray-200 dark:border-[#254933] hover:bg-emerald-50 dark:hover:bg-[#1a3827] transition-all transform active:scale-95 shadow-sm"
+                title={isBangla ? 'নোটিফিকেশন' : 'Notifications'}
+                aria-label="Notifications"
+              >
+                <Bell className={`w-5 h-5 ${unreadNotifCount > 0 ? 'text-amber-500 animate-bounce' : 'text-gray-600 dark:text-emerald-300'}`} />
+                {unreadNotifCount > 0 && (
+                  <span className="absolute -top-1.5 -right-1.5 bg-red-600 text-white text-[10px] font-black w-5 h-5 rounded-full flex items-center justify-center shadow-md animate-pulse">
+                    {unreadNotifCount > 9 ? '9+' : unreadNotifCount}
+                  </span>
+                )}
+              </button>
+
+              {/* Notification Popover Dropdown */}
+              {isNotifOpen && (
+                <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-white dark:bg-[#112419] rounded-3xl shadow-2xl border border-gray-200/80 dark:border-[#244530] overflow-hidden z-50 animate-in fade-in slide-in-from-top-2 duration-200">
+                  
+                  {/* Header */}
+                  <div className="p-4 bg-gradient-to-r from-brand-950 via-brand-900 to-emerald-950 text-white flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="text-lg">🔔</span>
+                      <div>
+                        <h4 className="font-black text-xs sm:text-sm">
+                          {isBangla ? 'নোটিফিকেশন সেন্টার' : 'Notification Center'}
+                        </h4>
+                        <p className="text-[10px] text-emerald-200/80">
+                          {user?.role === 'admin' 
+                            ? (isBangla ? 'অ্যাডমিন অর্ডার ও সিস্টেম এলার্ট' : 'Admin Order & System Alerts')
+                            : user?.role === 'seller'
+                            ? (isBangla ? 'সেলার স্টোর ও অর্ডার নোটিফিকেশন' : 'Seller Store & Order Alerts')
+                            : (isBangla ? 'অফার, ডিসকাউন্ট ও অর্ডার আপডেট' : 'Offers, Discounts & Order Updates')}
+                        </p>
+                      </div>
+                    </div>
+
+                    {unreadNotifCount > 0 && (
+                      <button
+                        onClick={handleMarkAllRead}
+                        className="text-[10px] bg-white/15 hover:bg-white/25 px-2.5 py-1 rounded-xl font-bold transition-colors flex items-center gap-1"
+                      >
+                        <CheckCheck className="w-3 h-3" />
+                        <span>{isBangla ? 'সব পঠিত' : 'Mark all read'}</span>
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Notification Items List */}
+                  <div className="max-h-80 overflow-y-auto divide-y divide-gray-100 dark:divide-emerald-950/60 p-1">
+                    {notifications.length === 0 ? (
+                      <div className="py-8 text-center text-gray-400 space-y-2">
+                        <span className="text-3xl">🎉</span>
+                        <p className="text-xs font-bold text-gray-600 dark:text-emerald-200">
+                          {isBangla ? 'কোনো নতুন নোটিফিকেশন নেই' : 'No new notifications'}
+                        </p>
+                        <p className="text-[10px] text-gray-400">
+                          {isBangla ? 'নতুন অর্ডার বা অফার আসলে এখানে দেখতে পাবেন।' : 'New orders or offers will appear here.'}
+                        </p>
+                      </div>
+                    ) : (
+                      notifications.map((n) => {
+                        const isOrder = n.type === 'order';
+                        const targetLink = n.link || (user?.role === 'admin' ? '/admin' : user?.role === 'seller' ? '/seller' : (n.order_id ? '/track-order' : '/products'));
+
+                        return (
+                          <div
+                            key={n.id || n._id}
+                            onClick={() => handleMarkRead(n.id || n._id, targetLink)}
+                            className={`p-3 rounded-2xl cursor-pointer transition-all flex items-start gap-3 hover:bg-emerald-50/80 dark:hover:bg-emerald-950/40 ${
+                              !n.is_read ? 'bg-amber-50/50 dark:bg-black/30' : ''
+                            }`}
+                          >
+                            {/* Icon */}
+                            <div className={`w-9 h-9 rounded-xl flex items-center justify-center text-base flex-shrink-0 shadow-sm ${
+                              isOrder ? 'bg-amber-100 dark:bg-amber-950 text-amber-600' : 'bg-emerald-100 dark:bg-emerald-950 text-emerald-600'
+                            }`}>
+                              {isOrder ? '📦' : '🎁'}
+                            </div>
+
+                            {/* Content */}
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center justify-between gap-1">
+                                <h5 className="text-xs font-bold text-gray-900 dark:text-emerald-100 truncate">
+                                  {isBangla ? n.title : (n.title_en || n.title)}
+                                </h5>
+                                {!n.is_read && (
+                                  <span className="w-2 h-2 rounded-full bg-amber-500 flex-shrink-0 animate-ping" />
+                                )}
+                              </div>
+                              <p className="text-[11px] text-gray-600 dark:text-gray-300 line-clamp-2 mt-0.5 leading-snug">
+                                {isBangla ? n.message : (n.message_en || n.message)}
+                              </p>
+                              <div className="flex items-center justify-between mt-1.5 text-[10px] text-gray-400">
+                                <span>
+                                  {n.created_at ? new Date(n.created_at).toLocaleTimeString(isBangla ? 'bn-BD' : 'en-US', { hour: '2-digit', minute: '2-digit' }) : 'সবেমাত্র'}
+                                </span>
+                                <span className="font-bold text-brand-900 dark:text-emerald-400 hover:underline">
+                                  {isBangla ? 'বিস্তারিত দেখুন →' : 'View Details →'}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+
+                  {/* Footer */}
+                  <div className="p-2.5 bg-gray-50 dark:bg-black/40 border-t border-gray-100 dark:border-emerald-950 text-center">
+                    {user?.role === 'admin' ? (
+                      <Link
+                        href="/admin"
+                        onClick={() => setIsNotifOpen(false)}
+                        className="text-xs font-bold text-brand-900 dark:text-emerald-400 hover:underline"
+                      >
+                        🛠️ {isBangla ? 'অ্যাডমিন অর্ডার ম্যানেজমেন্টে যান' : 'Go to Admin Orders'}
+                      </Link>
+                    ) : user?.role === 'seller' ? (
+                      <Link
+                        href="/seller"
+                        onClick={() => setIsNotifOpen(false)}
+                        className="text-xs font-bold text-amber-700 dark:text-amber-400 hover:underline"
+                      >
+                        🏪 {isBangla ? 'সেলার সেন্টারে যান' : 'Go to Seller Center'}
+                      </Link>
+                    ) : (
+                      <Link
+                        href="/products"
+                        onClick={() => setIsNotifOpen(false)}
+                        className="text-xs font-bold text-emerald-800 dark:text-emerald-400 hover:underline"
+                      >
+                        🛍️ {isBangla ? 'সকল স্পেশাল অফার ও পণ্য দেখুন' : 'Explore All Special Offers'}
+                      </Link>
+                    )}
+                  </div>
+
+                </div>
               )}
             </div>
 

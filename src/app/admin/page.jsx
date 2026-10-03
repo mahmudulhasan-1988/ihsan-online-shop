@@ -255,17 +255,21 @@ export default function AdminDashboardPage() {
   useEffect(() => {
     loadAllData();
 
-    // Auto-refresh users online status every 15 seconds
+    // Auto Data Refresh every 10 seconds for real-time live sync (Orders, Users, Sellers)
     const interval = setInterval(async () => {
       try {
-        const usersRes = await getUsers();
-        if (usersRes?.data) {
-          setUsersList(usersRes.data);
-        }
+        const [ordersRes, usersRes, sellersRes] = await Promise.all([
+          getOrders(),
+          getUsers(),
+          getSellers()
+        ]);
+        if (ordersRes?.data) setOrdersList(ordersRes.data);
+        if (usersRes?.data) setUsersList(usersRes.data);
+        if (sellersRes?.data) setSellersList(sellersRes.data);
       } catch (e) {
         // silent
       }
-    }, 15000);
+    }, 10000);
 
     return () => clearInterval(interval);
   }, []);
@@ -2017,49 +2021,72 @@ export default function AdminDashboardPage() {
               )}
 
               {/* Search & Filter Toolbar */}
+              {/* Search & Filter Toolbar with Status Dropdown */}
               <div className="bg-white dark:bg-[#112318] p-5 rounded-3xl border border-gray-200 dark:border-[#1d3b28] shadow-sm space-y-4">
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                  
-                  {/* Status Filter Sub-Tabs */}
-                  <div className="flex flex-wrap gap-1.5 sm:gap-2">
-                    {[
-                      { id: 'all', label: isBangla ? 'সকল অর্ডার' : 'All', count: ordersList.length },
-                      { id: 'Pending', label: isBangla ? '🟡 অপেক্ষমাণ' : 'Pending', count: ordersList.filter(o => o.status === 'Pending').length },
-                      { id: 'Confirmed', label: isBangla ? '🔵 কনফার্মড' : 'Confirmed', count: ordersList.filter(o => o.status === 'Confirmed').length },
-                      { id: 'Packed', label: isBangla ? '📦 প্যাকড' : 'Packed', count: ordersList.filter(o => o.status === 'Packed' || o.status === 'Processing').length },
-                      { id: 'Shipped', label: isBangla ? '🚚 শিপড' : 'Shipped', count: ordersList.filter(o => o.status === 'Shipped').length },
-                      { id: 'Delivered', label: isBangla ? '✅ ডেলিভারড' : 'Delivered', count: ordersList.filter(o => o.status === 'Delivered').length },
-                      { id: 'Cancelled', label: isBangla ? '❌ বাতিল' : 'Cancelled', count: ordersList.filter(o => o.status === 'Cancelled').length },
-                    ].map((tab) => (
-                      <button
-                        key={tab.id}
-                        onClick={() => setActiveSubTab(tab.id)}
-                        className={`px-3 py-1.5 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 ${
-                          activeSubTab === tab.id
-                            ? 'bg-brand-900 text-white shadow-md dark:bg-emerald-600'
-                            : 'bg-gray-100 dark:bg-black/30 text-gray-700 dark:text-emerald-300 hover:bg-gray-200 dark:hover:bg-emerald-950/60'
-                        }`}
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+                  <div className="flex flex-col sm:flex-row items-center gap-3 flex-1 w-full">
+                    {/* Search Input */}
+                    <div className="relative flex-1 w-full">
+                      <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
+                      <input
+                        type="text"
+                        placeholder={isBangla ? 'অর্ডার আইডি, গ্রাহকের নাম বা ফোন দিয়ে খুঁজুন...' : 'Search by Order ID, name or phone...'}
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="w-full pl-9 pr-4 py-2.5 bg-gray-50 dark:bg-black/40 border border-gray-200 dark:border-emerald-900 rounded-2xl text-xs font-semibold focus:outline-none focus:border-brand-900"
+                      />
+                      {searchQuery && (
+                        <button onClick={() => setSearchQuery('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Status Filter Dropdown next to Search */}
+                    <div className="relative w-full sm:w-64 flex-shrink-0">
+                      <div className="absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none text-sm">
+                        📊
+                      </div>
+                      <select
+                        value={activeSubTab}
+                        onChange={(e) => setActiveSubTab(e.target.value)}
+                        className="w-full pl-10 pr-9 py-2.5 bg-gray-50 dark:bg-black/40 border border-gray-200 dark:border-emerald-900 rounded-2xl text-xs font-bold text-gray-800 dark:text-emerald-100 focus:outline-none focus:border-brand-900 appearance-none cursor-pointer hover:border-brand-700 shadow-sm"
                       >
-                        <span>{tab.label}</span>
-                        <span className="text-[10px] px-1.5 py-0.2 bg-black/15 dark:bg-white/15 rounded-full font-black">
-                          {tab.count}
-                        </span>
-                      </button>
-                    ))}
+                        <option value="all" className="bg-white dark:bg-[#112318] text-gray-900 dark:text-emerald-100 font-bold">
+                          🛒 {isBangla ? 'সকল অর্ডার (All Orders)' : 'All Orders'} ({ordersList.length})
+                        </option>
+                        <option value="Pending" className="bg-white dark:bg-[#112318] text-amber-700 dark:text-amber-300 font-bold">
+                          🟡 {isBangla ? 'অপেক্ষমাণ (Pending)' : 'Pending'} ({ordersList.filter(o => o.status === 'Pending').length})
+                        </option>
+                        <option value="Confirmed" className="bg-white dark:bg-[#112318] text-blue-700 dark:text-blue-300 font-bold">
+                          🔵 {isBangla ? 'কনফার্মড (Confirmed)' : 'Confirmed'} ({ordersList.filter(o => o.status === 'Confirmed').length})
+                        </option>
+                        <option value="Packed" className="bg-white dark:bg-[#112318] text-purple-700 dark:text-purple-300 font-bold">
+                          📦 {isBangla ? 'প্যাকড / প্রসেসিং (Packed)' : 'Packed / Processing'} ({ordersList.filter(o => o.status === 'Packed' || o.status === 'Processing').length})
+                        </option>
+                        <option value="Shipped" className="bg-white dark:bg-[#112318] text-indigo-700 dark:text-indigo-300 font-bold">
+                          🚚 {isBangla ? 'শিপড / ট্রানজিট (Shipped)' : 'Shipped'} ({ordersList.filter(o => o.status === 'Shipped').length})
+                        </option>
+                        <option value="Delivered" className="bg-white dark:bg-[#112318] text-emerald-700 dark:text-emerald-300 font-bold">
+                          ✅ {isBangla ? 'ডেলিভারড (Delivered)' : 'Delivered'} ({ordersList.filter(o => o.status === 'Delivered').length})
+                        </option>
+                        <option value="Cancelled" className="bg-white dark:bg-[#112318] text-red-700 dark:text-red-300 font-bold">
+                          ❌ {isBangla ? 'বাতিলকৃত (Cancelled)' : 'Cancelled'} ({ordersList.filter(o => o.status === 'Cancelled').length})
+                        </option>
+                      </select>
+                      <div className="absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400">
+                        <ChevronDown className="w-4 h-4" />
+                      </div>
+                    </div>
                   </div>
 
-                  {/* Search Input */}
-                  <div className="relative w-full md:w-72">
-                    <Search className="w-4 h-4 absolute left-3.5 top-3 text-gray-400" />
-                    <input
-                      type="text"
-                      placeholder={isBangla ? 'অর্ডার আইডি, নাম বা ফোন দিয়ে খুঁজুন...' : 'Search by ID, name or phone...'}
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      className="w-full pl-9 pr-4 py-2 bg-gray-50 dark:bg-black/40 border border-gray-200 dark:border-emerald-900 rounded-2xl text-xs font-semibold focus:outline-none focus:border-brand-900"
-                    />
+                  {/* Auto-Refresh Live Sync Indicator */}
+                  <div className="flex items-center gap-2 self-start md:self-auto flex-shrink-0 bg-emerald-50 dark:bg-emerald-950/40 px-3.5 py-2 rounded-2xl border border-emerald-200 dark:border-emerald-900/60">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
+                    <span className="text-xs font-bold text-emerald-800 dark:text-emerald-300">
+                      {isBangla ? 'অটো লাইভ সিঙ্ক 🟢' : 'Auto Live Sync 🟢'}
+                    </span>
                   </div>
-
                 </div>
 
                 {/* Orders List Table */}
@@ -2070,7 +2097,7 @@ export default function AdminDashboardPage() {
                         <th className="p-3.5">Order ID & Date</th>
                         <th className="p-3.5">Customer Details</th>
                         <th className="p-3.5">Delivery Address</th>
-                        <th className="p-3.5">Items & Quantity</th>
+                        <th className="p-3.5">Items & Seller</th>
                         <th className="p-3.5">Payment</th>
                         <th className="p-3.5 text-center">Lifecycle Status & Quick Action</th>
                         <th className="p-3.5 text-right">Actions</th>
@@ -2153,13 +2180,21 @@ export default function AdminDashboardPage() {
                                 )}
                               </td>
 
-                              {/* 4. Ordered Items Preview */}
+                              {/* 4. Ordered Items Preview with Seller / Shop Name */}
                               <td className="p-3.5">
-                                <div className="space-y-1 max-w-[190px]">
+                                <div className="space-y-1.5 max-w-[220px]">
                                   {order.items?.map((it, idx) => (
-                                    <div key={idx} className="text-[11px] text-gray-700 dark:text-emerald-300 flex items-center justify-between gap-2">
-                                      <span className="truncate">• {it.name} ({it.weight || 'Std'})</span>
-                                      <span className="font-bold text-gray-900 dark:text-white shrink-0">×{it.quantity}</span>
+                                    <div key={idx} className="text-[11px] p-1.5 rounded-xl bg-gray-50 dark:bg-black/30 border border-gray-100 dark:border-emerald-950/60 space-y-0.5">
+                                      <div className="flex items-center justify-between gap-1.5 text-gray-800 dark:text-emerald-200">
+                                        <span className="font-bold truncate">• {it.name || it.name_bn}</span>
+                                        <span className="font-black text-brand-900 dark:text-white shrink-0 px-1 py-0.2 bg-emerald-100 dark:bg-emerald-900/40 rounded text-[10px]">×{it.quantity}</span>
+                                      </div>
+                                      <div className="flex items-center justify-between text-[10px] text-gray-400 gap-1">
+                                        <span>{it.weight || it.unit || 'Std'}</span>
+                                        <span className="text-amber-800 dark:text-amber-400 font-bold truncate">
+                                          🏪 {it.seller_name || it.seller_name_bn || it.shop_name || it.shop_name_bn || 'সুন্দরবন ন্যাচারাল'}
+                                        </span>
+                                      </div>
                                     </div>
                                   ))}
                                 </div>

@@ -249,6 +249,13 @@ export default function SellerDashboardPage() {
   useEffect(() => {
     if (user && (user.role === 'seller' || user.role === 'admin')) {
       loadSellerData();
+
+      // Auto Data Refresh every 10 seconds for seller orders & stock live sync
+      const interval = setInterval(() => {
+        loadSellerData();
+      }, 10000);
+
+      return () => clearInterval(interval);
     }
   }, [user]);
 

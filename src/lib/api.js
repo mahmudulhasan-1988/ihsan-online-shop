@@ -382,12 +382,41 @@ export const getBanners = async () => {
 // ==========================================
 // 8. Notifications & Support Tickets API
 // ==========================================
-export const getNotifications = async (userId = null) => {
+export const getNotifications = async (params = {}) => {
   try {
-    const res = await apiClient.get('/notifications', { params: { userId } });
+    const queryParams = typeof params === 'object' ? params : { userId: params };
+    const res = await apiClient.get('/notifications', { params: queryParams });
     return res.data;
   } catch (error) {
-    return { success: false, data: [] };
+    console.error('getNotifications error:', error.message);
+    return { success: false, data: [], unreadCount: 0 };
+  }
+};
+
+export const createNotification = async (notificationData) => {
+  try {
+    const res = await apiClient.post('/notifications', notificationData);
+    return res.data;
+  } catch (error) {
+    return { success: false, message: error.response?.data?.message || 'Failed to create notification' };
+  }
+};
+
+export const markNotificationAsRead = async (id) => {
+  try {
+    const res = await apiClient.patch(`/notifications/${id}/read`);
+    return res.data;
+  } catch (error) {
+    return { success: false };
+  }
+};
+
+export const markAllNotificationsAsRead = async (filter = {}) => {
+  try {
+    const res = await apiClient.patch('/notifications/read-all', filter);
+    return res.data;
+  } catch (error) {
+    return { success: false };
   }
 };
 
