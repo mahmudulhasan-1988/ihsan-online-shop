@@ -1,34 +1,31 @@
 import axios from 'axios';
-import {
-  mockUsers,
-  mockSellers,
-  mockCategories,
-  mockBrands,
-  mockProducts,
-  mockOrders,
-  mockAddresses,
-  mockPayments,
-  mockSellerWithdrawals,
-  mockReviews,
-  mockCoupons,
-  mockBanners,
-  mockNotifications,
-  mockSupportTickets,
-  mockSiteSettings,
-} from './mockData';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+// Determine Base API URL dynamically (prioritizes env, then live Vercel backend in production, else localhost)
+const getBaseUrl = () => {
+  if (process.env.NEXT_PUBLIC_API_URL) {
+    return process.env.NEXT_PUBLIC_API_URL;
+  }
+  if (typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+    return 'https://ihsan-online-shop-server.vercel.app/api';
+  }
+  return 'http://localhost:5000/api';
+};
+
+const API_BASE_URL = getBaseUrl();
 
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
   headers: {
     'Content-Type': 'application/json',
   },
-  timeout: 8000,
+  timeout: 15000,
 });
 
-// Attach JWT token if available in localStorage
+// Dynamically update baseURL if needed on runtime
 apiClient.interceptors.request.use((config) => {
+  if (!config.baseURL || config.baseURL.includes('localhost') && typeof window !== 'undefined' && window.location.hostname !== 'localhost') {
+    config.baseURL = getBaseUrl();
+  }
   if (typeof window !== 'undefined') {
     const token = localStorage.getItem('gb_token');
     if (token) {
@@ -38,20 +35,16 @@ apiClient.interceptors.request.use((config) => {
   return config;
 });
 
-// 1. Users API
+// ==========================================
+// 1. Users API (MongoDB Connected)
+// ==========================================
 export const getUsers = async (params = {}) => {
   try {
     const res = await apiClient.get('/users', { params });
     return res.data;
   } catch (error) {
-    let filtered = [...mockUsers];
-    if (params.role) filtered = filtered.filter((u) => u.role === params.role);
-    if (params.status) filtered = filtered.filter((u) => u.status === params.status);
-    if (params.search) {
-      const q = params.search.toLowerCase();
-      filtered = filtered.filter((u) => u.name.toLowerCase().includes(q) || u.phone.includes(q) || u.email.toLowerCase().includes(q));
-    }
-    return { success: true, data: filtered, total: filtered.length };
+    console.error('getUsers error:', error.message);
+    return { success: false, data: [], total: 0, message: error.response?.data?.message || 'Failed to fetch users from server' };
   }
 };
 
@@ -80,9 +73,8 @@ export const updateUserStatus = async (id, status) => {
     const res = await apiClient.patch(`/users/${id}/status`, { status });
     return res.data;
   } catch (error) {
-    const user = mockUsers.find((u) => u.id === Number(id));
-    if (user) user.status = status;
-    return { success: true, message: `User status updated to ${status}` };
+    console.error('updateUserStatus error:', error);
+    return { success: false, message: error.response?.data?.message || 'Failed to update user status' };
   }
 };
 
@@ -91,9 +83,8 @@ export const updateUserRole = async (id, role) => {
     const res = await apiClient.patch(`/users/${id}/role`, { role });
     return res.data;
   } catch (error) {
-    const user = mockUsers.find((u) => u.id === Number(id));
-    if (user) user.role = role;
-    return { success: true, message: `User role updated to ${role}` };
+    console.error('updateUserRole error:', error);
+    return { success: false, message: error.response?.data?.message || 'Failed to update user role' };
   }
 };
 
@@ -129,15 +120,16 @@ export const sendUserOffline = async (userData) => {
   }
 };
 
-// 2. Sellers API
+// ==========================================
+// 2. Sellers API (MongoDB Connected)
+// ==========================================
 export const getSellers = async (params = {}) => {
   try {
     const res = await apiClient.get('/sellers', { params });
     return res.data;
   } catch (error) {
-    let filtered = [...mockSellers];
-    if (params.status) filtered = filtered.filter((s) => s.status === params.status);
-    return { success: true, data: filtered, total: filtered.length };
+    console.error('getSellers error:', error.message);
+    return { success: false, data: [], total: 0, message: error.response?.data?.message || 'Failed to fetch sellers' };
   }
 };
 
@@ -146,9 +138,8 @@ export const updateSellerStatus = async (id, status) => {
     const res = await apiClient.patch(`/sellers/${id}/status`, { status });
     return res.data;
   } catch (error) {
-    const seller = mockSellers.find((s) => s.id === Number(id));
-    if (seller) seller.status = status;
-    return { success: true, message: `Seller status updated to ${status}` };
+    console.error('updateSellerStatus error:', error);
+    return { success: false, message: error.response?.data?.message || 'Failed to update seller status' };
   }
 };
 
@@ -158,7 +149,7 @@ export const getSellerProfile = async (identifier) => {
     return res.data;
   } catch (error) {
     console.error('getSellerProfile error:', error);
-    return { success: false, message: 'Failed to fetch seller profile' };
+    return { success: false, message: error.response?.data?.message || 'Failed to fetch seller profile' };
   }
 };
 
@@ -177,30 +168,21 @@ export const updateSellerCommission = async (id, commission_rate) => {
     const res = await apiClient.patch(`/sellers/${id}/commission`, { commission_rate });
     return res.data;
   } catch (error) {
-    const seller = mockSellers.find((s) => s.id === Number(id));
-    if (seller) seller.commission_rate = Number(commission_rate);
-    return { success: true, message: 'Commission updated' };
+    console.error('updateSellerCommission error:', error);
+    return { success: false, message: error.response?.data?.message || 'Failed to update commission' };
   }
 };
 
-// 3. Products API
+// ==========================================
+// 3. Products API (MongoDB Connected)
+// ==========================================
 export const getProducts = async (params = {}) => {
   try {
     const res = await apiClient.get('/products', { params });
     return res.data;
   } catch (error) {
-    let filtered = [...mockProducts];
-    if (params.category && params.category !== 'all') {
-      filtered = filtered.filter((p) => p.category_id === Number(params.category) || p.slug.includes(params.category));
-    }
-    if (params.search) {
-      const q = params.search.toLowerCase();
-      filtered = filtered.filter((p) => p.name.toLowerCase().includes(q) || (p.name_en && p.name_en.toLowerCase().includes(q)));
-    }
-    if (params.status) {
-      filtered = filtered.filter((p) => p.status === params.status);
-    }
-    return { success: true, data: filtered, total: filtered.length };
+    console.error('getProducts error:', error.message);
+    return { success: false, data: [], total: 0, message: error.response?.data?.message || 'Failed to fetch products from MongoDB' };
   }
 };
 
@@ -209,8 +191,8 @@ export const getProductById = async (id) => {
     const res = await apiClient.get(`/products/${id}`);
     return res.data;
   } catch (error) {
-    const prod = mockProducts.find((p) => p.id === Number(id) || p.slug === id || p._id === id);
-    return { success: !!prod, data: prod || mockProducts[0] };
+    console.error('getProductById error:', error.message);
+    return { success: false, data: null, message: error.response?.data?.message || 'Product not found in MongoDB' };
   }
 };
 
@@ -219,16 +201,8 @@ export const createProduct = async (productData) => {
     const res = await apiClient.post('/products', productData);
     return res.data;
   } catch (error) {
-    const newP = {
-      id: mockProducts.length + 1,
-      ...productData,
-      rating: 5.0,
-      ratingCount: 1,
-      status: 'approved',
-      created_at: new Date().toISOString(),
-    };
-    mockProducts.unshift(newP);
-    return { success: true, data: newP, message: 'Product created successfully' };
+    console.error('createProduct error:', error);
+    return { success: false, message: error.response?.data?.message || 'Failed to save product in MongoDB' };
   }
 };
 
@@ -237,11 +211,8 @@ export const updateProduct = async (id, updateData) => {
     const res = await apiClient.put(`/products/${id}`, updateData);
     return res.data;
   } catch (error) {
-    const idx = mockProducts.findIndex((p) => p.id === Number(id));
-    if (idx !== -1) {
-      mockProducts[idx] = { ...mockProducts[idx], ...updateData };
-    }
-    return { success: true, message: 'Product updated successfully' };
+    console.error('updateProduct error:', error);
+    return { success: false, message: error.response?.data?.message || 'Failed to update product in MongoDB' };
   }
 };
 
@@ -250,19 +221,21 @@ export const deleteProduct = async (id) => {
     const res = await apiClient.delete(`/products/${id}`);
     return res.data;
   } catch (error) {
-    const idx = mockProducts.findIndex((p) => p.id === Number(id));
-    if (idx !== -1) mockProducts.splice(idx, 1);
-    return { success: true, message: 'Product deleted' };
+    console.error('deleteProduct error:', error);
+    return { success: false, message: error.response?.data?.message || 'Failed to delete product from MongoDB' };
   }
 };
 
-// 4. Categories & Brands API
+// ==========================================
+// 4. Categories & Brands API (MongoDB Connected)
+// ==========================================
 export const getCategories = async () => {
   try {
     const res = await apiClient.get('/categories');
     return res.data;
   } catch (error) {
-    return { success: true, data: mockCategories };
+    console.error('getCategories error:', error.message);
+    return { success: false, data: [] };
   }
 };
 
@@ -271,26 +244,21 @@ export const getBrands = async () => {
     const res = await apiClient.get('/brands');
     return res.data;
   } catch (error) {
-    return { success: true, data: mockBrands };
+    console.error('getBrands error:', error.message);
+    return { success: false, data: [] };
   }
 };
 
-// 5. Orders API
+// ==========================================
+// 5. Orders API (MongoDB Connected)
+// ==========================================
 export const placeOrder = async (orderData) => {
   try {
     const res = await apiClient.post('/orders', orderData);
     return res.data;
   } catch (error) {
-    const orderId = `GB-ORD-${Math.floor(1000 + Math.random() * 9000)}`;
-    const newOrder = {
-      id: mockOrders.length + 1,
-      orderId,
-      ...orderData,
-      status: 'Pending',
-      createdAt: new Date().toISOString(),
-    };
-    mockOrders.unshift(newOrder);
-    return { success: true, orderId, data: newOrder, message: 'Order placed successfully' };
+    console.error('placeOrder error:', error);
+    return { success: false, message: error.response?.data?.message || 'অর্ডার প্লেস করতে সমস্যা হয়েছে, পুনরায় চেষ্টা করুন।' };
   }
 };
 
@@ -299,18 +267,8 @@ export const getOrders = async (params = {}) => {
     const res = await apiClient.get('/orders', { params });
     return res.data;
   } catch (error) {
-    let filtered = [...mockOrders];
-    if (params.status && params.status !== 'all') {
-      filtered = filtered.filter((o) => o.status.toLowerCase() === params.status.toLowerCase());
-    }
-    if (params.search) {
-      const q = params.search.toLowerCase();
-      filtered = filtered.filter((o) => o.orderId.toLowerCase().includes(q) || o.customerName.toLowerCase().includes(q) || o.customerPhone.includes(q));
-    }
-    if (params.userId) {
-      filtered = filtered.filter((o) => o.user_id === Number(params.userId));
-    }
-    return { success: true, data: filtered, total: filtered.length };
+    console.error('getOrders error:', error.message);
+    return { success: false, data: [], total: 0, message: error.response?.data?.message || 'Failed to fetch orders' };
   }
 };
 
@@ -321,9 +279,7 @@ export const updateOrderStatus = async (id, statusOrData) => {
     return res.data;
   } catch (error) {
     console.error('Update order status error:', error);
-    const ord = mockOrders.find((o) => o.id === Number(id) || o.orderId === id || o._id === id);
-    if (ord) ord.status = typeof statusOrData === 'string' ? statusOrData : statusOrData.status;
-    return { success: true, message: 'Order status updated' };
+    return { success: false, message: error.response?.data?.message || 'Failed to update order status in MongoDB' };
   }
 };
 
@@ -332,11 +288,8 @@ export const deleteOrder = async (id) => {
     const res = await apiClient.delete(`/orders/${id}`);
     return res.data;
   } catch (error) {
-    const idx = mockOrders.findIndex((o) => o.id === Number(id) || o.orderId === id || o._id === id);
-    if (idx !== -1) {
-      mockOrders.splice(idx, 1);
-    }
-    return { success: true, message: 'Order deleted successfully' };
+    console.error('deleteOrder error:', error);
+    return { success: false, message: error.response?.data?.message || 'Failed to delete order from MongoDB' };
   }
 };
 
@@ -345,21 +298,21 @@ export const trackOrder = async (identifier) => {
     const res = await apiClient.get(`/orders/track/${encodeURIComponent(identifier)}`);
     return res.data;
   } catch (error) {
-    const ord = mockOrders.find((o) => o.orderId.toLowerCase() === identifier.trim().toLowerCase() || o.customerPhone.includes(identifier.trim()));
-    if (ord) {
-      return { success: true, data: ord };
-    }
-    return { success: false, message: 'অর্ডার খুঁজে পাওয়া যায়নি' };
+    console.error('trackOrder error:', error.message);
+    return { success: false, message: error.response?.data?.message || 'অর্ডার খুঁজে পাওয়া যায়নি' };
   }
 };
 
-// 6. Payments & Withdrawals
+// ==========================================
+// 6. Payments & Withdrawals (MongoDB Connected)
+// ==========================================
 export const getPayments = async () => {
   try {
     const res = await apiClient.get('/payments');
     return res.data;
   } catch (error) {
-    return { success: true, data: mockPayments };
+    console.error('getPayments error:', error.message);
+    return { success: false, data: [] };
   }
 };
 
@@ -368,21 +321,18 @@ export const getSellerWithdrawals = async () => {
     const res = await apiClient.get('/withdrawals');
     return res.data;
   } catch (error) {
-    return { success: true, data: mockSellerWithdrawals };
+    console.error('getSellerWithdrawals error:', error.message);
+    return { success: false, data: [] };
   }
 };
 
 export const updateWithdrawalStatus = async (id, status) => {
   try {
-    const res = await apiClient.patch(`/withdrawals/${id}`, { status });
+    const res = await apiClient.put(`/withdrawals/${id}`, { status });
     return res.data;
   } catch (error) {
-    const item = mockSellerWithdrawals.find((w) => w.id === Number(id));
-    if (item) {
-      item.status = status;
-      if (status === 'approved') item.processed_at = new Date().toISOString();
-    }
-    return { success: true, message: `Withdrawal request ${status}` };
+    console.error('updateWithdrawalStatus error:', error);
+    return { success: false, message: error.response?.data?.message || 'Failed to update withdrawal status' };
   }
 };
 
@@ -391,25 +341,21 @@ export const requestSellerWithdrawal = async (withdrawData) => {
     const res = await apiClient.post('/withdrawals', withdrawData);
     return res.data;
   } catch (error) {
-    const newW = {
-      id: mockSellerWithdrawals.length + 1,
-      ...withdrawData,
-      status: 'pending',
-      requested_at: new Date().toISOString(),
-      processed_at: null,
-    };
-    mockSellerWithdrawals.unshift(newW);
-    return { success: true, data: newW, message: 'Withdrawal requested successfully' };
+    console.error('requestSellerWithdrawal error:', error);
+    return { success: false, message: error.response?.data?.message || 'Failed to submit withdrawal request' };
   }
 };
 
-// 7. Coupons & Banners API
+// ==========================================
+// 7. Coupons & Banners API (MongoDB Connected)
+// ==========================================
 export const getCoupons = async () => {
   try {
     const res = await apiClient.get('/coupons');
     return res.data;
   } catch (error) {
-    return { success: true, data: mockCoupons };
+    console.error('getCoupons error:', error.message);
+    return { success: false, data: [] };
   }
 };
 
@@ -418,9 +364,8 @@ export const createCoupon = async (couponData) => {
     const res = await apiClient.post('/coupons', couponData);
     return res.data;
   } catch (error) {
-    const newC = { id: mockCoupons.length + 1, ...couponData, usage_count: 0 };
-    mockCoupons.unshift(newC);
-    return { success: true, data: newC, message: 'Coupon created' };
+    console.error('createCoupon error:', error);
+    return { success: false, message: error.response?.data?.message || 'Failed to create coupon' };
   }
 };
 
@@ -429,19 +374,20 @@ export const getBanners = async () => {
     const res = await apiClient.get('/banners');
     return res.data;
   } catch (error) {
-    return { success: true, data: mockBanners };
+    console.error('getBanners error:', error.message);
+    return { success: false, data: [] };
   }
 };
 
+// ==========================================
 // 8. Notifications & Support Tickets API
+// ==========================================
 export const getNotifications = async (userId = null) => {
   try {
     const res = await apiClient.get('/notifications', { params: { userId } });
     return res.data;
   } catch (error) {
-    let filtered = [...mockNotifications];
-    if (userId) filtered = filtered.filter((n) => n.user_id === Number(userId) || n.user_id === null);
-    return { success: true, data: filtered };
+    return { success: false, data: [] };
   }
 };
 
@@ -450,10 +396,7 @@ export const getSupportTickets = async (params = {}) => {
     const res = await apiClient.get('/support-tickets', { params });
     return res.data;
   } catch (error) {
-    let filtered = [...mockSupportTickets];
-    if (params.userRole) filtered = filtered.filter((t) => t.user_role === params.userRole);
-    if (params.status) filtered = filtered.filter((t) => t.status === params.status);
-    return { success: true, data: filtered };
+    return { success: false, data: [] };
   }
 };
 
@@ -462,18 +405,13 @@ export const createSupportTicket = async (ticketData) => {
     const res = await apiClient.post('/support-tickets', ticketData);
     return res.data;
   } catch (error) {
-    const newT = {
-      id: mockSupportTickets.length + 1,
-      ...ticketData,
-      status: 'open',
-      created_at: new Date().toISOString(),
-    };
-    mockSupportTickets.unshift(newT);
-    return { success: true, data: newT, message: 'Ticket submitted successfully' };
+    return { success: false, message: error.response?.data?.message || 'Failed to submit ticket' };
   }
 };
 
-// 9. Reviews API
+// ==========================================
+// 9. Reviews API (MongoDB Connected)
+// ==========================================
 export const checkReviewEligibility = async (productId, params = {}) => {
   try {
     const res = await apiClient.get(`/reviews/eligibility/${productId}`, { params });
@@ -492,9 +430,8 @@ export const getReviews = async (productId = 'all') => {
     const res = await apiClient.get(`/reviews/${productId}`);
     return res.data;
   } catch (error) {
-    let filtered = [...mockReviews];
-    if (productId !== 'all') filtered = filtered.filter((r) => r.product_id === Number(productId));
-    return { success: true, data: filtered };
+    console.error('getReviews error:', error.message);
+    return { success: false, data: [] };
   }
 };
 
@@ -503,12 +440,9 @@ export const submitReview = async (reviewData) => {
     const res = await apiClient.post('/reviews', reviewData);
     return res.data;
   } catch (error) {
-    if (error.response?.data) {
-      return error.response.data;
-    }
     return {
       success: false,
-      message: 'শুধুমাত্র পণ্যটি ক্রয় এবং সফল ডেলিভারি (Delivered) সম্পন্নকারী গ্রাহকরাই ভেরিফাইড রিভিউ দিতে পারবেন।'
+      message: error.response?.data?.message || 'শুধুমাত্র পণ্যটি ক্রয় এবং সফল ডেলিভারি (Delivered) সম্পন্নকারী গ্রাহকরাই ভেরিফাইড রিভিউ দিতে পারবেন।'
     };
   }
 };
@@ -519,20 +453,19 @@ export const replyReview = async (reviewId, replyData) => {
     const res = await apiClient.post(`/reviews/${reviewId}/reply`, payload);
     return res.data;
   } catch (error) {
-    const r = mockReviews.find((rev) => rev.id === Number(reviewId));
-    if (r) r.seller_reply = typeof replyData === 'string' ? replyData : replyData.replyText;
-    return { success: true, message: 'Reply posted' };
+    return { success: false, message: error.response?.data?.message || 'Failed to post reply' };
   }
 };
 
-// 10. Addresses API
-export const getAddresses = async (userId = 2) => {
+// ==========================================
+// 10. Addresses API (MongoDB Connected)
+// ==========================================
+export const getAddresses = async (userId) => {
   try {
     const res = await apiClient.get(`/users/${userId}/addresses`);
     return res.data;
   } catch (error) {
-    const filtered = mockAddresses.filter((a) => a.user_id === Number(userId));
-    return { success: true, data: filtered };
+    return { success: false, data: [] };
   }
 };
 
@@ -541,19 +474,19 @@ export const saveAddress = async (addressData) => {
     const res = await apiClient.post('/addresses', addressData);
     return res.data;
   } catch (error) {
-    const newAddr = { id: mockAddresses.length + 1, ...addressData };
-    mockAddresses.push(newAddr);
-    return { success: true, data: newAddr, message: 'Address saved' };
+    return { success: false, message: 'Failed to save address' };
   }
 };
 
-// 11. Site Settings & Stats API
+// ==========================================
+// 11. Site Settings & Stats API (MongoDB Connected)
+// ==========================================
 export const getSiteSettings = async () => {
   try {
     const res = await apiClient.get('/settings');
     return res.data;
   } catch (error) {
-    return { success: true, data: mockSiteSettings };
+    return { success: false, data: {} };
   }
 };
 
@@ -562,12 +495,13 @@ export const updateSiteSettings = async (settingsData) => {
     const res = await apiClient.put('/settings', settingsData);
     return res.data;
   } catch (error) {
-    Object.assign(mockSiteSettings, settingsData);
-    return { success: true, message: 'Settings saved' };
+    return { success: false, message: 'Settings could not be saved' };
   }
 };
 
-// 12. Popup Notice API
+// ==========================================
+// 12. Popup Notice API (MongoDB Connected)
+// ==========================================
 export const getPopupMessage = async () => {
   try {
     const res = await apiClient.get('/popup');
@@ -608,23 +542,24 @@ export const getStats = async () => {
     const res = await apiClient.get('/stats');
     return res.data;
   } catch (error) {
-    const totalRev = mockOrders.reduce((sum, o) => sum + (o.totalAmount || 0), 0);
     return {
-      success: true,
+      success: false,
       data: {
-        totalRevenue: totalRev,
-        totalOrders: mockOrders.length,
-        pendingOrders: mockOrders.filter((o) => o.status === 'Pending').length,
-        deliveredOrders: mockOrders.filter((o) => o.status === 'Delivered').length,
-        totalProducts: mockProducts.length,
-        totalUsers: mockUsers.length,
-        totalSellers: mockSellers.length,
+        totalRevenue: 0,
+        totalOrders: 0,
+        pendingOrders: 0,
+        deliveredOrders: 0,
+        totalProducts: 0,
+        totalUsers: 0,
+        totalSellers: 0,
       },
     };
   }
 };
 
-// Auth API
+// ==========================================
+// 13. Auth API (MongoDB Connected)
+// ==========================================
 export const registerUser = async (data) => {
   try {
     const res = await apiClient.post('/auth/register', data);
@@ -633,7 +568,7 @@ export const registerUser = async (data) => {
     console.error('Register API error:', error);
     return {
       success: false,
-      message: error.response?.data?.message || (error.message ? `Server error: ${error.message}` : 'রেজিস্ট্রেশন করতে সমস্যা হয়েছে, পুনরায় চেষ্টা করুন।')
+      message: error.response?.data?.message || 'রেজিস্ট্রেশন করতে সমস্যা হয়েছে, পুনরায় চেষ্টা করুন।'
     };
   }
 };
@@ -643,28 +578,12 @@ export const loginUser = async (data) => {
     const res = await apiClient.post('/auth/login', data);
     return res.data;
   } catch (error) {
-    const loginId = (data.identifier || data.email || data.phone || '').trim().toLowerCase();
-    if ((loginId === '01700000000' || loginId === 'admin@ihsan.com' || loginId === 'admin@ghorerbazar.com') && data.password === 'admin123') {
-      return {
-        success: true,
-        token: 'mock-admin-token-7788',
-        user: { id: 1, name: 'Admin Moderator', email: 'admin@ihsan.com', phone: '01700000000', role: 'admin', avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80' },
-      };
-    }
-    const found = mockUsers.find((u) => 
-      (u.phone && u.phone === loginId) || 
-      (u.email && u.email.toLowerCase() === loginId)
-    );
-    if (found) {
-      return { success: true, token: 'mock-user-token-9900', user: found };
-    }
+    console.error('Login API error:', error);
     return {
-      success: true,
-      token: 'mock-user-token-9900',
-      user: { id: 2, name: 'Md. Ariful Islam', email: data.email || `${loginId}@example.com`, phone: data.phone || loginId, role: 'customer', avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=200&q=80' },
+      success: false,
+      message: error.response?.data?.message || 'ভুল ফোন/ইমেইল অথবা পাসওয়ার্ড দেওয়া হয়েছে।'
     };
   }
 };
 
 export default apiClient;
-
