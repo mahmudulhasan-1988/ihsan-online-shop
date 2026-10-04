@@ -462,7 +462,7 @@ export default function Header() {
 
               {/* Notification Popover Dropdown */}
               {isNotifOpen && (
-                <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-white dark:bg-[#112419] rounded-3xl shadow-2xl border border-gray-200/80 dark:border-[#244530] overflow-hidden z-50 animate-in fade-in slide-in-from-top-2 duration-200">
+                <div className="absolute right-0 sm:right-0 mt-2 w-[calc(100vw-32px)] sm:w-96 max-w-sm sm:max-w-md bg-white dark:bg-[#112419] rounded-3xl shadow-2xl border border-gray-200/80 dark:border-[#244530] overflow-hidden z-50 animate-in fade-in slide-in-from-top-2 duration-200">
                   
                   {/* Header */}
                   <div className="p-3.5 bg-gradient-to-r from-brand-950 via-brand-900 to-emerald-950 text-white flex items-center justify-between">
@@ -486,7 +486,12 @@ export default function Header() {
                       <div className="flex items-center gap-1.5">
                         {unreadNotifCount > 0 && (
                           <button
-                            onClick={handleMarkAllRead}
+                            type="button"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              handleMarkAllRead();
+                            }}
                             className="text-[10px] bg-white/15 hover:bg-white/25 px-2 py-1 rounded-lg font-bold transition-colors flex items-center gap-1 text-emerald-100 hover:text-white"
                             title={isBangla ? 'সব পঠিত হিসেবে চিহ্নিত করুন' : 'Mark all as read'}
                           >
@@ -495,7 +500,12 @@ export default function Header() {
                           </button>
                         )}
                         <button
-                          onClick={handleClearAll}
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            handleClearAll();
+                          }}
                           className="text-[10px] bg-red-500/20 hover:bg-red-500/30 text-red-200 hover:text-white px-2 py-1 rounded-lg font-bold transition-colors flex items-center gap-1 border border-red-500/30"
                           title={isBangla ? 'সব নোটিফিকেশন মুছে ফেলুন' : 'Clear all notifications'}
                         >
@@ -509,8 +519,13 @@ export default function Header() {
                   {/* Notification Items List - Smooth Mouse Scrollable */}
                   <div 
                     tabIndex={0}
-                    className="max-h-[340px] overflow-y-auto overscroll-contain focus:outline-none divide-y divide-gray-100 dark:divide-emerald-950/60 p-1.5 space-y-1"
-                    style={{ scrollbarWidth: 'thin' }}
+                    onWheel={(e) => e.stopPropagation()}
+                    className="max-h-[350px] overflow-y-auto overscroll-contain focus:outline-none divide-y divide-gray-100 dark:divide-emerald-950/60 p-1.5 space-y-1 select-text scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-emerald-800"
+                    style={{
+                      maxHeight: '350px',
+                      overflowY: 'auto',
+                      WebkitOverflowScrolling: 'touch'
+                    }}
                   >
                     {notifications.length === 0 ? (
                       <div className="py-10 text-center text-gray-400 space-y-2">
@@ -567,6 +582,7 @@ export default function Header() {
 
                             {/* Delete single notification button */}
                             <button
+                              type="button"
                               onClick={(e) => handleDeleteSingle(e, n.id || n._id)}
                               className="opacity-0 group-hover:opacity-100 p-1 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/50 transition-opacity absolute right-2 top-2"
                               title={isBangla ? 'মুছে ফেলুন' : 'Delete'}
@@ -612,22 +628,6 @@ export default function Header() {
               )}
             </div>
 
-            {/* Cart Drawer Trigger Button */}
-            <button
-              onClick={openCartDrawer}
-              className="flex items-center gap-2 bg-gradient-to-r from-brand-800 to-emerald-900 dark:from-emerald-700 dark:to-teal-800 hover:from-brand-900 hover:to-emerald-950 text-white px-3 sm:px-3.5 py-2 sm:py-2.5 rounded-2xl shadow-md hover:shadow-lg transition-all transform active:scale-95 border border-emerald-600/30"
-              aria-label="Open Cart"
-            >
-              <div className="relative">
-                <ShoppingBag className="w-5 h-5" />
-                {totalItems > 0 && (
-                  <span className="absolute -top-2 -right-2 bg-secondary text-brand-950 text-[10px] font-black w-4 h-4 rounded-full flex items-center justify-center shadow">
-                    {totalItems}
-                  </span>
-                )}
-              </div>
-              <span className="text-xs font-extrabold tracking-tight">৳ {subtotal}</span>
-            </button>
           </div>
         </div>
 
