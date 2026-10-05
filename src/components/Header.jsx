@@ -57,7 +57,19 @@ export default function Header() {
     try {
       const role = user?.role || 'customer';
       const userId = user?.id || user?._id;
-      const res = await getNotifications({ role, userId });
+      const sellerId = user?.sellerId || user?.seller_id || user?.id || user?._id;
+      const sellerEmail = user?.email;
+      const sellerPhone = user?.phone;
+      const sellerStore = user?.shop_name || user?.shopName || user?.storeName || user?.name;
+
+      const res = await getNotifications({
+        role,
+        userId,
+        sellerId,
+        sellerEmail,
+        sellerPhone,
+        sellerStore
+      });
       if (res?.success && Array.isArray(res.data)) {
         let filtered = res.data;
         // For Customer or Guest: ONLY show Product and Offer notifications, NEVER show order alerts
@@ -107,9 +119,12 @@ export default function Header() {
 
   const handleMarkAllRead = async () => {
     try {
-      await markAllNotificationsAsRead({ role: user?.role || 'customer', userId: user?.id || user?._id });
+      const role = user?.role || 'customer';
+      const userId = user?.id || user?._id;
+      const sellerId = user?.sellerId || user?.seller_id || user?.id || user?._id;
       setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
       setUnreadNotifCount(0);
+      await markAllNotificationsAsRead({ role, userId, sellerId });
     } catch (e) {
       setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
       setUnreadNotifCount(0);
@@ -118,9 +133,12 @@ export default function Header() {
 
   const handleClearAll = async () => {
     try {
-      await clearAllNotifications({ role: user?.role || 'customer', userId: user?.id || user?._id });
+      const role = user?.role || 'customer';
+      const userId = user?.id || user?._id;
+      const sellerId = user?.sellerId || user?.seller_id || user?.id || user?._id;
       setNotifications([]);
       setUnreadNotifCount(0);
+      await clearAllNotifications({ role, userId, sellerId });
     } catch (e) {
       setNotifications([]);
       setUnreadNotifCount(0);
