@@ -89,7 +89,8 @@ import {
   replyReview, 
   updateSiteSettings,
   getPopupMessage,
-  updatePopupMessage
+  updatePopupMessage,
+  updateUserProfile
 } from '@/lib/api';
 import { uploadToImgBB } from '@/lib/imgbb';
 import { useCart } from '@/context/CartContext';
@@ -106,6 +107,30 @@ export default function AdminDashboardPage() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [loading, setLoading] = useState(true);
   const [revealedPasswords, setRevealedPasswords] = useState({});
+
+  // Admin Profile Edit State
+  const [adminProfile, setAdminProfile] = useState({
+    name: user?.name || '',
+    email: user?.email || '',
+    phone: user?.phone || '',
+    avatar: user?.avatar || '',
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: '',
+  });
+  const [isSavingAdminProfile, setIsSavingAdminProfile] = useState(false);
+
+  useEffect(() => {
+    if (user) {
+      setAdminProfile(prev => ({
+        ...prev,
+        name: user.name || '',
+        email: user.email || '',
+        phone: user.phone || '',
+        avatar: user.avatar || '',
+      }));
+    }
+  }, [user]);
 
   // Data States
   const [stats, setStats] = useState(null);
@@ -261,10 +286,10 @@ export default function AdminDashboardPage() {
   useEffect(() => {
     loadAllData(true); // First load with initial loader
 
-    // Silent background auto-sync every 8 seconds without page flicker or loading spinner
+    // Silent background auto-sync every 45 seconds without page flicker or buffering
     const interval = setInterval(() => {
       loadAllData(false);
-    }, 8000);
+    }, 45000);
 
     return () => clearInterval(interval);
   }, []);
@@ -561,10 +586,56 @@ export default function AdminDashboardPage() {
     loadAllData();
   };
 
+  const handleSaveAdminProfile = async (e) => {
+    e.preventDefault();
+    if (!adminProfile.name || !adminProfile.name.trim()) {
+      showToast(isBangla ? 'দয়া করে নাম লিখুন' : 'Please provide name', 'error');
+      return;
+    }
+    if (adminProfile.newPassword && adminProfile.newPassword !== adminProfile.confirmPassword) {
+      showToast(isBangla ? 'নতুন পাসওয়ার্ড দুটি মিলছে না' : 'New passwords do not match', 'error');
+      return;
+    }
+
+    setIsSavingAdminProfile(true);
+    try {
+      const currentUserId = user?.id || user?._id || user?.userId;
+      const res = await updateUserProfile({
+        userId: currentUserId,
+        id: currentUserId,
+        name: adminProfile.name.trim(),
+        phone: adminProfile.phone ? adminProfile.phone.trim() : '',
+        email: adminProfile.email ? adminProfile.email.trim() : '',
+        avatar: adminProfile.avatar || '',
+        currentPassword: adminProfile.currentPassword || '',
+        newPassword: adminProfile.newPassword || '',
+      });
+
+      if (res?.success !== false) {
+        showToast(isBangla ? '🎉 এডমিন প্রোফাইল সফলভাবে আপডেট হয়েছে!' : 'Admin profile updated successfully!');
+        if (typeof window !== 'undefined' && res.user) {
+          localStorage.setItem('gb_user', JSON.stringify(res.user));
+        }
+        setAdminProfile((prev) => ({ ...prev, currentPassword: '', newPassword: '', confirmPassword: '' }));
+      } else {
+        showToast(res?.message || (isBangla ? 'প্রোফাইল আপডেট করতে সমস্যা হয়েছে' : 'Failed to update profile'), 'error');
+      }
+    } catch (err) {
+      console.error('Admin profile update error:', err);
+      showToast(isBangla ? 'সার্ভার ত্রুটি ঘটেছে' : 'Server error occurred', 'error');
+    } finally {
+      setIsSavingAdminProfile(false);
+    }
+  };
+
   const handleSaveSettings = async (e) => {
     e.preventDefault();
-    await updateSiteSettings(siteSettings);
-    showToast(isBangla ? 'সেটিংস সফলভাবে সংরক্ষিত হয়েছে!' : 'Settings saved successfully!');
+    try {
+      await updateSiteSettings(siteSettings);
+      showToast(isBangla ? '🎉 সিস্টেম সেটিংস ডাটাবেসে সফলভাবে সংরক্ষিত হয়েছে!' : 'System settings saved successfully to MongoDB!');
+    } catch (err) {
+      showToast(isBangla ? 'সেটিংস সংরক্ষণে সমস্যা হয়েছে' : 'Failed to save settings', 'error');
+    }
   };
 
   const handleUpdatePopup = async (e) => {
@@ -587,6 +658,8 @@ export default function AdminDashboardPage() {
   // Nav Items Menu Configuration
   const navMenuItems = [
     { id: 'dashboard', label: isBangla ? 'ড্যাশবোর্ড ওভারভিউ' : 'Dashboard', icon: BarChart3, count: null },
+    { id: 'profile', label: isBangla ? 'অ্যাডমিন প্রোফাইল' : 'Admin Profile', icon: User, count: null },
+    { id: 'settings', label: isBangla ? 'সিস্টেম সেটিংস' : 'System Settings', icon: Settings, count: null },
     { id: 'users', label: isBangla ? 'ইউজার ম্যানেজমেন্ট' : 'User Management', icon: Users, count: usersList.length },
     { id: 'sellers', label: isBangla ? 'সেলার ম্যানেজমেন্ট' : 'Seller Management', icon: Store, count: sellersList.filter(s => s.status === 'pending').length || null, countColor: 'bg-amber-500' },
     { id: 'products', label: isBangla ? 'পণ্য ব্যবস্থাপনা' : 'Product Management', icon: Package, count: productsList.length },
@@ -598,7 +671,6 @@ export default function AdminDashboardPage() {
     { id: 'cms', label: isBangla ? 'কনটেন্ট (CMS)' : 'Content Management', icon: FileText, count: null },
     { id: 'reports', label: isBangla ? 'রিপোর্টস ও অ্যানালিটিক্স' : 'Reports & Export', icon: TrendingUp, count: null },
     { id: 'support', label: isBangla ? 'সাপোর্ট ও টিকেটস' : 'Support Tickets', icon: Headphones, count: ticketsList.filter(t => t.status === 'open').length || null, countColor: 'bg-emerald-500' },
-    { id: 'settings', label: isBangla ? 'সিস্টেম সেটিংস' : 'System Settings', icon: Settings, count: null },
   ];
 
   // Dynamic calculations for Charts & Data Visualization
@@ -803,46 +875,25 @@ export default function AdminDashboardPage() {
             </div>
           </div>
 
-          {/* Quick Action Toolbar (Profile, Settings, Theme) */}
-          <div className={`grid grid-cols-3 gap-1.5 p-1 bg-emerald-50/60 dark:bg-black/40 rounded-2xl border border-emerald-200/50 dark:border-emerald-900/40 ${!isSidebarOpen && 'lg:hidden'}`}>
-            <button
-              type="button"
-              onClick={() => {
-                setActiveMenu('settings');
-                setActiveSubTab('all');
-              }}
-              className="flex flex-col items-center justify-center py-1.5 px-1 rounded-xl text-[10px] font-bold text-gray-700 dark:text-emerald-200 hover:bg-white dark:hover:bg-emerald-900/60 shadow-sm transition-all"
-              title={isBangla ? 'প্রোফাইল' : 'Profile'}
-            >
-              <User className="w-3.5 h-3.5 text-brand-900 dark:text-emerald-400 mb-0.5" />
-              <span className="truncate">{isBangla ? 'প্রোফাইল' : 'Profile'}</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => {
-                setActiveMenu('settings');
-                setActiveSubTab('all');
-              }}
-              className="flex flex-col items-center justify-center py-1.5 px-1 rounded-xl text-[10px] font-bold text-gray-700 dark:text-emerald-200 hover:bg-white dark:hover:bg-emerald-900/60 shadow-sm transition-all"
-              title={isBangla ? 'সেটিংস' : 'Settings'}
-            >
-              <Settings className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400 mb-0.5" />
-              <span className="truncate">{isBangla ? 'সেটিংস' : 'Settings'}</span>
-            </button>
-
+          {/* Theme Toggle Button */}
+          <div className={`${!isSidebarOpen && 'lg:hidden'}`}>
             <button
               type="button"
               onClick={toggleTheme}
-              className="flex flex-col items-center justify-center py-1.5 px-1 rounded-xl text-[10px] font-bold text-amber-700 dark:text-amber-300 hover:bg-white dark:hover:bg-emerald-900/60 shadow-sm transition-all"
+              className="w-full flex items-center justify-between py-2.5 px-3 bg-emerald-50/70 hover:bg-emerald-100 dark:bg-black/40 dark:hover:bg-emerald-950/60 text-emerald-900 dark:text-emerald-200 text-xs font-bold rounded-2xl border border-emerald-200/60 dark:border-emerald-900/40 transition-all shadow-sm"
               title={isBangla ? 'থিম পরিবর্তন' : 'Toggle Theme'}
             >
-              {theme === 'dark' ? (
-                <Sun className="w-3.5 h-3.5 text-amber-400 mb-0.5" />
-              ) : (
-                <Moon className="w-3.5 h-3.5 text-amber-600 mb-0.5" />
-              )}
-              <span className="truncate">{theme === 'dark' ? (isBangla ? 'লাইট' : 'Light') : (isBangla ? 'ডার্ক' : 'Dark')}</span>
+              <div className="flex items-center gap-2">
+                {theme === 'dark' ? (
+                  <Sun className="w-4 h-4 text-amber-400" />
+                ) : (
+                  <Moon className="w-4 h-4 text-amber-600" />
+                )}
+                <span>{theme === 'dark' ? (isBangla ? 'লাইট মোড' : 'Light Mode') : (isBangla ? 'ডার্ক মোড' : 'Dark Mode')}</span>
+              </div>
+              <span className="text-[10px] px-2 py-0.5 rounded-full bg-white dark:bg-emerald-900 font-extrabold uppercase shadow-sm">
+                {theme === 'dark' ? 'Dark 🌙' : 'Light ☀️'}
+              </span>
             </button>
           </div>
 
@@ -3875,76 +3926,392 @@ export default function AdminDashboardPage() {
           )}
 
           {/* ======================================================== */}
-          {/* 9. ⚙️ SETTINGS                                           */}
+          {/* 🌟 ADMIN PROFILE SETTINGS                                */}
           {/* ======================================================== */}
-          {activeMenu === 'settings' && siteSettings && (
-            <div className="bg-white dark:bg-[#112318] rounded-3xl p-6 border border-[#e0ebe2] dark:border-[#1d3b28] shadow-sm space-y-6 max-w-3xl">
-              <div className="border-b border-[#e0ebe2] dark:border-[#1d3b28] pb-4">
-                <h3 className="text-lg font-black text-gray-900 dark:text-emerald-100">
-                  {isBangla ? 'সিস্টেম ও সাইট কনফিগারেশন' : 'System & Site Settings'}
-                </h3>
+          {activeMenu === 'profile' && (
+            <div className="space-y-6">
+              {/* Header */}
+              <div className="bg-white dark:bg-[#112318] rounded-3xl p-6 border border-[#e0ebe2] dark:border-[#1d3b28] shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="p-2 rounded-2xl bg-purple-100 dark:bg-purple-950 text-purple-800 dark:text-purple-300">
+                      <User className="w-5 h-5" />
+                    </span>
+                    <h3 className="text-xl font-black text-gray-900 dark:text-emerald-100">
+                      {isBangla ? 'অ্যাডমিন প্রোফাইল ও নিরাপত্তা ব্যবস্থাপনা' : 'Admin Profile & Security Settings'}
+                    </h3>
+                  </div>
+                  <p className="text-xs text-gray-500 dark:text-emerald-400">
+                    {isBangla ? 'আপনার ব্যক্তিগত তথ্য, প্রোফাইল ছবি এবং পাসওয়ার্ড আপডেট করুন।' : 'Manage your personal information, profile photo, and password security.'}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 self-start sm:self-auto">
+                  <span className="px-3 py-1 rounded-xl bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800 text-xs font-black">
+                    🛡️ {user?.role ? user.role.toUpperCase() : 'ADMIN'}
+                  </span>
+                </div>
               </div>
 
-              <form onSubmit={handleSaveSettings} className="space-y-4">
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                {/* Left: Admin Overview Card (4 Cols) */}
+                <div className="lg:col-span-4 space-y-6">
+                  <div className="bg-white dark:bg-[#112318] rounded-3xl p-6 border border-[#e0ebe2] dark:border-[#1d3b28] shadow-sm text-center space-y-4">
+                    <div className="relative inline-block mx-auto">
+                      {adminProfile.avatar || user?.avatar ? (
+                        <img
+                          src={adminProfile.avatar || user?.avatar}
+                          alt="Admin Avatar"
+                          className="w-28 h-28 rounded-3xl object-cover border-4 border-emerald-500/30 shadow-xl mx-auto"
+                        />
+                      ) : (
+                        <div className="w-28 h-28 rounded-3xl bg-gradient-to-tr from-brand-900 via-emerald-800 to-teal-700 text-white font-black text-3xl flex items-center justify-center shadow-xl mx-auto">
+                          {user?.name?.charAt(0) || 'A'}
+                        </div>
+                      )}
+                      <span className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-emerald-500 border-2 border-white dark:border-black flex items-center justify-center text-[10px] text-white">
+                        ✓
+                      </span>
+                    </div>
+
+                    <div>
+                      <h4 className="text-lg font-black text-gray-900 dark:text-emerald-100">
+                        {adminProfile.name || user?.name || 'Admin'}
+                      </h4>
+                      <p className="text-xs text-gray-500 dark:text-emerald-400 font-medium">{adminProfile.email || user?.email || 'admin@ihsan.com'}</p>
+                      <span className="mt-2 inline-block px-3 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 text-[10px] font-black border border-emerald-300 dark:border-emerald-800">
+                        ⚡ Master Administrator
+                      </span>
+                    </div>
+
+                    <div className="pt-4 border-t border-gray-100 dark:border-emerald-950/60 grid grid-cols-2 gap-2 text-left text-xs">
+                      <div className="p-3 rounded-2xl bg-gray-50 dark:bg-black/20">
+                        <span className="text-[10px] text-gray-400 block">{isBangla ? 'স্ট্যাটাস' : 'Status'}</span>
+                        <span className="font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+                          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                          {isBangla ? 'সক্রিয়' : 'Active'}
+                        </span>
+                      </div>
+                      <div className="p-3 rounded-2xl bg-gray-50 dark:bg-black/20">
+                        <span className="text-[10px] text-gray-400 block">{isBangla ? 'রোল' : 'Role'}</span>
+                        <span className="font-bold text-purple-600 dark:text-purple-400">Admin Master</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="bg-gradient-to-br from-brand-900 to-emerald-950 text-white rounded-3xl p-6 shadow-md space-y-3">
+                    <div className="flex items-center gap-2">
+                      <ShieldCheck className="w-5 h-5 text-emerald-400" />
+                      <h5 className="font-black text-sm">{isBangla ? 'নিরাপত্তা সুরক্ষা' : 'Security Assurance'}</h5>
+                    </div>
+                    <p className="text-xs text-emerald-100/80 leading-relaxed">
+                      {isBangla
+                        ? 'আপনার পাসওয়ার্ড এনক্রিপ্টেড আকারে MongoDB ডাটাবেসে সংরক্ষিত থাকে। নিয়মিত নতুন পাসওয়ার্ড পরিবর্তন করার পরামর্শ দেওয়া হচ্ছে।'
+                        : 'Your credentials are securely hashed and stored in MongoDB Atlas. Keep your password confidential.'}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Right: Edit Forms (8 Cols) */}
+                <div className="lg:col-span-8 space-y-6">
+                  <div className="bg-white dark:bg-[#112318] rounded-3xl p-6 sm:p-8 border border-[#e0ebe2] dark:border-[#1d3b28] shadow-sm">
+                    <form onSubmit={handleSaveAdminProfile} className="space-y-6">
+                      
+                      {/* 1. Avatar Uploader */}
+                      <div>
+                        <h4 className="text-sm font-black text-gray-900 dark:text-emerald-100 mb-3 flex items-center gap-2">
+                          <ImageIcon className="w-4 h-4 text-emerald-600" />
+                          <span>{isBangla ? 'প্রোফাইল ছবি পরিবর্তন করুন (ImgBB CDN)' : 'Change Profile Avatar (ImgBB CDN)'}</span>
+                        </h4>
+                        <ImageUploader
+                          label={isBangla ? 'নতুন প্রোফাইল ছবি আপলোড করুন' : 'Upload New Profile Photo'}
+                          value={adminProfile.avatar}
+                          onChange={(url) => setAdminProfile({ ...adminProfile, avatar: url })}
+                        />
+                      </div>
+
+                      {/* 2. Personal Information */}
+                      <div className="pt-4 border-t border-gray-100 dark:border-emerald-950 space-y-4">
+                        <h4 className="text-sm font-black text-gray-900 dark:text-emerald-100 flex items-center gap-2">
+                          <User className="w-4 h-4 text-brand-900 dark:text-emerald-400" />
+                          <span>{isBangla ? 'ব্যক্তিগত তথ্য (Personal Info)' : 'Personal Information'}</span>
+                        </h4>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          <div>
+                            <label className="block text-xs font-bold text-gray-700 dark:text-emerald-300 mb-1.5">
+                              {isBangla ? 'এডমিনের পুরো নাম *' : 'Admin Full Name *'}
+                            </label>
+                            <input
+                              type="text"
+                              required
+                              value={adminProfile.name}
+                              onChange={(e) => setAdminProfile({ ...adminProfile, name: e.target.value })}
+                              placeholder="e.g. Mahmudul Hasan"
+                              className="w-full px-4 py-3 bg-gray-50 dark:bg-black/30 border border-gray-200 dark:border-emerald-900 rounded-2xl text-xs sm:text-sm font-bold text-gray-900 dark:text-emerald-50 focus:outline-none focus:border-brand-900"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-xs font-bold text-gray-700 dark:text-emerald-300 mb-1.5">
+                              {isBangla ? 'মোবাইল নম্বর' : 'Phone Number'}
+                            </label>
+                            <input
+                              type="text"
+                              value={adminProfile.phone}
+                              onChange={(e) => setAdminProfile({ ...adminProfile, phone: e.target.value })}
+                              placeholder="017XXXXXXXX"
+                              className="w-full px-4 py-3 bg-gray-50 dark:bg-black/30 border border-gray-200 dark:border-emerald-900 rounded-2xl text-xs sm:text-sm font-medium text-gray-900 dark:text-emerald-50 focus:outline-none focus:border-brand-900"
+                            />
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-bold text-gray-700 dark:text-emerald-300 mb-1.5">
+                            {isBangla ? 'ইমেইল অ্যাড্রেস' : 'Email Address'}
+                          </label>
+                          <input
+                            type="email"
+                            value={adminProfile.email}
+                            onChange={(e) => setAdminProfile({ ...adminProfile, email: e.target.value })}
+                            placeholder="admin@ihsan.com"
+                            className="w-full px-4 py-3 bg-gray-50 dark:bg-black/30 border border-gray-200 dark:border-emerald-900 rounded-2xl text-xs sm:text-sm font-medium text-gray-900 dark:text-emerald-50 focus:outline-none focus:border-brand-900"
+                          />
+                        </div>
+                      </div>
+
+                      {/* 3. Password Change Section */}
+                      <div className="pt-4 border-t border-gray-100 dark:border-emerald-950 space-y-4">
+                        <h4 className="text-sm font-black text-gray-900 dark:text-emerald-100 flex items-center gap-2">
+                          <ShieldCheck className="w-4 h-4 text-amber-600" />
+                          <span>{isBangla ? 'পাসওয়ার্ড পরিবর্তন (Password Update)' : 'Change Password'}</span>
+                        </h4>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          <div>
+                            <label className="block text-xs font-bold text-gray-700 dark:text-emerald-300 mb-1.5">
+                              {isBangla ? 'নতুন পাসওয়ার্ড (ঐচ্ছিক)' : 'New Password (Optional)'}
+                            </label>
+                            <input
+                              type="password"
+                              value={adminProfile.newPassword}
+                              onChange={(e) => setAdminProfile({ ...adminProfile, newPassword: e.target.value })}
+                              placeholder="••••••••"
+                              className="w-full px-4 py-3 bg-gray-50 dark:bg-black/30 border border-gray-200 dark:border-emerald-900 rounded-2xl text-xs sm:text-sm font-medium text-gray-900 dark:text-emerald-50 focus:outline-none focus:border-brand-900"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-xs font-bold text-gray-700 dark:text-emerald-300 mb-1.5">
+                              {isBangla ? 'নতুন পাসওয়ার্ড নিশ্চিত করুন' : 'Confirm New Password'}
+                            </label>
+                            <input
+                              type="password"
+                              value={adminProfile.confirmPassword}
+                              onChange={(e) => setAdminProfile({ ...adminProfile, confirmPassword: e.target.value })}
+                              placeholder="••••••••"
+                              className="w-full px-4 py-3 bg-gray-50 dark:bg-black/30 border border-gray-200 dark:border-emerald-900 rounded-2xl text-xs sm:text-sm font-medium text-gray-900 dark:text-emerald-50 focus:outline-none focus:border-brand-900"
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Submit Button */}
+                      <div className="pt-4">
+                        <button
+                          type="submit"
+                          disabled={isSavingAdminProfile}
+                          className="w-full bg-gradient-to-r from-brand-900 via-emerald-800 to-teal-800 hover:from-brand-800 hover:to-teal-700 text-white font-black py-4 px-6 rounded-2xl shadow-xl flex items-center justify-center gap-2.5 transition-all text-sm disabled:opacity-50"
+                        >
+                          {isSavingAdminProfile ? (
+                            <>
+                              <RefreshCw className="w-5 h-5 animate-spin" />
+                              <span>{isBangla ? 'সংরক্ষণ করা হচ্ছে...' : 'Saving to MongoDB...'}</span>
+                            </>
+                          ) : (
+                            <>
+                              <Save className="w-5 h-5" />
+                              <span>{isBangla ? 'অ্যাডমিন প্রোফাইল সংরক্ষণ করুন (Save to MongoDB)' : 'Save Admin Profile to MongoDB'}</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
+
+                    </form>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ======================================================== */}
+          {/* ⚙️ SYSTEM SETTINGS (ENHANCED & CONNECTED TO MONGODB)     */}
+          {/* ======================================================== */}
+          {activeMenu === 'settings' && siteSettings && (
+            <div className="space-y-6 max-w-5xl">
+              {/* Header */}
+              <div className="bg-white dark:bg-[#112318] rounded-3xl p-6 border border-[#e0ebe2] dark:border-[#1d3b28] shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
-                  <label className="block text-xs font-bold mb-1">Site Title</label>
-                  <input
-                    type="text"
-                    value={siteSettings.siteName}
-                    onChange={(e) => setSiteSettings({ ...siteSettings, siteName: e.target.value })}
-                    className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-black/30 border border-gray-300 dark:border-emerald-900 rounded-xl text-xs sm:text-sm"
-                  />
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="p-2 rounded-2xl bg-blue-100 dark:bg-blue-950 text-blue-800 dark:text-blue-300">
+                      <Settings className="w-5 h-5" />
+                    </span>
+                    <h3 className="text-xl font-black text-gray-900 dark:text-emerald-100">
+                      {isBangla ? 'সিস্টেম ও প্ল্যাটফর্ম কনফিগারেশন' : 'System & Platform Settings'}
+                    </h3>
+                  </div>
+                  <p className="text-xs text-gray-500 dark:text-emerald-400">
+                    {isBangla ? 'ডেলিভারি চার্জ, সেলার কমিশন ও প্ল্যাটফর্ম কনফিগারেশন সরাসরি MongoDB-তে সংরক্ষিত হয়।' : 'Configure shipping rates, seller commissions, and platform parameters with live MongoDB sync.'}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 self-start sm:self-auto">
+                  <span className="px-3 py-1 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 text-xs font-black flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                    <span>MongoDB Atlas Connected</span>
+                  </span>
+                </div>
+              </div>
+
+              <form onSubmit={handleSaveSettings} className="space-y-6">
+                
+                {/* 1. General Branding */}
+                <div className="bg-white dark:bg-[#112318] rounded-3xl p-6 border border-[#e0ebe2] dark:border-[#1d3b28] shadow-sm space-y-4">
+                  <h4 className="text-sm font-black text-gray-900 dark:text-emerald-100 flex items-center gap-2 border-b border-gray-100 dark:border-emerald-950 pb-3">
+                    <Store className="w-4 h-4 text-brand-900 dark:text-emerald-400" />
+                    <span>{isBangla ? '১. স্টোর ও ব্র্যান্ডিং তথ্য' : '1. Store & Branding Information'}</span>
+                  </h4>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-bold text-gray-700 dark:text-emerald-300 mb-1.5">
+                        {isBangla ? 'সাইট / স্টোরের নাম' : 'Store Name'}
+                      </label>
+                      <input
+                        type="text"
+                        value={siteSettings.siteName || ''}
+                        onChange={(e) => setSiteSettings({ ...siteSettings, siteName: e.target.value })}
+                        className="w-full px-4 py-3 bg-gray-50 dark:bg-black/30 border border-gray-200 dark:border-emerald-900 rounded-2xl text-xs sm:text-sm font-bold text-gray-900 dark:text-emerald-50 focus:outline-none focus:border-brand-900"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-gray-700 dark:text-emerald-300 mb-1.5">
+                        {isBangla ? 'অফিসিয়াল হেল্পলাইন নম্বর' : 'Official Helpline Phone'}
+                      </label>
+                      <input
+                        type="text"
+                        value={siteSettings.contactPhone || '01977-882233'}
+                        onChange={(e) => setSiteSettings({ ...siteSettings, contactPhone: e.target.value })}
+                        className="w-full px-4 py-3 bg-gray-50 dark:bg-black/30 border border-gray-200 dark:border-emerald-900 rounded-2xl text-xs sm:text-sm font-medium text-gray-900 dark:text-emerald-50 focus:outline-none focus:border-brand-900"
+                      />
+                    </div>
+                  </div>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-bold mb-1">Inside Dhaka Delivery (৳)</label>
-                    <input
-                      type="number"
-                      value={siteSettings.insideDhakaShipping}
-                      onChange={(e) => setSiteSettings({ ...siteSettings, insideDhakaShipping: Number(e.target.value) })}
-                      className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-black/30 border border-gray-300 dark:border-emerald-900 rounded-xl text-xs sm:text-sm font-bold"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold mb-1">Outside Dhaka Delivery (৳)</label>
-                    <input
-                      type="number"
-                      value={siteSettings.outsideDhakaShipping}
-                      onChange={(e) => setSiteSettings({ ...siteSettings, outsideDhakaShipping: Number(e.target.value) })}
-                      className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-black/30 border border-gray-300 dark:border-emerald-900 rounded-xl text-xs sm:text-sm font-bold"
-                    />
+                {/* 2. Shipping & Delivery Charges */}
+                <div className="bg-white dark:bg-[#112318] rounded-3xl p-6 border border-[#e0ebe2] dark:border-[#1d3b28] shadow-sm space-y-4">
+                  <h4 className="text-sm font-black text-gray-900 dark:text-emerald-100 flex items-center gap-2 border-b border-gray-100 dark:border-emerald-950 pb-3">
+                    <Truck className="w-4 h-4 text-emerald-600" />
+                    <span>{isBangla ? '২. ডেলিভারি ও শিপিং চার্জ (Shipping Rates)' : '2. Shipping & Delivery Rates'}</span>
+                  </h4>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div className="p-4 rounded-2xl bg-emerald-50/50 dark:bg-black/20 border border-emerald-100 dark:border-emerald-950">
+                      <label className="block text-xs font-bold text-emerald-950 dark:text-emerald-300 mb-1.5">
+                        {isBangla ? 'ঢাকার ভিতরে ডেলিভারি (৳)' : 'Inside Dhaka (৳)'}
+                      </label>
+                      <div className="relative">
+                        <span className="absolute left-3.5 top-1/2 -translate-y-1/2 font-black text-gray-400">৳</span>
+                        <input
+                          type="number"
+                          value={siteSettings.insideDhakaShipping ?? 70}
+                          onChange={(e) => setSiteSettings({ ...siteSettings, insideDhakaShipping: Number(e.target.value) })}
+                          className="w-full pl-9 pr-4 py-2.5 bg-white dark:bg-black/40 border border-emerald-200 dark:border-emerald-900 rounded-xl text-sm font-black text-gray-900 dark:text-emerald-50 focus:outline-none focus:border-brand-900"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="p-4 rounded-2xl bg-blue-50/50 dark:bg-black/20 border border-blue-100 dark:border-emerald-950">
+                      <label className="block text-xs font-bold text-blue-950 dark:text-blue-300 mb-1.5">
+                        {isBangla ? 'ঢাকার বাইরে ডেলিভারি (৳)' : 'Outside Dhaka (৳)'}
+                      </label>
+                      <div className="relative">
+                        <span className="absolute left-3.5 top-1/2 -translate-y-1/2 font-black text-gray-400">৳</span>
+                        <input
+                          type="number"
+                          value={siteSettings.outsideDhakaShipping ?? 130}
+                          onChange={(e) => setSiteSettings({ ...siteSettings, outsideDhakaShipping: Number(e.target.value) })}
+                          className="w-full pl-9 pr-4 py-2.5 bg-white dark:bg-black/40 border border-blue-200 dark:border-emerald-900 rounded-xl text-sm font-black text-gray-900 dark:text-emerald-50 focus:outline-none focus:border-brand-900"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="p-4 rounded-2xl bg-amber-50/50 dark:bg-black/20 border border-amber-100 dark:border-emerald-950">
+                      <label className="block text-xs font-bold text-amber-950 dark:text-amber-300 mb-1.5">
+                        {isBangla ? 'ফ্রি ডেলিভারি ন্যূনতম অর্ডার (৳)' : 'Free Delivery Min (৳)'}
+                      </label>
+                      <div className="relative">
+                        <span className="absolute left-3.5 top-1/2 -translate-y-1/2 font-black text-gray-400">৳</span>
+                        <input
+                          type="number"
+                          value={siteSettings.freeDeliveryThreshold ?? 2000}
+                          onChange={(e) => setSiteSettings({ ...siteSettings, freeDeliveryThreshold: Number(e.target.value) })}
+                          className="w-full pl-9 pr-4 py-2.5 bg-white dark:bg-black/40 border border-amber-200 dark:border-emerald-900 rounded-xl text-sm font-black text-gray-900 dark:text-emerald-50 focus:outline-none focus:border-brand-900"
+                        />
+                      </div>
+                    </div>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-bold mb-1">Default Seller Commission (%)</label>
-                    <input
-                      type="number"
-                      value={siteSettings.defaultCommissionRate}
-                      onChange={(e) => setSiteSettings({ ...siteSettings, defaultCommissionRate: Number(e.target.value) })}
-                      className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-black/30 border border-gray-300 dark:border-emerald-900 rounded-xl text-xs sm:text-sm font-bold"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold mb-1">Free Delivery Threshold (৳)</label>
-                    <input
-                      type="number"
-                      value={siteSettings.freeDeliveryThreshold}
-                      onChange={(e) => setSiteSettings({ ...siteSettings, freeDeliveryThreshold: Number(e.target.value) })}
-                      className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-black/30 border border-gray-300 dark:border-emerald-900 rounded-xl text-xs sm:text-sm font-bold"
-                    />
+                {/* 3. Multi-Vendor Commission */}
+                <div className="bg-white dark:bg-[#112318] rounded-3xl p-6 border border-[#e0ebe2] dark:border-[#1d3b28] shadow-sm space-y-4">
+                  <h4 className="text-sm font-black text-gray-900 dark:text-emerald-100 flex items-center gap-2 border-b border-gray-100 dark:border-emerald-950 pb-3">
+                    <Percent className="w-4 h-4 text-purple-600" />
+                    <span>{isBangla ? '৩. মাল্টি-ভেন্ডর সেলার কমিশন রেট' : '3. Multi-Vendor Seller Commission'}</span>
+                  </h4>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-bold text-gray-700 dark:text-emerald-300 mb-1.5">
+                        {isBangla ? 'ডিফল্ট সেলার কমিশন রেট (%)' : 'Default Seller Commission Rate (%)'}
+                      </label>
+                      <div className="relative">
+                        <input
+                          type="number"
+                          value={siteSettings.defaultCommissionRate ?? 10}
+                          onChange={(e) => setSiteSettings({ ...siteSettings, defaultCommissionRate: Number(e.target.value) })}
+                          className="w-full px-4 py-3 bg-gray-50 dark:bg-black/30 border border-gray-200 dark:border-emerald-900 rounded-2xl text-xs sm:text-sm font-bold text-gray-900 dark:text-emerald-50 focus:outline-none focus:border-brand-900"
+                        />
+                        <span className="absolute right-4 top-1/2 -translate-y-1/2 font-black text-gray-400">%</span>
+                      </div>
+                      <p className="text-[11px] text-gray-400 mt-1">
+                        {isBangla ? 'নতুন সেলারদের প্রতিটি অর্ডারের উপর প্ল্যাটফর্ম ফি।' : 'Platform fee applicable for seller orders.'}
+                      </p>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-gray-700 dark:text-emerald-300 mb-1.5">
+                        {isBangla ? 'পেমেন্ট গেটওয়ে কারেন্সি' : 'Default Currency'}
+                      </label>
+                      <input
+                        type="text"
+                        disabled
+                        value="BDT (৳) - Bangladeshi Taka"
+                        className="w-full px-4 py-3 bg-gray-100 dark:bg-black/50 border border-gray-200 dark:border-emerald-950 rounded-2xl text-xs sm:text-sm font-bold text-gray-500 cursor-not-allowed"
+                      />
+                    </div>
                   </div>
                 </div>
 
-                <button
-                  type="submit"
-                  className="w-full bg-brand-900 hover:bg-brand-800 text-white font-extrabold py-3.5 rounded-2xl shadow-lg flex items-center justify-center gap-2"
-                >
-                  <Save className="w-4 h-4" />
-                  <span>{isBangla ? 'সেটিংস সংরক্ষণ করুন' : 'Save Settings'}</span>
-                </button>
+                {/* Save Button */}
+                <div>
+                  <button
+                    type="submit"
+                    className="w-full bg-gradient-to-r from-brand-900 via-emerald-800 to-teal-800 hover:from-brand-800 hover:to-teal-700 text-white font-black py-4 px-6 rounded-2xl shadow-xl flex items-center justify-center gap-2.5 transition-all text-sm"
+                  >
+                    <Save className="w-5 h-5" />
+                    <span>{isBangla ? 'সিস্টেম সেটিংস সংরক্ষণ করুন (Save to MongoDB)' : 'Save System Settings to MongoDB'}</span>
+                  </button>
+                </div>
+
               </form>
             </div>
           )}

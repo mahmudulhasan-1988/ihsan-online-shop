@@ -159,8 +159,8 @@ export default function SellerDashboardPage() {
     is_bestseller: false,
   });
 
-  const loadSellerData = async () => {
-    setLoading(true);
+  const loadSellerData = async (showLoading = false) => {
+    if (showLoading) setLoading(true);
     try {
       const sellerIdentifier = user?.id || user?._id || user?.email || user?.phone || 'seller';
       const [prodRes, ordRes, withRes, revRes, sellerProfileRes, catRes] = await Promise.all([
@@ -248,18 +248,18 @@ export default function SellerDashboardPage() {
     } catch (err) {
       console.error('Error loading seller data', err);
     } finally {
-      setLoading(false);
+      if (showLoading) setLoading(false);
     }
   };
 
   useEffect(() => {
     if (user && (user.role === 'seller' || user.role === 'admin')) {
-      loadSellerData();
+      loadSellerData(true);
 
-      // Auto Data Refresh every 10 seconds for seller orders & stock live sync
+      // Silent Auto Data Refresh every 45 seconds for seller orders & stock live sync without buffering
       const interval = setInterval(() => {
-        loadSellerData();
-      }, 10000);
+        loadSellerData(false);
+      }, 45000);
 
       return () => clearInterval(interval);
     }
@@ -690,13 +690,12 @@ export default function SellerDashboardPage() {
 
   const navMenuItems = [
     { id: 'dashboard', label: isBangla ? 'ড্যাশবোর্ড ওভারভিউ' : 'Dashboard', icon: BarChart3 },
-    { id: 'vendor_management', label: isBangla ? '🏪 সেলার ও ভেন্ডর ম্যানেজমেন্ট' : 'Seller & Vendor Management', icon: Store },
+    { id: 'vendor_management', label: isBangla ? '🏪 সেলার ও শপ প্রোফাইল' : 'Seller & Shop Profile', icon: Store },
     { id: 'products', label: isBangla ? 'পণ্য ব্যবস্থাপনা' : 'Products & Stock', icon: Package, count: myProducts.length },
     { id: 'orders', label: isBangla ? 'অর্ডার প্রসেসিং' : 'Orders Fulfillment', icon: ShoppingCart, count: myOrders.length },
     { id: 'earnings', label: isBangla ? 'আর্নিংস ও উইথড্র' : 'Earnings & Payouts', icon: Wallet },
     { id: 'reviews', label: isBangla ? 'গ্রাহক রিভিউ ও রেটিং' : 'Reviews & Replies', icon: Star, count: myReviews.length },
     { id: 'support', label: isBangla ? 'সাপোর্ট ও সাহায্য' : 'Help & Support', icon: Headphones },
-    { id: 'profile', label: isBangla ? 'ব্যক্তিগত সেটিংস' : 'Profile Settings', icon: User },
   ];
 
   return (
@@ -785,40 +784,25 @@ export default function SellerDashboardPage() {
             </div>
           </div>
 
-          {/* Quick Action Toolbar (Profile, Settings, Theme) */}
-          <div className={`grid grid-cols-3 gap-1.5 p-1 bg-amber-50/60 dark:bg-black/40 rounded-2xl border border-amber-200/50 dark:border-emerald-900/40 ${!isSidebarOpen && 'lg:hidden'}`}>
-            <button
-              type="button"
-              onClick={() => setActiveMenu('vendor_management')}
-              className="flex flex-col items-center justify-center py-1.5 px-1 rounded-xl text-[10px] font-bold text-gray-700 dark:text-emerald-200 hover:bg-white dark:hover:bg-emerald-900/60 shadow-sm transition-all"
-              title={isBangla ? 'প্রোফাইল' : 'Profile'}
-            >
-              <User className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 mb-0.5" />
-              <span className="truncate">{isBangla ? 'প্রোফাইল' : 'Profile'}</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setActiveMenu('vendor_management')}
-              className="flex flex-col items-center justify-center py-1.5 px-1 rounded-xl text-[10px] font-bold text-gray-700 dark:text-emerald-200 hover:bg-white dark:hover:bg-emerald-900/60 shadow-sm transition-all"
-              title={isBangla ? 'সেটিংস' : 'Settings'}
-            >
-              <Settings className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400 mb-0.5" />
-              <span className="truncate">{isBangla ? 'সেটিংস' : 'Settings'}</span>
-            </button>
-
+          {/* Theme Toggle Button */}
+          <div className={`${!isSidebarOpen && 'lg:hidden'}`}>
             <button
               type="button"
               onClick={toggleTheme}
-              className="flex flex-col items-center justify-center py-1.5 px-1 rounded-xl text-[10px] font-bold text-amber-700 dark:text-amber-300 hover:bg-white dark:hover:bg-emerald-900/60 shadow-sm transition-all"
+              className="w-full flex items-center justify-between py-2.5 px-3 bg-amber-50/70 hover:bg-amber-100 dark:bg-black/40 dark:hover:bg-emerald-950/60 text-amber-950 dark:text-amber-200 text-xs font-bold rounded-2xl border border-amber-200/60 dark:border-emerald-900/40 transition-all shadow-sm"
               title={isBangla ? 'থিম পরিবর্তন' : 'Toggle Theme'}
             >
-              {theme === 'dark' ? (
-                <Sun className="w-3.5 h-3.5 text-amber-400 mb-0.5" />
-              ) : (
-                <Moon className="w-3.5 h-3.5 text-amber-600 mb-0.5" />
-              )}
-              <span className="truncate">{theme === 'dark' ? (isBangla ? 'লাইট' : 'Light') : (isBangla ? 'ডার্ক' : 'Dark')}</span>
+              <div className="flex items-center gap-2">
+                {theme === 'dark' ? (
+                  <Sun className="w-4 h-4 text-amber-400" />
+                ) : (
+                  <Moon className="w-4 h-4 text-amber-600" />
+                )}
+                <span>{theme === 'dark' ? (isBangla ? 'লাইট মোড' : 'Light Mode') : (isBangla ? 'ডার্ক মোড' : 'Dark Mode')}</span>
+              </div>
+              <span className="text-[10px] px-2 py-0.5 rounded-full bg-white dark:bg-emerald-900 font-extrabold uppercase shadow-sm">
+                {theme === 'dark' ? 'Dark 🌙' : 'Light ☀️'}
+              </span>
             </button>
           </div>
 

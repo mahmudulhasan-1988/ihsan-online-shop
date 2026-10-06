@@ -113,8 +113,8 @@ export default function CustomerDashboardPage() {
   const [ticketSubject, setTicketSubject] = useState('');
   const [ticketMsg, setTicketMsg] = useState('');
 
-  const loadUserData = async (isManual = false) => {
-    setLoading(true);
+  const loadUserData = async (isManual = false, showLoading = false) => {
+    if (showLoading) setLoading(true);
     try {
       const currentUserId = user?.id || user?._id || user?.userId;
       const [ordRes, addrRes, notifRes, prodRes] = await Promise.all([
@@ -142,13 +142,20 @@ export default function CustomerDashboardPage() {
         showToast(isBangla ? 'ডাটা রিফ্রেশ করতে সমস্যা হয়েছে' : 'Failed to refresh data', 'error');
       }
     } finally {
-      setLoading(false);
+      if (showLoading) setLoading(false);
     }
   };
 
   useEffect(() => {
     if (user) {
-      loadUserData(false);
+      loadUserData(false, true);
+
+      // Silent Auto Sync every 45s without buffering or screen jumps
+      const interval = setInterval(() => {
+        loadUserData(false, false);
+      }, 45000);
+
+      return () => clearInterval(interval);
     }
   }, [user]);
 
@@ -478,40 +485,25 @@ export default function CustomerDashboardPage() {
             </div>
           </div>
 
-          {/* Quick Action Toolbar (Profile, Settings, Theme) */}
-          <div className={`grid grid-cols-3 gap-1.5 p-1 bg-emerald-50/60 dark:bg-black/40 rounded-2xl border border-emerald-200/50 dark:border-emerald-900/40 ${!isSidebarOpen && 'lg:hidden'}`}>
-            <button
-              type="button"
-              onClick={() => setActiveMenu('profile')}
-              className="flex flex-col items-center justify-center py-1.5 px-1 rounded-xl text-[10px] font-bold text-gray-700 dark:text-emerald-200 hover:bg-white dark:hover:bg-emerald-900/60 shadow-sm transition-all"
-              title={isBangla ? 'প্রোফাইল' : 'Profile'}
-            >
-              <User className="w-3.5 h-3.5 text-brand-900 dark:text-emerald-400 mb-0.5" />
-              <span className="truncate">{isBangla ? 'প্রোফাইল' : 'Profile'}</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setActiveMenu('profile')}
-              className="flex flex-col items-center justify-center py-1.5 px-1 rounded-xl text-[10px] font-bold text-gray-700 dark:text-emerald-200 hover:bg-white dark:hover:bg-emerald-900/60 shadow-sm transition-all"
-              title={isBangla ? 'সেটিংস' : 'Settings'}
-            >
-              <Settings className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400 mb-0.5" />
-              <span className="truncate">{isBangla ? 'সেটিংস' : 'Settings'}</span>
-            </button>
-
+          {/* Theme Toggle Button */}
+          <div className={`${!isSidebarOpen && 'lg:hidden'}`}>
             <button
               type="button"
               onClick={toggleTheme}
-              className="flex flex-col items-center justify-center py-1.5 px-1 rounded-xl text-[10px] font-bold text-amber-700 dark:text-amber-300 hover:bg-white dark:hover:bg-emerald-900/60 shadow-sm transition-all"
+              className="w-full flex items-center justify-between py-2.5 px-3 bg-emerald-50/70 hover:bg-emerald-100 dark:bg-black/40 dark:hover:bg-emerald-950/60 text-emerald-900 dark:text-emerald-200 text-xs font-bold rounded-2xl border border-emerald-200/60 dark:border-emerald-900/40 transition-all shadow-sm"
               title={isBangla ? 'থিম পরিবর্তন' : 'Toggle Theme'}
             >
-              {theme === 'dark' ? (
-                <Sun className="w-3.5 h-3.5 text-amber-400 mb-0.5" />
-              ) : (
-                <Moon className="w-3.5 h-3.5 text-amber-600 mb-0.5" />
-              )}
-              <span className="truncate">{theme === 'dark' ? (isBangla ? 'লাইট' : 'Light') : (isBangla ? 'ডার্ক' : 'Dark')}</span>
+              <div className="flex items-center gap-2">
+                {theme === 'dark' ? (
+                  <Sun className="w-4 h-4 text-amber-400" />
+                ) : (
+                  <Moon className="w-4 h-4 text-amber-600" />
+                )}
+                <span>{theme === 'dark' ? (isBangla ? 'লাইট মোড' : 'Light Mode') : (isBangla ? 'ডার্ক মোড' : 'Dark Mode')}</span>
+              </div>
+              <span className="text-[10px] px-2 py-0.5 rounded-full bg-white dark:bg-emerald-900 font-extrabold uppercase shadow-sm">
+                {theme === 'dark' ? 'Dark 🌙' : 'Light ☀️'}
+              </span>
             </button>
           </div>
 
@@ -1401,132 +1393,244 @@ export default function CustomerDashboardPage() {
           )}
 
           {/* ======================================================== */}
-          {/* 👤 4. MY PROFILE EDIT & SAVE                              */}
+          {/* 👤 4. MY PROFILE EDIT & SAVE (ENHANCED UI & MONGODB SYNC) */}
           {/* ======================================================== */}
           {activeMenu === 'profile' && (
-            <div className="bg-white dark:bg-[#112318] rounded-3xl p-6 sm:p-8 border border-[#e0ebe2] dark:border-[#1d3b28] shadow-sm space-y-6">
-              <div className="flex items-center justify-between border-b border-[#e0ebe2] dark:border-[#1d3b28] pb-4">
+            <div className="space-y-6">
+              {/* Header */}
+              <div className="bg-white dark:bg-[#112318] rounded-3xl p-6 border border-[#e0ebe2] dark:border-[#1d3b28] shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
-                  <h3 className="text-lg sm:text-xl font-black text-gray-900 dark:text-emerald-100 flex items-center gap-2">
-                    <span>👤 {isBangla ? 'আমার প্রোফাইল সেটিংস ও সম্পাদনা' : 'My Profile & Account Settings'}</span>
-                  </h3>
-                  <p className="text-xs text-gray-500 dark:text-emerald-400 mt-0.5">
-                    {isBangla ? 'আপনার নাম, ইমেইল, মোবাইল নম্বর, প্রোফাইল ছবি ও ঠিকানা পরিবর্তন করুন' : 'Update your personal details, profile picture and delivery address'}
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="p-2 rounded-2xl bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300">
+                      <User className="w-5 h-5" />
+                    </span>
+                    <h3 className="text-xl font-black text-gray-900 dark:text-emerald-100">
+                      {isBangla ? 'আমার প্রোফাইল সেটিংস ও সম্পাদনা' : 'My Profile & Account Settings'}
+                    </h3>
+                  </div>
+                  <p className="text-xs text-gray-500 dark:text-emerald-400">
+                    {isBangla ? 'আপনার ব্যক্তিগত তথ্য, ছবি, ডেলিভারি ঠিকানা ও পাসওয়ার্ড সরাসরি MongoDB-তে আপডেট করুন।' : 'Update your personal profile, photo, delivery addresses, and security credentials.'}
                   </p>
+                </div>
+                <div className="flex items-center gap-2 self-start sm:self-auto">
+                  <span className="px-3.5 py-1.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 text-xs font-black flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                    <span>{isBangla ? 'ভেরিফাইড কাস্টমার' : 'Verified Member'}</span>
+                  </span>
                 </div>
               </div>
 
-              <form onSubmit={handleSaveProfile} className="max-w-2xl space-y-5">
-                
-                {/* Profile Picture Upload to ImgBB */}
-                <div>
-                  <ImageUploader
-                    label={isBangla ? 'প্রোফাইল ছবি পরিবর্তন করুন (ImgBB CDN) *' : 'Profile Picture (ImgBB CDN) *'}
-                    placeholder={isBangla ? 'নতুন প্রোফাইল ছবি আপলোড করতে ক্লিক করুন' : 'Click or drag new profile photo to upload'}
-                    value={profile.avatar}
-                    onChange={(url) => setProfile({ ...profile, avatar: url })}
-                  />
-                </div>
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                {/* Left Overview (4 cols) */}
+                <div className="lg:col-span-4 space-y-6">
+                  <div className="bg-white dark:bg-[#112318] rounded-3xl p-6 border border-[#e0ebe2] dark:border-[#1d3b28] shadow-sm text-center space-y-4">
+                    <div className="relative inline-block mx-auto">
+                      {profile.avatar || user?.avatar ? (
+                        <img
+                          src={profile.avatar || user?.avatar}
+                          alt="Customer Avatar"
+                          className="w-28 h-28 rounded-3xl object-cover border-4 border-emerald-500/30 shadow-xl mx-auto"
+                        />
+                      ) : (
+                        <div className="w-28 h-28 rounded-3xl bg-gradient-to-tr from-brand-900 via-emerald-800 to-teal-700 text-white font-black text-3xl flex items-center justify-center shadow-xl mx-auto">
+                          {user?.name?.charAt(0) || profile?.name?.charAt(0) || 'U'}
+                        </div>
+                      )}
+                      <span className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-emerald-500 border-2 border-white dark:border-black flex items-center justify-center text-[10px] text-white">
+                        ✓
+                      </span>
+                    </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-bold text-gray-700 dark:text-emerald-300 mb-1">
-                      {isBangla ? 'পূর্ণ নাম *' : 'Full Name *'}
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      value={profile.name}
-                      onChange={(e) => setProfile({ ...profile, name: e.target.value })}
-                      className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-black/30 border border-gray-300 dark:border-emerald-900 rounded-xl text-xs sm:text-sm font-semibold focus:outline-none focus:border-brand-900"
-                    />
+                    <div>
+                      <h4 className="text-lg font-black text-gray-900 dark:text-emerald-100">
+                        {profile.name || user?.name || 'Customer'}
+                      </h4>
+                      <p className="text-xs text-gray-500 dark:text-emerald-400 font-mono mt-0.5">{profile.phone || user?.phone || '01XXXXXXXXX'}</p>
+                      {profile.email && <p className="text-[11px] text-gray-400">{profile.email}</p>}
+                    </div>
+
+                    <div className="pt-4 border-t border-gray-100 dark:border-emerald-950/60 grid grid-cols-2 gap-2 text-left text-xs">
+                      <div className="p-3 rounded-2xl bg-gray-50 dark:bg-black/20">
+                        <span className="text-[10px] text-gray-400 block">{isBangla ? 'মোট অর্ডার' : 'Total Orders'}</span>
+                        <span className="font-bold text-brand-900 dark:text-emerald-400 text-sm">{myOrders.length} {isBangla ? 'টি' : ''}</span>
+                      </div>
+                      <div className="p-3 rounded-2xl bg-gray-50 dark:bg-black/20">
+                        <span className="text-[10px] text-gray-400 block">{isBangla ? 'মোট কেনাকাটা' : 'Total Spent'}</span>
+                        <span className="font-bold text-emerald-600 dark:text-emerald-400 text-sm">৳ {myOrders.reduce((acc, o) => acc + (Number(o.totalAmount || o.total_amount || 0)), 0).toLocaleString()}</span>
+                      </div>
+                    </div>
                   </div>
 
-                  <div>
-                    <label className="block text-xs font-bold text-gray-700 dark:text-emerald-300 mb-1">
-                      {isBangla ? 'মোবাইল নম্বর *' : 'Mobile Number *'}
-                    </label>
-                    <input
-                      type="tel"
-                      required
-                      value={profile.phone}
-                      onChange={(e) => setProfile({ ...profile, phone: e.target.value })}
-                      className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-black/30 border border-gray-300 dark:border-emerald-900 rounded-xl text-xs sm:text-sm font-semibold focus:outline-none focus:border-brand-900"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-bold text-gray-700 dark:text-emerald-300 mb-1">
-                      {isBangla ? 'ইমেইল অ্যাড্রেস' : 'Email Address'}
-                    </label>
-                    <input
-                      type="email"
-                      value={profile.email}
-                      onChange={(e) => setProfile({ ...profile, email: e.target.value })}
-                      className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-black/30 border border-gray-300 dark:border-emerald-900 rounded-xl text-xs sm:text-sm font-semibold focus:outline-none focus:border-brand-900"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-bold text-gray-700 dark:text-emerald-300 mb-1">
-                      {isBangla ? 'শহর / জেলা' : 'City / District'}
-                    </label>
-                    <input
-                      type="text"
-                      value={profile.city}
-                      onChange={(e) => setProfile({ ...profile, city: e.target.value, district: e.target.value })}
-                      className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-black/30 border border-gray-300 dark:border-emerald-900 rounded-xl text-xs sm:text-sm font-semibold focus:outline-none focus:border-brand-900"
-                    />
+                  <div className="bg-gradient-to-br from-brand-900 to-emerald-950 text-white rounded-3xl p-6 shadow-md space-y-2.5">
+                    <div className="flex items-center gap-2">
+                      <ShieldCheck className="w-5 h-5 text-emerald-400" />
+                      <h5 className="font-black text-sm">{isBangla ? 'নিরাপদ শপিং নিশ্চয়তা' : 'Secure Shopping Account'}</h5>
+                    </div>
+                    <p className="text-xs text-emerald-100/80 leading-relaxed">
+                      {isBangla
+                        ? 'আপনার অ্যাকাউন্ট ও ডেলিভারি তথ্য সম্পূর্ণ সুরক্ষিত। অর্ডারের ট্র্যাকিং তথ্য সরাসরি এসএমএস এবং এই ড্যাশবোর্ডে পাবেন।'
+                        : 'Your personal data and address are safely encrypted. You can track all your orders seamlessly.'}
+                    </p>
                   </div>
                 </div>
 
-                <div>
-                  <label className="block text-xs font-bold text-gray-700 dark:text-emerald-300 mb-1">
-                    {isBangla ? 'ডিফল্ট ডেলিভারি ঠিকানা' : 'Default Delivery Address'}
-                  </label>
-                  <textarea
-                    rows={2}
-                    value={profile.address}
-                    onChange={(e) => setProfile({ ...profile, address: e.target.value })}
-                    placeholder={isBangla ? 'বাসা নং, রোড নং, থানা, জেলা...' : 'House, Road, Area, City...'}
-                    className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-black/30 border border-gray-300 dark:border-emerald-900 rounded-xl text-xs sm:text-sm font-semibold focus:outline-none focus:border-brand-900"
-                  />
-                </div>
+                {/* Right Form (8 cols) */}
+                <div className="lg:col-span-8 space-y-6">
+                  <div className="bg-white dark:bg-[#112318] rounded-3xl p-6 sm:p-8 border border-[#e0ebe2] dark:border-[#1d3b28] shadow-sm">
+                    <form onSubmit={handleSaveProfile} className="space-y-6">
+                      
+                      {/* Avatar Upload */}
+                      <div>
+                        <h4 className="text-sm font-black text-gray-900 dark:text-emerald-100 mb-3 flex items-center gap-2">
+                          <User className="w-4 h-4 text-emerald-600" />
+                          <span>{isBangla ? 'প্রোফাইল ছবি পরিবর্তন করুন (ImgBB CDN)' : 'Change Profile Avatar (ImgBB CDN)'}</span>
+                        </h4>
+                        <ImageUploader
+                          label={isBangla ? 'নতুন প্রোফাইল ছবি আপলোড করুন' : 'Upload New Profile Photo'}
+                          value={profile.avatar}
+                          onChange={(url) => setProfile({ ...profile, avatar: url })}
+                        />
+                      </div>
 
-                {/* Password Change Section */}
-                <div className="p-4 bg-gray-50 dark:bg-black/20 rounded-2xl border border-gray-200 dark:border-emerald-900/40 space-y-3">
-                  <h4 className="text-xs font-black uppercase text-gray-700 dark:text-emerald-300">
-                    🔒 {isBangla ? 'পাসওয়ার্ড পরিবর্তন (ঐচ্ছিক)' : 'Change Password (Optional)'}
-                  </h4>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <input
-                      type="password"
-                      placeholder={isBangla ? 'বর্তমান পাসওয়ার্ড' : 'Current Password'}
-                      value={profile.currentPassword || ''}
-                      onChange={(e) => setProfile({ ...profile, currentPassword: e.target.value })}
-                      className="px-3 py-2 bg-white dark:bg-black/40 border rounded-xl text-xs"
-                    />
-                    <input
-                      type="password"
-                      placeholder={isBangla ? 'নতুন পাসওয়ার্ড' : 'New Password'}
-                      value={profile.newPassword || ''}
-                      onChange={(e) => setProfile({ ...profile, newPassword: e.target.value })}
-                      className="px-3 py-2 bg-white dark:bg-black/40 border rounded-xl text-xs"
-                    />
+                      {/* Personal Information */}
+                      <div className="pt-4 border-t border-gray-100 dark:border-emerald-950 space-y-4">
+                        <h4 className="text-sm font-black text-gray-900 dark:text-emerald-100 flex items-center gap-2">
+                          <span>📋 {isBangla ? 'ব্যক্তিগত ও ডেলিভারি তথ্য' : 'Personal & Delivery Details'}</span>
+                        </h4>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          <div>
+                            <label className="block text-xs font-bold text-gray-700 dark:text-emerald-300 mb-1.5">
+                              {isBangla ? 'পূর্ণ নাম *' : 'Full Name *'}
+                            </label>
+                            <input
+                              type="text"
+                              required
+                              value={profile.name}
+                              onChange={(e) => setProfile({ ...profile, name: e.target.value })}
+                              placeholder="e.g. Abdullah Al Mamun"
+                              className="w-full px-4 py-3 bg-gray-50 dark:bg-black/30 border border-gray-200 dark:border-emerald-900 rounded-2xl text-xs sm:text-sm font-bold text-gray-900 dark:text-emerald-50 focus:outline-none focus:border-brand-900"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-xs font-bold text-gray-700 dark:text-emerald-300 mb-1.5">
+                              {isBangla ? 'মোবাইল নম্বর *' : 'Mobile Number *'}
+                            </label>
+                            <input
+                              type="tel"
+                              required
+                              value={profile.phone}
+                              onChange={(e) => setProfile({ ...profile, phone: e.target.value })}
+                              placeholder="017XXXXXXXX"
+                              className="w-full px-4 py-3 bg-gray-50 dark:bg-black/30 border border-gray-200 dark:border-emerald-900 rounded-2xl text-xs sm:text-sm font-bold text-gray-900 dark:text-emerald-50 focus:outline-none focus:border-brand-900"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          <div>
+                            <label className="block text-xs font-bold text-gray-700 dark:text-emerald-300 mb-1.5">
+                              {isBangla ? 'ইমেইল অ্যাড্রেস' : 'Email Address'}
+                            </label>
+                            <input
+                              type="email"
+                              value={profile.email}
+                              onChange={(e) => setProfile({ ...profile, email: e.target.value })}
+                              placeholder="user@example.com"
+                              className="w-full px-4 py-3 bg-gray-50 dark:bg-black/30 border border-gray-200 dark:border-emerald-900 rounded-2xl text-xs sm:text-sm font-medium text-gray-900 dark:text-emerald-50 focus:outline-none focus:border-brand-900"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-xs font-bold text-gray-700 dark:text-emerald-300 mb-1.5">
+                              {isBangla ? 'শহর / জেলা' : 'City / District'}
+                            </label>
+                            <input
+                              type="text"
+                              value={profile.city}
+                              onChange={(e) => setProfile({ ...profile, city: e.target.value, district: e.target.value })}
+                              placeholder="e.g. Dhaka"
+                              className="w-full px-4 py-3 bg-gray-50 dark:bg-black/30 border border-gray-200 dark:border-emerald-900 rounded-2xl text-xs sm:text-sm font-medium text-gray-900 dark:text-emerald-50 focus:outline-none focus:border-brand-900"
+                            />
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-bold text-gray-700 dark:text-emerald-300 mb-1.5">
+                            {isBangla ? 'ডিফল্ট ডেলিভারি ঠিকানা' : 'Default Delivery Address'}
+                          </label>
+                          <textarea
+                            rows={3}
+                            value={profile.address}
+                            onChange={(e) => setProfile({ ...profile, address: e.target.value })}
+                            placeholder={isBangla ? 'বাসা নং, রোড নং, এলাকা, থানা, জেলা...' : 'House, Road, Area, Thana, District...'}
+                            className="w-full px-4 py-3 bg-gray-50 dark:bg-black/30 border border-gray-200 dark:border-emerald-900 rounded-2xl text-xs sm:text-sm font-medium text-gray-900 dark:text-emerald-50 focus:outline-none focus:border-brand-900 leading-relaxed"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Password Change Section */}
+                      <div className="pt-4 border-t border-gray-100 dark:border-emerald-950 space-y-4">
+                        <h4 className="text-sm font-black text-gray-900 dark:text-emerald-100 flex items-center gap-2">
+                          <ShieldCheck className="w-4 h-4 text-amber-600" />
+                          <span>{isBangla ? 'পাসওয়ার্ড পরিবর্তন (Password Update)' : 'Change Password'}</span>
+                        </h4>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          <div>
+                            <label className="block text-xs font-bold text-gray-700 dark:text-emerald-300 mb-1.5">
+                              {isBangla ? 'নতুন পাসওয়ার্ড (ঐচ্ছিক)' : 'New Password (Optional)'}
+                            </label>
+                            <input
+                              type="password"
+                              placeholder="••••••••"
+                              value={profile.newPassword || ''}
+                              onChange={(e) => setProfile({ ...profile, newPassword: e.target.value })}
+                              className="w-full px-4 py-3 bg-gray-50 dark:bg-black/30 border border-gray-200 dark:border-emerald-900 rounded-2xl text-xs sm:text-sm font-medium text-gray-900 dark:text-emerald-50 focus:outline-none focus:border-brand-900"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-xs font-bold text-gray-700 dark:text-emerald-300 mb-1.5">
+                              {isBangla ? 'বর্তমান পাসওয়ার্ড' : 'Current Password'}
+                            </label>
+                            <input
+                              type="password"
+                              placeholder="••••••••"
+                              value={profile.currentPassword || ''}
+                              onChange={(e) => setProfile({ ...profile, currentPassword: e.target.value })}
+                              className="w-full px-4 py-3 bg-gray-50 dark:bg-black/30 border border-gray-200 dark:border-emerald-900 rounded-2xl text-xs sm:text-sm font-medium text-gray-900 dark:text-emerald-50 focus:outline-none focus:border-brand-900"
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Save Button */}
+                      <div className="pt-2">
+                        <button
+                          type="submit"
+                          disabled={isSavingProfile}
+                          className="w-full bg-gradient-to-r from-brand-900 via-emerald-800 to-teal-800 hover:from-brand-800 hover:to-teal-700 text-white font-black py-4 px-6 rounded-2xl shadow-xl flex items-center justify-center gap-2.5 transition-all text-sm disabled:opacity-50"
+                        >
+                          {isSavingProfile ? (
+                            <>
+                              <RefreshCw className="w-5 h-5 animate-spin" />
+                              <span>{isBangla ? 'সংরক্ষণ করা হচ্ছে...' : 'Saving to MongoDB...'}</span>
+                            </>
+                          ) : (
+                            <>
+                              <Save className="w-5 h-5" />
+                              <span>{isBangla ? 'প্রোফাইল পরিবর্তন সংরক্ষণ করুন (Save to MongoDB)' : 'Save Profile Changes to MongoDB'}</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
+
+                    </form>
                   </div>
                 </div>
-
-                <button
-                  type="submit"
-                  disabled={isSavingProfile}
-                  className="w-full py-3 bg-brand-900 hover:bg-brand-800 text-white font-black rounded-2xl shadow-lg flex items-center justify-center gap-2 text-xs sm:text-sm transition-all"
-                >
-                  <Save className="w-4 h-4" />
-                  <span>{isSavingProfile ? (isBangla ? 'সংরক্ষণ হচ্ছে...' : 'Saving...') : (isBangla ? 'প্রোফাইল পরিবর্তন সংরক্ষণ করুন' : 'Save Profile Changes')}</span>
-                </button>
-              </form>
+              </div>
             </div>
           )}
 
