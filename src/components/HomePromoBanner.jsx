@@ -11,7 +11,7 @@ export default function HomePromoBanner() {
   return (
     <div className="max-w-7xl mx-auto px-4 my-6 sm:my-8">
       <div className="bg-gradient-to-r from-emerald-950 via-brand-950 to-[#072114] rounded-3xl p-6 sm:p-10 text-white flex flex-col md:flex-row items-center justify-between gap-6 shadow-xl relative overflow-hidden border border-emerald-500/20">
-        
+
         <div className="space-y-3 z-10 text-center md:text-left">
           <span className="inline-block bg-secondary text-brand-950 text-[11px] sm:text-xs font-black px-3.5 py-1 rounded-full uppercase shadow-sm">
             {isBangla ? 'শতভাগ ভেজালমুক্ত নিশ্চয়তা' : '100% Organic & Pure Guarantee'}
