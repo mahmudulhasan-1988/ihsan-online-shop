@@ -1,8 +1,8 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { ArrowRight, Sparkles } from 'lucide-react';
+import { ArrowRight, Sparkles, ChevronLeft, ChevronRight } from 'lucide-react';
 import ProductCard from './ProductCard';
 import { useThemeLanguage } from '@/context/ThemeLanguageContext';
 
@@ -20,11 +20,28 @@ export default function ProductSection({
 }) {
   const { isBangla, t } = useThemeLanguage();
 
+  const ITEMS_PER_PAGE = 4;
+  const [currentPage, setCurrentPage] = useState(1);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [products.length]);
+
   if (!products || products.length === 0) return null;
+
+  const totalPages = Math.ceil(products.length / ITEMS_PER_PAGE);
+  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+  const currentProducts = products.slice(startIndex, startIndex + ITEMS_PER_PAGE);
 
   const displayTitle = isBangla ? title : (titleEn || title);
   const displaySubtitle = isBangla ? subtitle : (subtitleEn || subtitle);
   const displayBadge = isBangla ? badge : (badgeEn || badge);
+
+  const handlePageChange = (newPage) => {
+    if (newPage >= 1 && newPage <= totalPages) {
+      setCurrentPage(newPage);
+    }
+  };
 
   return (
     <section className="max-w-7xl mx-auto px-4 my-8 sm:my-14">
@@ -98,14 +115,74 @@ export default function ProductSection({
         </div>
       )}
 
-      {/* Grid of Product Cards */}
+      {/* Grid of Product Cards (Exactly 4 Cards displayed) */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-6">
-        {products.map((product) => (
+        {currentProducts.map((product) => (
           <ProductCard key={product.id || product._id} product={product} />
         ))}
       </div>
+
+      {/* 📄 Category Pagination (Rendered when products > 4) */}
+      {totalPages > 1 && (
+        <div className="mt-8 flex flex-col sm:flex-row items-center justify-between gap-3 pt-4 border-t border-gray-100 dark:border-emerald-950/60">
+          <p className="text-xs font-medium text-gray-500 dark:text-gray-400">
+            {isBangla 
+              ? `মোট ${products.length}টি পণ্যের মধ্যে ${startIndex + 1}-${Math.min(startIndex + ITEMS_PER_PAGE, products.length)}টি দেখানো হচ্ছে (পৃষ্ঠা ${currentPage}/${totalPages})`
+              : `Showing ${startIndex + 1}-${Math.min(startIndex + ITEMS_PER_PAGE, products.length)} of ${products.length} products (Page ${currentPage}/${totalPages})`}
+          </p>
+
+          <div className="flex items-center gap-1.5">
+            {/* Previous Page */}
+            <button
+              type="button"
+              onClick={() => handlePageChange(currentPage - 1)}
+              disabled={currentPage === 1}
+              className={`p-2 rounded-xl flex items-center justify-center transition-all ${
+                currentPage === 1
+                  ? 'bg-gray-100 dark:bg-emerald-950/20 text-gray-300 dark:text-gray-600 cursor-not-allowed'
+                  : 'bg-white dark:bg-[#14291d] text-gray-700 dark:text-emerald-300 border border-gray-200 dark:border-[#254933] hover:bg-emerald-50 dark:hover:bg-[#1a3827] shadow-sm active:scale-95'
+              }`}
+              aria-label="Previous page"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+
+            {/* Page Number Buttons */}
+            {Array.from({ length: totalPages }, (_, idx) => idx + 1).map((pageNum) => (
+              <button
+                key={pageNum}
+                type="button"
+                onClick={() => handlePageChange(pageNum)}
+                className={`w-8 h-8 rounded-xl text-xs font-black transition-all flex items-center justify-center shadow-sm ${
+                  currentPage === pageNum
+                    ? 'bg-gradient-to-r from-brand-900 to-emerald-800 text-white shadow-md scale-105 border border-emerald-600/40'
+                    : 'bg-white dark:bg-[#14291d] text-gray-700 dark:text-emerald-300 border border-gray-200 dark:border-[#254933] hover:bg-emerald-50 dark:hover:bg-[#1a3827] active:scale-95'
+                }`}
+              >
+                {pageNum}
+              </button>
+            ))}
+
+            {/* Next Page */}
+            <button
+              type="button"
+              onClick={() => handlePageChange(currentPage + 1)}
+              disabled={currentPage === totalPages}
+              className={`p-2 rounded-xl flex items-center justify-center transition-all ${
+                currentPage === totalPages
+                  ? 'bg-gray-100 dark:bg-emerald-950/20 text-gray-300 dark:text-gray-600 cursor-not-allowed'
+                  : 'bg-white dark:bg-[#14291d] text-gray-700 dark:text-emerald-300 border border-gray-200 dark:border-[#254933] hover:bg-emerald-50 dark:hover:bg-[#1a3827] shadow-sm active:scale-95'
+              }`}
+              aria-label="Next page"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
     </section>
   );
 }
+
 
 
