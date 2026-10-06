@@ -51,7 +51,12 @@ import {
   Star,
   Send,
   CheckCircle,
-  ChevronDown
+  ChevronDown,
+  Sun,
+  Moon,
+  PieChart,
+  Activity,
+  User
 } from 'lucide-react';
 import { 
   getStats, 
@@ -93,7 +98,7 @@ import { useThemeLanguage } from '@/context/ThemeLanguageContext';
 export default function AdminDashboardPage() {
   const router = useRouter();
   const { user, logout, showToast } = useCart();
-  const { isBangla, theme } = useThemeLanguage();
+  const { isBangla, theme, toggleTheme } = useThemeLanguage();
 
   // Active Menu Section
   const [activeMenu, setActiveMenu] = useState('dashboard');
@@ -596,6 +601,114 @@ export default function AdminDashboardPage() {
     { id: 'settings', label: isBangla ? 'সিস্টেম সেটিংস' : 'System Settings', icon: Settings, count: null },
   ];
 
+  // Dynamic calculations for Charts & Data Visualization
+  const last7DaysData = React.useMemo(() => {
+    const days = [];
+    const now = new Date();
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(now.getDate() - i);
+      const dateStr = d.toISOString().split('T')[0];
+      const dayNameBn = ['রবি', 'সোম', 'মঙ্গল', 'বুধ', 'বৃহঃ', 'শুক্র', 'শনি'][d.getDay()];
+      const dayNameEn = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][d.getDay()];
+      
+      const dayOrders = (ordersList || []).filter(o => {
+        const oDate = o.createdAt ? new Date(o.createdAt).toISOString().split('T')[0] : (o.date ? new Date(o.date).toISOString().split('T')[0] : '');
+        return oDate === dateStr;
+      });
+
+      const dayRevenue = dayOrders.reduce((sum, o) => sum + (Number(o.total_amount || o.totalPrice || o.total || 0)), 0);
+      days.push({
+        date: dateStr,
+        dayLabel: isBangla ? dayNameBn : dayNameEn,
+        ordersCount: dayOrders.length,
+        revenue: dayRevenue,
+      });
+    }
+
+    const maxRev = Math.max(...days.map(d => d.revenue), 1000);
+    return { days, maxRev };
+  }, [ordersList, isBangla]);
+
+  const orderStatusBreakdown = React.useMemo(() => {
+    const total = ordersList.length || 1;
+    const delivered = ordersList.filter(o => (o.status || '').toLowerCase() === 'delivered' || (o.status || '').toLowerCase() === 'completed').length;
+    const processing = ordersList.filter(o => ['processing', 'confirmed', 'packed', 'shipped'].includes((o.status || '').toLowerCase())).length;
+    const pending = ordersList.filter(o => (o.status || '').toLowerCase() === 'pending').length;
+    const cancelled = ordersList.filter(o => ['cancelled', 'returned'].includes((o.status || '').toLowerCase())).length;
+
+    return {
+      delivered: { count: delivered, pct: Math.round((delivered / total) * 100) },
+      processing: { count: processing, pct: Math.round((processing / total) * 100) },
+      pending: { count: pending, pct: Math.round((pending / total) * 100) },
+      cancelled: { count: cancelled, pct: Math.round((cancelled / total) * 100) },
+      total: ordersList.length
+    };
+  }, [ordersList]);
+
+  const categoryStats = React.useMemo(() => {
+    const map = {};
+    (productsList || []).forEach(p => {
+      const cat = p.category || p.category_name || 'অন্যান্য';
+      map[cat] = (map[cat] || 0) + 1;
+    });
+    const totalProds = productsList.length || 1;
+    return Object.entries(map).map(([name, count]) => ({
+      name,
+      count,
+      pct: Math.round((count / totalProds) * 100)
+    })).sort((a, b) => b.count - a.count).slice(0, 4);
+  }, [productsList]);
+
+  // Strict Role Guard: Only Admin can access /admin
+  if (!user || user.role !== 'admin') {
+    return (
+      <div className="min-h-screen bg-slate-900 text-white flex items-center justify-center p-4">
+        <div className="max-w-md w-full bg-slate-800/90 border border-slate-700 rounded-3xl p-8 text-center shadow-2xl backdrop-blur-xl">
+          <div className="w-16 h-16 rounded-2xl bg-rose-500/20 text-rose-400 flex items-center justify-center text-3xl mx-auto mb-4 border border-rose-500/30">
+            🚫
+          </div>
+          <h2 className="text-2xl font-black mb-2">{isBangla ? 'প্রবেশাধিকার সংরক্ষিত' : 'Access Restricted'}</h2>
+          <p className="text-slate-400 text-sm mb-6">
+            {isBangla
+              ? 'এডমিন ড্যাশবোর্ডে শুধুমাত্র অনুমোদিত এডমিন একাউন্ট প্রবেশ করতে পারবে। আপনার একাউন্টের জন্য প্রযোজ্য ড্যাশবোর্ডে যান।'
+              : 'Only authorized Admin accounts can access the Admin Dashboard. Please proceed to your designated dashboard.'}
+          </p>
+          <div className="flex flex-col gap-3">
+            {user?.role === 'seller' ? (
+              <Link
+                href="/seller"
+                className="w-full py-3.5 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-black rounded-2xl shadow-lg transition-all text-center text-sm"
+              >
+                🏪 {isBangla ? 'সেলার ড্যাশবোর্ডে যান' : 'Go to Seller Dashboard'}
+              </Link>
+            ) : user ? (
+              <Link
+                href="/dashboard"
+                className="w-full py-3.5 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-white font-black rounded-2xl shadow-lg transition-all text-center text-sm"
+              >
+                🛍️ {isBangla ? 'কাস্টমার ড্যাশবোর্ডে যান' : 'Go to Customer Dashboard'}
+              </Link>
+            ) : (
+              <Link
+                href="/auth"
+                className="w-full py-3.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-black rounded-2xl shadow-lg transition-all text-center text-sm"
+              >
+                🔐 {isBangla ? 'এডমিন হিসেবে লগইন করুন' : 'Login as Admin'}
+              </Link>
+            )}
+            <Link
+              href="/"
+              className="w-full py-3 bg-slate-700 hover:bg-slate-600 text-slate-300 font-bold rounded-2xl transition-all text-center text-sm"
+            >
+              🏠 {isBangla ? 'হোমপেজে ফিরে যান' : 'Back to Home'}
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-[#f4f7f4] dark:bg-[#0a150e] text-gray-900 dark:text-emerald-50 flex transition-colors">
       
@@ -634,7 +747,7 @@ export default function AdminDashboardPage() {
           </div>
 
           {/* Nav List */}
-          <nav className="p-3 space-y-1 max-h-[calc(100vh-210px)] overflow-y-auto custom-scrollbar">
+          <nav className="p-3 space-y-1 max-h-[calc(100vh-270px)] overflow-y-auto custom-scrollbar">
             {navMenuItems.map((item) => {
               const Icon = item.icon;
               const isActive = activeMenu === item.id;
@@ -671,13 +784,14 @@ export default function AdminDashboardPage() {
           </nav>
         </div>
 
-        {/* Sidebar Footer User Info & Actions */}
+        {/* Sidebar Footer User Info & Quick Actions (Profile, Settings, Theme) */}
         <div className="p-3 border-t border-[#e0ebe2] dark:border-[#1d3b28] space-y-2">
+          {/* User Avatar Card */}
           <div className="flex items-center gap-2.5 p-2 rounded-2xl bg-gray-50 dark:bg-black/30 border border-gray-100 dark:border-emerald-950">
             {user?.avatar ? (
-              <img src={user.avatar} alt={user.name} className="w-8 h-8 rounded-full object-cover flex-shrink-0 border border-emerald-500/30" />
+              <img src={user.avatar} alt={user.name} className="w-9 h-9 rounded-xl object-cover flex-shrink-0 border border-emerald-500/30" />
             ) : (
-              <div className="w-8 h-8 rounded-full bg-brand-800 text-white flex items-center justify-center font-bold text-xs flex-shrink-0">
+              <div className="w-9 h-9 rounded-xl bg-brand-800 text-white flex items-center justify-center font-bold text-xs flex-shrink-0">
                 {user?.name?.charAt(0) || 'A'}
               </div>
             )}
@@ -685,10 +799,54 @@ export default function AdminDashboardPage() {
               <p className="text-xs font-bold truncate text-gray-900 dark:text-emerald-100">
                 {user?.name || (isBangla ? 'এডমিন মডারেটর' : 'Admin Moderator')}
               </p>
-              <p className="text-[10px] text-gray-500 truncate">{user?.email || user?.phone || '01700000000'}</p>
+              <p className="text-[10px] text-gray-500 truncate">{user?.email || user?.phone || 'admin@ihsan.com'}</p>
             </div>
           </div>
 
+          {/* Quick Action Toolbar (Profile, Settings, Theme) */}
+          <div className={`grid grid-cols-3 gap-1.5 p-1 bg-emerald-50/60 dark:bg-black/40 rounded-2xl border border-emerald-200/50 dark:border-emerald-900/40 ${!isSidebarOpen && 'lg:hidden'}`}>
+            <button
+              type="button"
+              onClick={() => {
+                setActiveMenu('settings');
+                setActiveSubTab('all');
+              }}
+              className="flex flex-col items-center justify-center py-1.5 px-1 rounded-xl text-[10px] font-bold text-gray-700 dark:text-emerald-200 hover:bg-white dark:hover:bg-emerald-900/60 shadow-sm transition-all"
+              title={isBangla ? 'প্রোফাইল' : 'Profile'}
+            >
+              <User className="w-3.5 h-3.5 text-brand-900 dark:text-emerald-400 mb-0.5" />
+              <span className="truncate">{isBangla ? 'প্রোফাইল' : 'Profile'}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setActiveMenu('settings');
+                setActiveSubTab('all');
+              }}
+              className="flex flex-col items-center justify-center py-1.5 px-1 rounded-xl text-[10px] font-bold text-gray-700 dark:text-emerald-200 hover:bg-white dark:hover:bg-emerald-900/60 shadow-sm transition-all"
+              title={isBangla ? 'সেটিংস' : 'Settings'}
+            >
+              <Settings className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400 mb-0.5" />
+              <span className="truncate">{isBangla ? 'সেটিংস' : 'Settings'}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={toggleTheme}
+              className="flex flex-col items-center justify-center py-1.5 px-1 rounded-xl text-[10px] font-bold text-amber-700 dark:text-amber-300 hover:bg-white dark:hover:bg-emerald-900/60 shadow-sm transition-all"
+              title={isBangla ? 'থিম পরিবর্তন' : 'Toggle Theme'}
+            >
+              {theme === 'dark' ? (
+                <Sun className="w-3.5 h-3.5 text-amber-400 mb-0.5" />
+              ) : (
+                <Moon className="w-3.5 h-3.5 text-amber-600 mb-0.5" />
+              )}
+              <span className="truncate">{theme === 'dark' ? (isBangla ? 'লাইট' : 'Light') : (isBangla ? 'ডার্ক' : 'Dark')}</span>
+            </button>
+          </div>
+
+          {/* Quick Footer Links */}
           <div className={`flex flex-col gap-1.5 ${!isSidebarOpen && 'lg:hidden'}`}>
             <Link
               href="/"
@@ -837,6 +995,269 @@ export default function AdminDashboardPage() {
                   </div>
                 </div>
               )}
+
+              {/* ======================================================== */}
+              {/* 📈 3 INTERACTIVE CHARTS & QUICK DATA VISUALIZATION         */}
+              {/* ======================================================== */}
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                
+                {/* 1. 7-Day Revenue & Sales Trend Bar Chart */}
+                <div className="lg:col-span-2 bg-white dark:bg-[#112318] p-6 rounded-3xl border border-[#e0ebe2] dark:border-[#1d3b28] shadow-sm space-y-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[#e0ebe2] dark:border-[#1d3b28] pb-4">
+                    <div>
+                      <h3 className="text-base sm:text-lg font-black text-gray-900 dark:text-emerald-100 flex items-center gap-2">
+                        <TrendingUp className="w-5 h-5 text-emerald-600" />
+                        <span>{isBangla ? 'গত ৭ দিনের সেলস ও রেভিনিউ অ্যানালিটিক্স' : '7-Day Sales & Revenue Trend'}</span>
+                      </h3>
+                      <p className="text-xs text-gray-500 dark:text-emerald-400">
+                        {isBangla ? 'MongoDB থেকে লাইভ অর্ডারের দৈনিক বিক্রয় ও অর্ডারের সংখ্যা' : 'Live daily revenue and order volume from MongoDB'}
+                      </p>
+                    </div>
+                    <span className="text-xs font-black bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 px-3 py-1 rounded-full self-start sm:self-auto">
+                      {isBangla ? 'লাইভ ট্রেন্ড 🟢' : 'Live Sync 🟢'}
+                    </span>
+                  </div>
+
+                  {/* SVG Bar Chart with Tooltips & Metric Bars */}
+                  <div className="pt-2">
+                    <div className="h-56 w-full flex items-end justify-between gap-2 sm:gap-4 px-2 pb-4 pt-6 bg-[#f8faf8] dark:bg-black/20 rounded-2xl border border-gray-100 dark:border-emerald-950/80">
+                      {last7DaysData.days.map((item, idx) => {
+                        const heightPct = Math.max(Math.round((item.revenue / (last7DaysData.maxRev || 1)) * 100), item.revenue > 0 ? 15 : 6);
+                        return (
+                          <div key={idx} className="flex-1 flex flex-col items-center h-full justify-end group relative">
+                            {/* Hover Tooltip */}
+                            <div className="absolute -top-10 opacity-0 group-hover:opacity-100 transition-all duration-200 pointer-events-none z-20 bg-slate-900 text-white text-[11px] font-bold py-1 px-2.5 rounded-xl shadow-xl whitespace-nowrap">
+                              <span>৳ {item.revenue.toLocaleString()}</span>
+                              <span className="text-emerald-400 block text-[9px]">{item.ordersCount} {isBangla ? 'অর্ডার' : 'orders'}</span>
+                            </div>
+
+                            {/* Bar Pillar */}
+                            <div className="w-full max-w-[42px] bg-emerald-100/60 dark:bg-emerald-950/40 rounded-xl flex items-end p-1 h-full">
+                              <div
+                                style={{ height: `${heightPct}%` }}
+                                className={`w-full rounded-lg transition-all duration-500 relative ${
+                                  item.revenue > 0
+                                    ? 'bg-gradient-to-t from-emerald-600 via-emerald-500 to-teal-400 shadow-md group-hover:brightness-110'
+                                    : 'bg-gray-200 dark:bg-gray-800'
+                                }`}
+                              >
+                                {item.ordersCount > 0 && (
+                                  <span className="absolute -top-5 left-1/2 -translate-x-1/2 text-[9px] font-black text-emerald-800 dark:text-emerald-300">
+                                    {item.ordersCount}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* X-Axis Label */}
+                            <span className="text-[11px] font-extrabold text-gray-600 dark:text-emerald-300 mt-2">
+                              {item.dayLabel}
+                            </span>
+                            <span className="text-[9px] text-gray-400 font-medium">
+                              {item.date.split('-')[2]}/{item.date.split('-')[1]}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {/* Chart Footer Summary Cards */}
+                    <div className="grid grid-cols-3 gap-3 pt-3">
+                      <div className="p-2.5 rounded-2xl bg-emerald-50/70 dark:bg-black/30 border border-emerald-200 dark:border-emerald-900/50">
+                        <span className="text-[10px] text-gray-500 font-semibold block">{isBangla ? '৭ দিনের মোট বিক্রয়' : '7-Day Total'}</span>
+                        <span className="text-xs sm:text-sm font-black text-emerald-700 dark:text-emerald-300">
+                          ৳ {last7DaysData.days.reduce((s, d) => s + d.revenue, 0).toLocaleString()}
+                        </span>
+                      </div>
+
+                      <div className="p-2.5 rounded-2xl bg-blue-50/70 dark:bg-black/30 border border-blue-200 dark:border-blue-900/50">
+                        <span className="text-[10px] text-gray-500 font-semibold block">{isBangla ? 'মোট অর্ডার' : 'Total Orders'}</span>
+                        <span className="text-xs sm:text-sm font-black text-blue-700 dark:text-blue-300">
+                          {last7DaysData.days.reduce((s, d) => s + d.ordersCount, 0)} {isBangla ? 'টি' : 'orders'}
+                        </span>
+                      </div>
+
+                      <div className="p-2.5 rounded-2xl bg-purple-50/70 dark:bg-black/30 border border-purple-200 dark:border-purple-900/50">
+                        <span className="text-[10px] text-gray-500 font-semibold block">{isBangla ? 'সর্বোচ্চ দিনের বিক্রয়' : 'Peak Day'}</span>
+                        <span className="text-xs sm:text-sm font-black text-purple-700 dark:text-purple-300">
+                          ৳ {Math.max(...last7DaysData.days.map(d => d.revenue)).toLocaleString()}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 2. Order Status Breakdown (Doughnut / Radial Visualization) */}
+                <div className="bg-white dark:bg-[#112318] p-6 rounded-3xl border border-[#e0ebe2] dark:border-[#1d3b28] shadow-sm space-y-4 flex flex-col justify-between">
+                  <div>
+                    <div className="border-b border-[#e0ebe2] dark:border-[#1d3b28] pb-4">
+                      <h3 className="text-base sm:text-lg font-black text-gray-900 dark:text-emerald-100 flex items-center gap-2">
+                        <PieChart className="w-5 h-5 text-blue-600" />
+                        <span>{isBangla ? 'অর্ডার স্ট্যাটাস বিন্যাস' : 'Order Status Share'}</span>
+                      </h3>
+                      <p className="text-xs text-gray-500 dark:text-emerald-400">
+                        {isBangla ? 'সকল অর্ডারের বর্তমান অবস্থা ও শতকরা হার' : 'Live breakdown of orders by fulfillment stage'}
+                      </p>
+                    </div>
+
+                    {/* Circular Doughnut Center SVG */}
+                    <div className="py-4 flex flex-col items-center justify-center">
+                      <div className="relative w-36 h-36 flex items-center justify-center">
+                        <svg className="w-full h-full -rotate-90" viewBox="0 0 36 36">
+                          {/* Background Ring */}
+                          <circle cx="18" cy="18" r="15.915" fill="none" stroke="currentColor" strokeWidth="3.8" className="text-gray-100 dark:text-emerald-950" />
+                          
+                          {/* Delivered Arc */}
+                          <circle
+                            cx="18"
+                            cy="18"
+                            r="15.915"
+                            fill="none"
+                            stroke="#10b981"
+                            strokeWidth="3.8"
+                            strokeDasharray={`${orderStatusBreakdown.delivered.pct} 100`}
+                            strokeDashoffset="0"
+                            strokeLinecap="round"
+                            className="transition-all duration-700"
+                          />
+
+                          {/* Processing Arc */}
+                          <circle
+                            cx="18"
+                            cy="18"
+                            r="15.915"
+                            fill="none"
+                            stroke="#3b82f6"
+                            strokeWidth="3.8"
+                            strokeDasharray={`${orderStatusBreakdown.processing.pct} 100`}
+                            strokeDashoffset={`-${orderStatusBreakdown.delivered.pct}`}
+                            strokeLinecap="round"
+                            className="transition-all duration-700"
+                          />
+
+                          {/* Pending Arc */}
+                          <circle
+                            cx="18"
+                            cy="18"
+                            r="15.915"
+                            fill="none"
+                            stroke="#f59e0b"
+                            strokeWidth="3.8"
+                            strokeDasharray={`${orderStatusBreakdown.pending.pct} 100`}
+                            strokeDashoffset={`-${orderStatusBreakdown.delivered.pct + orderStatusBreakdown.processing.pct}`}
+                            strokeLinecap="round"
+                            className="transition-all duration-700"
+                          />
+                        </svg>
+
+                        <div className="absolute inset-0 flex flex-col items-center justify-center text-center pointer-events-none">
+                          <span className="text-xl font-black text-gray-900 dark:text-emerald-100">{ordersList.length}</span>
+                          <span className="text-[10px] text-gray-500 font-bold uppercase">{isBangla ? 'মোট অর্ডার' : 'Total'}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Legends */}
+                    <div className="space-y-2 pt-1">
+                      <div className="flex items-center justify-between p-2 rounded-xl bg-emerald-50/70 dark:bg-black/30 border border-emerald-200/60 dark:border-emerald-900/40 text-xs">
+                        <div className="flex items-center gap-2 font-bold text-emerald-800 dark:text-emerald-300">
+                          <span className="w-3 h-3 rounded-full bg-emerald-500 inline-block" />
+                          <span>{isBangla ? 'ডেলিভারড (সম্পন্ন)' : 'Delivered'}</span>
+                        </div>
+                        <span className="font-black text-gray-900 dark:text-emerald-100">{orderStatusBreakdown.delivered.count} ({orderStatusBreakdown.delivered.pct}%)</span>
+                      </div>
+
+                      <div className="flex items-center justify-between p-2 rounded-xl bg-blue-50/70 dark:bg-black/30 border border-blue-200/60 dark:border-blue-900/40 text-xs">
+                        <div className="flex items-center gap-2 font-bold text-blue-800 dark:text-blue-300">
+                          <span className="w-3 h-3 rounded-full bg-blue-500 inline-block" />
+                          <span>{isBangla ? 'প্রসেসিং / শিপড' : 'Processing'}</span>
+                        </div>
+                        <span className="font-black text-gray-900 dark:text-emerald-100">{orderStatusBreakdown.processing.count} ({orderStatusBreakdown.processing.pct}%)</span>
+                      </div>
+
+                      <div className="flex items-center justify-between p-2 rounded-xl bg-amber-50/70 dark:bg-black/30 border border-amber-200/60 dark:border-amber-900/40 text-xs">
+                        <div className="flex items-center gap-2 font-bold text-amber-800 dark:text-amber-300">
+                          <span className="w-3 h-3 rounded-full bg-amber-500 inline-block" />
+                          <span>{isBangla ? 'পেন্ডিং অর্ডার' : 'Pending'}</span>
+                        </div>
+                        <span className="font-black text-gray-900 dark:text-emerald-100">{orderStatusBreakdown.pending.count} ({orderStatusBreakdown.pending.pct}%)</span>
+                      </div>
+
+                      <div className="flex items-center justify-between p-2 rounded-xl bg-rose-50/70 dark:bg-black/30 border border-rose-200/60 dark:border-rose-900/40 text-xs">
+                        <div className="flex items-center gap-2 font-bold text-rose-800 dark:text-rose-300">
+                          <span className="w-3 h-3 rounded-full bg-rose-500 inline-block" />
+                          <span>{isBangla ? 'বাতিলকৃত' : 'Cancelled'}</span>
+                        </div>
+                        <span className="font-black text-gray-900 dark:text-emerald-100">{orderStatusBreakdown.cancelled.count} ({orderStatusBreakdown.cancelled.pct}%)</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 3. Category Share & Top Multi-Vendor Visualization */}
+                <div className="lg:col-span-3 bg-white dark:bg-[#112318] p-6 rounded-3xl border border-[#e0ebe2] dark:border-[#1d3b28] shadow-sm space-y-4">
+                  <div className="border-b border-[#e0ebe2] dark:border-[#1d3b28] pb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <div>
+                      <h3 className="text-base sm:text-lg font-black text-gray-900 dark:text-emerald-100 flex items-center gap-2">
+                        <Activity className="w-5 h-5 text-brand-900 dark:text-emerald-400" />
+                        <span>{isBangla ? 'ক্যাটাগরি ও শীর্ষ সেলারদের পারফরম্যান্স' : 'Category & Top Seller Performance'}</span>
+                      </h3>
+                      <p className="text-xs text-gray-500 dark:text-emerald-400">
+                        {isBangla ? 'শীর্ষ ক্যাটাগরি ও নিবন্ধিত ভেন্ডরদের সক্রিয় প্রোডাক্ট পরিসংখ্যান' : 'Distribution of active products across top categories and vendors'}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
+                    {/* Category Distribution Progress Bars */}
+                    <div className="space-y-3">
+                      <h4 className="text-xs font-bold uppercase text-gray-500 dark:text-emerald-400 tracking-wider">
+                        {isBangla ? '📦 ক্যাটাগরি শেয়ার' : '📦 Category Share'}
+                      </h4>
+                      {categoryStats.map((cat, idx) => (
+                        <div key={idx} className="space-y-1">
+                          <div className="flex items-center justify-between text-xs font-extrabold">
+                            <span className="text-gray-800 dark:text-emerald-100">{cat.name}</span>
+                            <span className="text-emerald-700 dark:text-emerald-300">{cat.count} {isBangla ? 'পণ্য' : 'items'} ({cat.pct}%)</span>
+                          </div>
+                          <div className="w-full bg-gray-100 dark:bg-emerald-950/60 rounded-full h-2.5 overflow-hidden">
+                            <div
+                              style={{ width: `${Math.max(cat.pct, 8)}%` }}
+                              className="h-full bg-gradient-to-r from-brand-800 to-emerald-500 rounded-full transition-all duration-500"
+                            />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Top Performing Vendors */}
+                    <div className="space-y-3">
+                      <h4 className="text-xs font-bold uppercase text-gray-500 dark:text-emerald-400 tracking-wider">
+                        {isBangla ? '🏪 নিবন্ধিত সেলার ও ভেন্ডর প্রোফাইল' : '🏪 Registered Sellers & Vendors'}
+                      </h4>
+                      <div className="space-y-2">
+                        {sellersList.slice(0, 3).map((seller, sIdx) => (
+                          <div key={sIdx} className="p-2.5 rounded-2xl bg-[#f8faf8] dark:bg-black/30 border border-gray-100 dark:border-emerald-950 flex items-center justify-between gap-3">
+                            <div className="flex items-center gap-3 min-w-0">
+                              <div className="w-9 h-9 rounded-xl bg-amber-500 text-brand-950 font-black flex items-center justify-center text-xs flex-shrink-0">
+                                🏪
+                              </div>
+                              <div className="min-w-0">
+                                <p className="text-xs font-black truncate text-gray-900 dark:text-emerald-100">{seller.shop_name || seller.name}</p>
+                                <p className="text-[10px] text-gray-500 truncate">{seller.email || seller.phone || 'Verified'}</p>
+                              </div>
+                            </div>
+                            <span className="text-[10px] font-black px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
+                              {seller.status === 'active' ? (isBangla ? 'সক্রিয় 🟢' : 'Active') : (isBangla ? 'পেন্ডিং 🟡' : 'Pending')}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+              </div>
 
               {/* Recent Orders Overview */}
               <div className="bg-white dark:bg-[#112318] rounded-3xl p-6 border border-[#e0ebe2] dark:border-[#1d3b28] shadow-sm space-y-4">

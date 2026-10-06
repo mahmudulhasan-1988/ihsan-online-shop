@@ -39,7 +39,13 @@ import {
   Image as ImageIcon,
   ChevronDown,
   Filter,
-  RefreshCw
+  RefreshCw,
+  Sun,
+  Moon,
+  PieChart,
+  TrendingUp,
+  Activity,
+  Settings
 } from 'lucide-react';
 import { 
   getProducts,
@@ -65,7 +71,7 @@ import { useThemeLanguage } from '@/context/ThemeLanguageContext';
 
 export default function SellerDashboardPage() {
   const { user, logout, showToast } = useCart();
-  const { isBangla } = useThemeLanguage();
+  const { isBangla, theme, toggleTheme } = useThemeLanguage();
 
   const [activeMenu, setActiveMenu] = useState('vendor_management'); // Default to 'vendor_management' or 'dashboard'
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
@@ -581,6 +587,66 @@ export default function SellerDashboardPage() {
     }
   };
 
+  // Dynamic calculations for Seller Charts & Visualizations
+  const sellerChartData = React.useMemo(() => {
+    const days = [];
+    const now = new Date();
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(now.getDate() - i);
+      const dateStr = d.toISOString().split('T')[0];
+      const dayNameBn = ['রবি', 'সোম', 'মঙ্গল', 'বুধ', 'বৃহঃ', 'শুক্র', 'শনি'][d.getDay()];
+      const dayNameEn = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][d.getDay()];
+      
+      const dayOrders = (myOrders || []).filter(o => {
+        const oDate = o.createdAt ? new Date(o.createdAt).toISOString().split('T')[0] : (o.date ? new Date(o.date).toISOString().split('T')[0] : '');
+        return oDate === dateStr;
+      });
+
+      const dayRevenue = dayOrders.reduce((sum, o) => sum + (Number(o.total_amount || o.totalPrice || o.total || 0)), 0);
+      days.push({
+        date: dateStr,
+        dayLabel: isBangla ? dayNameBn : dayNameEn,
+        ordersCount: dayOrders.length,
+        revenue: dayRevenue,
+      });
+    }
+
+    const maxRev = Math.max(...days.map(d => d.revenue), 500);
+    return { days, maxRev };
+  }, [myOrders, isBangla]);
+
+  const stockHealthData = React.useMemo(() => {
+    const total = myProducts.length || 1;
+    const inStock = myProducts.filter(p => (Number(p.stock || p.stock_quantity) || 0) > 15).length;
+    const lowStock = myProducts.filter(p => (Number(p.stock || p.stock_quantity) || 0) > 0 && (Number(p.stock || p.stock_quantity) || 0) <= 15).length;
+    const outOfStock = myProducts.filter(p => (Number(p.stock || p.stock_quantity) || 0) <= 0).length;
+
+    return {
+      inStock: { count: inStock, pct: Math.round((inStock / total) * 100) },
+      lowStock: { count: lowStock, pct: Math.round((lowStock / total) * 100) },
+      outOfStock: { count: outOfStock, pct: Math.round((outOfStock / total) * 100) },
+      total: myProducts.length
+    };
+  }, [myProducts]);
+
+  const earningsBreakdownData = React.useMemo(() => {
+    const totalSales = Number(sellerInfo.total_sales) || 0;
+    const commissionRate = Number(sellerInfo.commission_rate) || 10;
+    const platformCommission = Math.round(totalSales * (commissionRate / 100));
+    const netEarnings = totalSales - platformCommission;
+    const availableBalance = Number(sellerInfo.balance) || 0;
+
+    return {
+      totalSales,
+      platformCommission,
+      netEarnings,
+      availableBalance,
+      commissionRate
+    };
+  }, [sellerInfo]);
+
+  // Strict Role Guard: Only Seller or Admin can access /seller
   if (!user || (user.role !== 'seller' && user.role !== 'admin')) {
     return (
       <div className="min-h-screen bg-slate-900 text-white flex items-center justify-center p-4">
@@ -588,22 +654,33 @@ export default function SellerDashboardPage() {
           <div className="w-16 h-16 rounded-2xl bg-amber-500/20 text-amber-400 flex items-center justify-center text-3xl mx-auto mb-4 border border-amber-500/30">
             🚫
           </div>
-          <h2 className="text-2xl font-black mb-2">Access Restricted</h2>
+          <h2 className="text-2xl font-black mb-2">{isBangla ? 'প্রবেশাধিকার সংরক্ষিত' : 'Access Restricted'}</h2>
           <p className="text-slate-400 text-sm mb-6">
-            এই প্যানেলে শুধুমাত্র সেলার বা এডমিন একাউন্ট প্রবেশ করতে পারবে।
+            {isBangla
+              ? 'সেলার ড্যাশবোর্ডে শুধুমাত্র অনুমোদিত সেলার ও এডমিন প্রবেশ করতে পারবে। আপনার একাউন্টের ড্যাশবোর্ডে যান।'
+              : 'Only authorized Sellers and Admin can access the Seller Dashboard. Please proceed to your designated dashboard.'}
           </p>
           <div className="flex flex-col gap-3">
-            <Link
-              href="/auth"
-              className="w-full py-3.5 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-bold rounded-2xl shadow-lg transition-all"
-            >
-              Login with Seller / Admin Account
-            </Link>
+            {user?.role === 'customer' ? (
+              <Link
+                href="/dashboard"
+                className="w-full py-3.5 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-white font-black rounded-2xl shadow-lg transition-all text-center text-sm"
+              >
+                🛍️ {isBangla ? 'কাস্টমার ড্যাশবোর্ডে যান' : 'Go to Customer Dashboard'}
+              </Link>
+            ) : (
+              <Link
+                href="/auth"
+                className="w-full py-3.5 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-black rounded-2xl shadow-lg transition-all text-center text-sm"
+              >
+                🔐 {isBangla ? 'সেলার একাউন্টে লগইন করুন' : 'Login with Seller Account'}
+              </Link>
+            )}
             <Link
               href="/"
-              className="w-full py-3 bg-slate-700 hover:bg-slate-600 text-slate-300 font-bold rounded-2xl transition-all"
+              className="w-full py-3 bg-slate-700 hover:bg-slate-600 text-slate-300 font-bold rounded-2xl transition-all text-center text-sm"
             >
-              Back to Home
+              🏠 {isBangla ? 'হোমপেজে ফিরে যান' : 'Back to Home'}
             </Link>
           </div>
         </div>
@@ -650,7 +727,7 @@ export default function SellerDashboardPage() {
                   Ihsan Online Shop
                 </h2>
                 <span className="text-[10px] font-black text-amber-600 dark:text-amber-400 uppercase tracking-wider">
-                  {user?.role ? `${user.role} PANEL` : 'SELLER PANEL'}
+                  {user?.role ? `${user.role.toUpperCase()} PANEL` : 'SELLER PANEL'}
                 </span>
               </div>
             </Link>
@@ -663,7 +740,7 @@ export default function SellerDashboardPage() {
           </div>
 
           {/* Nav List */}
-          <nav className="p-3 space-y-1">
+          <nav className="p-3 space-y-1 max-h-[calc(100vh-270px)] overflow-y-auto custom-scrollbar">
             {navMenuItems.map((item) => {
               const Icon = item.icon;
               const isActive = activeMenu === item.id;
@@ -693,8 +770,9 @@ export default function SellerDashboardPage() {
           </nav>
         </div>
 
-        {/* Sidebar Shop Info & Bottom Buttons */}
+        {/* Sidebar Shop Info & Bottom Quick Actions (Profile, Settings, Theme) */}
         <div className="p-3 border-t border-[#e0ebe2] dark:border-[#1d3b28] space-y-2">
+          {/* Avatar / Shop Card */}
           <div className="p-2.5 rounded-2xl bg-amber-50/80 dark:bg-emerald-950/60 border border-amber-200 dark:border-emerald-800 flex items-center gap-2.5">
             {user?.avatar ? (
               <img src={user.avatar} alt={sellerInfo.shop_name} className="w-9 h-9 rounded-xl object-cover border" />
@@ -705,6 +783,43 @@ export default function SellerDashboardPage() {
               <p className="text-xs font-bold truncate text-gray-900 dark:text-emerald-100">{user?.name || sellerInfo.shop_name}</p>
               <p className="text-[10px] text-amber-700 dark:text-amber-400 font-extrabold">Balance: ৳ {sellerInfo.balance}</p>
             </div>
+          </div>
+
+          {/* Quick Action Toolbar (Profile, Settings, Theme) */}
+          <div className={`grid grid-cols-3 gap-1.5 p-1 bg-amber-50/60 dark:bg-black/40 rounded-2xl border border-amber-200/50 dark:border-emerald-900/40 ${!isSidebarOpen && 'lg:hidden'}`}>
+            <button
+              type="button"
+              onClick={() => setActiveMenu('vendor_management')}
+              className="flex flex-col items-center justify-center py-1.5 px-1 rounded-xl text-[10px] font-bold text-gray-700 dark:text-emerald-200 hover:bg-white dark:hover:bg-emerald-900/60 shadow-sm transition-all"
+              title={isBangla ? 'প্রোফাইল' : 'Profile'}
+            >
+              <User className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 mb-0.5" />
+              <span className="truncate">{isBangla ? 'প্রোফাইল' : 'Profile'}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveMenu('vendor_management')}
+              className="flex flex-col items-center justify-center py-1.5 px-1 rounded-xl text-[10px] font-bold text-gray-700 dark:text-emerald-200 hover:bg-white dark:hover:bg-emerald-900/60 shadow-sm transition-all"
+              title={isBangla ? 'সেটিংস' : 'Settings'}
+            >
+              <Settings className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400 mb-0.5" />
+              <span className="truncate">{isBangla ? 'সেটিংস' : 'Settings'}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={toggleTheme}
+              className="flex flex-col items-center justify-center py-1.5 px-1 rounded-xl text-[10px] font-bold text-amber-700 dark:text-amber-300 hover:bg-white dark:hover:bg-emerald-900/60 shadow-sm transition-all"
+              title={isBangla ? 'থিম পরিবর্তন' : 'Toggle Theme'}
+            >
+              {theme === 'dark' ? (
+                <Sun className="w-3.5 h-3.5 text-amber-400 mb-0.5" />
+              ) : (
+                <Moon className="w-3.5 h-3.5 text-amber-600 mb-0.5" />
+              )}
+              <span className="truncate">{theme === 'dark' ? (isBangla ? 'লাইট' : 'Light') : (isBangla ? 'ডার্ক' : 'Dark')}</span>
+            </button>
           </div>
 
           <div className="grid grid-cols-2 gap-2 pt-1">
@@ -773,18 +888,23 @@ export default function SellerDashboardPage() {
               🏪 {isBangla ? 'স্টোর ভিউ' : 'Store'}
             </Link>
 
-            <Link
-              href="/admin"
-              className="text-xs font-bold bg-brand-900 hover:bg-brand-800 text-white px-3.5 py-2 rounded-xl transition-all shadow-sm"
-            >
-              {isBangla ? 'এডমিন' : 'Admin'}
-            </Link>
-            <Link
-              href="/dashboard"
-              className="text-xs font-bold bg-emerald-100 dark:bg-emerald-950 text-brand-900 dark:text-emerald-300 px-3.5 py-2 rounded-xl"
-            >
-              {isBangla ? 'কাস্টমার' : 'Customer'}
-            </Link>
+            {/* Master Admin Switch (Only Admin can see and switch between Admin and Customer dashboards) */}
+            {user?.role === 'admin' && (
+              <>
+                <Link
+                  href="/admin"
+                  className="text-xs font-bold bg-brand-900 hover:bg-brand-800 text-white px-3.5 py-2 rounded-xl transition-all shadow-sm"
+                >
+                  {isBangla ? 'এডমিন' : 'Admin'}
+                </Link>
+                <Link
+                  href="/dashboard"
+                  className="text-xs font-bold bg-emerald-100 dark:bg-emerald-950 text-brand-900 dark:text-emerald-300 px-3.5 py-2 rounded-xl"
+                >
+                  {isBangla ? 'কাস্টমার' : 'Customer'}
+                </Link>
+              </>
+            )}
           </div>
         </header>
 
@@ -835,6 +955,219 @@ export default function SellerDashboardPage() {
                     <h3 className="text-xl sm:text-2xl font-black text-gray-900 dark:text-emerald-100">⭐ {sellerInfo.rating}</h3>
                   </div>
                 </div>
+              </div>
+
+              {/* ======================================================== */}
+              {/* 📈 3 INTERACTIVE SELLER CHARTS & VISUALIZATIONS            */}
+              {/* ======================================================== */}
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                
+                {/* 1. Seller Weekly Sales Trend Chart */}
+                <div className="lg:col-span-2 bg-white dark:bg-[#112318] p-6 rounded-3xl border border-[#e0ebe2] dark:border-[#1d3b28] shadow-sm space-y-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[#e0ebe2] dark:border-[#1d3b28] pb-4">
+                    <div>
+                      <h3 className="text-base sm:text-lg font-black text-gray-900 dark:text-emerald-100 flex items-center gap-2">
+                        <TrendingUp className="w-5 h-5 text-amber-500" />
+                        <span>{isBangla ? 'স্টোর সেলস ও আর্নিংস ট্রেন্ড' : 'Store Sales & Earnings Trend'}</span>
+                      </h3>
+                      <p className="text-xs text-gray-500 dark:text-emerald-400">
+                        {isBangla ? 'গত ৭ দিনে আপনার স্টোরের বিক্রয় ও অর্ডারের সংখ্যা' : 'Your store order volume & revenue over last 7 days'}
+                      </p>
+                    </div>
+                    <span className="text-xs font-black bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300 px-3 py-1 rounded-full self-start sm:self-auto">
+                      {isBangla ? 'ভেন্ডর অ্যানালিটিক্স 📊' : 'Vendor Stats 📊'}
+                    </span>
+                  </div>
+
+                  {/* SVG Bar Chart with Tooltips */}
+                  <div className="pt-2">
+                    <div className="h-52 w-full flex items-end justify-between gap-2 sm:gap-4 px-2 pb-4 pt-6 bg-[#f8faf8] dark:bg-black/20 rounded-2xl border border-gray-100 dark:border-emerald-950/80">
+                      {sellerChartData.days.map((item, idx) => {
+                        const heightPct = Math.max(Math.round((item.revenue / (sellerChartData.maxRev || 1)) * 100), item.revenue > 0 ? 15 : 6);
+                        return (
+                          <div key={idx} className="flex-1 flex flex-col items-center h-full justify-end group relative">
+                            {/* Hover Tooltip */}
+                            <div className="absolute -top-10 opacity-0 group-hover:opacity-100 transition-all duration-200 pointer-events-none z-20 bg-slate-900 text-white text-[11px] font-bold py-1 px-2.5 rounded-xl shadow-xl whitespace-nowrap">
+                              <span>৳ {item.revenue.toLocaleString()}</span>
+                              <span className="text-amber-400 block text-[9px]">{item.ordersCount} {isBangla ? 'অর্ডার' : 'orders'}</span>
+                            </div>
+
+                            {/* Bar Pillar */}
+                            <div className="w-full max-w-[40px] bg-amber-100/60 dark:bg-amber-950/40 rounded-xl flex items-end p-1 h-full">
+                              <div
+                                style={{ height: `${heightPct}%` }}
+                                className={`w-full rounded-lg transition-all duration-500 relative ${
+                                  item.revenue > 0
+                                    ? 'bg-gradient-to-t from-amber-500 via-orange-400 to-amber-300 shadow-md group-hover:brightness-110'
+                                    : 'bg-gray-200 dark:bg-gray-800'
+                                }`}
+                              >
+                                {item.ordersCount > 0 && (
+                                  <span className="absolute -top-5 left-1/2 -translate-x-1/2 text-[9px] font-black text-amber-700 dark:text-amber-300">
+                                    {item.ordersCount}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* X-Axis Label */}
+                            <span className="text-[11px] font-extrabold text-gray-600 dark:text-emerald-300 mt-2">
+                              {item.dayLabel}
+                            </span>
+                            <span className="text-[9px] text-gray-400 font-medium">
+                              {item.date.split('-')[2]}/{item.date.split('-')[1]}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 pt-3">
+                      <div className="p-2.5 rounded-2xl bg-amber-50/70 dark:bg-black/30 border border-amber-200 dark:border-emerald-900/50">
+                        <span className="text-[10px] text-gray-500 font-semibold block">{isBangla ? '৭ দিনের বিক্রয়' : '7-Day Revenue'}</span>
+                        <span className="text-xs sm:text-sm font-black text-amber-700 dark:text-amber-300">
+                          ৳ {sellerChartData.days.reduce((s, d) => s + d.revenue, 0).toLocaleString()}
+                        </span>
+                      </div>
+                      <div className="p-2.5 rounded-2xl bg-emerald-50/70 dark:bg-black/30 border border-emerald-200 dark:border-emerald-900/50">
+                        <span className="text-[10px] text-gray-500 font-semibold block">{isBangla ? 'অর্ডার সংখ্যা' : 'Total Orders'}</span>
+                        <span className="text-xs sm:text-sm font-black text-emerald-700 dark:text-emerald-300">
+                          {sellerChartData.days.reduce((s, d) => s + d.ordersCount, 0)} {isBangla ? 'টি' : 'orders'}
+                        </span>
+                      </div>
+                      <div className="p-2.5 rounded-2xl bg-purple-50/70 dark:bg-black/30 border border-purple-200 dark:border-emerald-900/50 col-span-2 sm:col-span-1">
+                        <span className="text-[10px] text-gray-500 font-semibold block">{isBangla ? 'কমিশন রেট' : 'Commission'}</span>
+                        <span className="text-xs sm:text-sm font-black text-purple-700 dark:text-purple-300">
+                          {earningsBreakdownData.commissionRate}%
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 2. Product Inventory & Stock Health Chart */}
+                <div className="bg-white dark:bg-[#112318] p-6 rounded-3xl border border-[#e0ebe2] dark:border-[#1d3b28] shadow-sm space-y-4 flex flex-col justify-between">
+                  <div>
+                    <div className="border-b border-[#e0ebe2] dark:border-[#1d3b28] pb-4">
+                      <h3 className="text-base sm:text-lg font-black text-gray-900 dark:text-emerald-100 flex items-center gap-2">
+                        <PieChart className="w-5 h-5 text-emerald-600" />
+                        <span>{isBangla ? 'ইনভেন্টরি ও স্টক হেলথ' : 'Stock & Inventory Health'}</span>
+                      </h3>
+                      <p className="text-xs text-gray-500 dark:text-emerald-400">
+                        {isBangla ? 'আপনার পণ্যের মজুদ ও স্টক অবস্থা' : 'Live status of your product stock levels'}
+                      </p>
+                    </div>
+
+                    {/* Stock Health Doughnut Ring */}
+                    <div className="py-4 flex flex-col items-center justify-center">
+                      <div className="relative w-32 h-32 flex items-center justify-center">
+                        <svg className="w-full h-full -rotate-90" viewBox="0 0 36 36">
+                          <circle cx="18" cy="18" r="15.915" fill="none" stroke="currentColor" strokeWidth="3.8" className="text-gray-100 dark:text-emerald-950" />
+                          <circle
+                            cx="18"
+                            cy="18"
+                            r="15.915"
+                            fill="none"
+                            stroke="#10b981"
+                            strokeWidth="3.8"
+                            strokeDasharray={`${stockHealthData.inStock.pct} 100`}
+                            strokeDashoffset="0"
+                            strokeLinecap="round"
+                            className="transition-all duration-700"
+                          />
+                          <circle
+                            cx="18"
+                            cy="18"
+                            r="15.915"
+                            fill="none"
+                            stroke="#f59e0b"
+                            strokeWidth="3.8"
+                            strokeDasharray={`${stockHealthData.lowStock.pct} 100`}
+                            strokeDashoffset={`-${stockHealthData.inStock.pct}`}
+                            strokeLinecap="round"
+                            className="transition-all duration-700"
+                          />
+                        </svg>
+                        <div className="absolute inset-0 flex flex-col items-center justify-center text-center pointer-events-none">
+                          <span className="text-xl font-black text-gray-900 dark:text-emerald-100">{myProducts.length}</span>
+                          <span className="text-[10px] text-gray-500 font-bold uppercase">{isBangla ? 'মোট পণ্য' : 'Items'}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Stock Legends */}
+                    <div className="space-y-2 pt-1">
+                      <div className="flex items-center justify-between p-2 rounded-xl bg-emerald-50/70 dark:bg-black/30 border border-emerald-200/60 dark:border-emerald-900/40 text-xs">
+                        <div className="flex items-center gap-2 font-bold text-emerald-800 dark:text-emerald-300">
+                          <span className="w-3 h-3 rounded-full bg-emerald-500 inline-block" />
+                          <span>{isBangla ? 'পর্যাপ্ত স্টক (>১৫)' : 'In Stock (>15)'}</span>
+                        </div>
+                        <span className="font-black text-gray-900 dark:text-emerald-100">{stockHealthData.inStock.count} ({stockHealthData.inStock.pct}%)</span>
+                      </div>
+
+                      <div className="flex items-center justify-between p-2 rounded-xl bg-amber-50/70 dark:bg-black/30 border border-amber-200/60 dark:border-amber-900/40 text-xs">
+                        <div className="flex items-center gap-2 font-bold text-amber-800 dark:text-amber-300">
+                          <span className="w-3 h-3 rounded-full bg-amber-500 inline-block" />
+                          <span>{isBangla ? 'কম স্টক (১-১৫)' : 'Low Stock (1-15)'}</span>
+                        </div>
+                        <span className="font-black text-gray-900 dark:text-emerald-100">{stockHealthData.lowStock.count} ({stockHealthData.lowStock.pct}%)</span>
+                      </div>
+
+                      <div className="flex items-center justify-between p-2 rounded-xl bg-rose-50/70 dark:bg-black/30 border border-rose-200/60 dark:border-rose-900/40 text-xs">
+                        <div className="flex items-center gap-2 font-bold text-rose-800 dark:text-rose-300">
+                          <span className="w-3 h-3 rounded-full bg-rose-500 inline-block" />
+                          <span>{isBangla ? 'স্টক শেষ (০)' : 'Out of Stock (0)'}</span>
+                        </div>
+                        <span className="font-black text-gray-900 dark:text-emerald-100">{stockHealthData.outOfStock.count} ({stockHealthData.outOfStock.pct}%)</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 3. Revenue & Wallet Payout Breakdown */}
+                <div className="lg:col-span-3 bg-white dark:bg-[#112318] p-6 rounded-3xl border border-[#e0ebe2] dark:border-[#1d3b28] shadow-sm space-y-4">
+                  <div className="border-b border-[#e0ebe2] dark:border-[#1d3b28] pb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <div>
+                      <h3 className="text-base sm:text-lg font-black text-gray-900 dark:text-emerald-100 flex items-center gap-2">
+                        <Activity className="w-5 h-5 text-emerald-600" />
+                        <span>{isBangla ? 'আর্নিংস ও পে-আউট আর্থিক প্রবাহ' : 'Earnings & Payout Financial Stream'}</span>
+                      </h3>
+                      <p className="text-xs text-gray-500 dark:text-emerald-400">
+                        {isBangla ? 'মোট সেলস, এডমিন কমিশন এবং আপনার উত্তোলনযোগ্য ব্যালেন্সের হিসাব' : 'Gross revenue, platform commission deduction, and withdrawable balance flow'}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
+                    <div className="p-4 rounded-2xl bg-emerald-50/70 dark:bg-black/30 border border-emerald-200 dark:border-emerald-900/60">
+                      <p className="text-xs text-gray-500 font-bold">{isBangla ? 'মোট বিক্রয় (Gross Sales)' : 'Gross Sales'}</p>
+                      <h4 className="text-xl font-black text-gray-900 dark:text-emerald-100 mt-1">৳ {earningsBreakdownData.totalSales.toLocaleString()}</h4>
+                      <div className="w-full bg-emerald-200 dark:bg-emerald-950 h-2 rounded-full mt-3 overflow-hidden">
+                        <div className="bg-emerald-500 h-full w-full rounded-full" />
+                      </div>
+                      <span className="text-[10px] text-emerald-700 dark:text-emerald-300 font-extrabold mt-1 block">100% Volume</span>
+                    </div>
+
+                    <div className="p-4 rounded-2xl bg-amber-50/70 dark:bg-black/30 border border-amber-200 dark:border-amber-900/60">
+                      <p className="text-xs text-gray-500 font-bold">{isBangla ? `প্ল্যাটফর্ম ফি (${earningsBreakdownData.commissionRate}%)` : `Platform Fee (${earningsBreakdownData.commissionRate}%)`}</p>
+                      <h4 className="text-xl font-black text-amber-700 dark:text-amber-300 mt-1">৳ {earningsBreakdownData.platformCommission.toLocaleString()}</h4>
+                      <div className="w-full bg-amber-200 dark:bg-amber-950 h-2 rounded-full mt-3 overflow-hidden">
+                        <div style={{ width: `${earningsBreakdownData.commissionRate}%` }} className="bg-amber-500 h-full rounded-full" />
+                      </div>
+                      <span className="text-[10px] text-amber-700 dark:text-amber-300 font-extrabold mt-1 block">{earningsBreakdownData.commissionRate}% Commission Rate</span>
+                    </div>
+
+                    <div className="p-4 rounded-2xl bg-blue-50/70 dark:bg-black/30 border border-blue-200 dark:border-blue-900/60">
+                      <p className="text-xs text-gray-500 font-bold">{isBangla ? 'আপনার নিট আয় (Net Balance)' : 'Withdrawable Balance'}</p>
+                      <h4 className="text-xl font-black text-blue-700 dark:text-blue-300 mt-1">৳ {earningsBreakdownData.availableBalance.toLocaleString()}</h4>
+                      <div className="w-full bg-blue-200 dark:bg-blue-950 h-2 rounded-full mt-3 overflow-hidden">
+                        <div className="bg-blue-500 h-full w-[90%] rounded-full" />
+                      </div>
+                      <span className="text-[10px] text-blue-700 dark:text-blue-300 font-extrabold mt-1 block">Ready to Withdraw</span>
+                    </div>
+                  </div>
+                </div>
+
               </div>
 
               {/* Quick Withdraw Request Card */}

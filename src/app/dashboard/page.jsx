@@ -27,9 +27,16 @@ import {
   ShieldCheck, 
   Printer, 
   Eye, 
-  Check,
-  RefreshCw,
-  Home
+  Check, 
+  RefreshCw, 
+  Home,
+  Sun,
+  Moon,
+  PieChart,
+  TrendingUp,
+  Activity,
+  Award,
+  Settings
 } from 'lucide-react';
 import { 
   getOrders, 
@@ -38,7 +45,7 @@ import {
   getNotifications, 
   getReviews, 
   createSupportTicket, 
-  getProducts,
+  getProducts, 
   updateUserProfile 
 } from '@/lib/api';
 import ImageUploader from '@/components/ImageUploader';
@@ -47,7 +54,7 @@ import { useThemeLanguage } from '@/context/ThemeLanguageContext';
 
 export default function CustomerDashboardPage() {
   const { user, logout, cart, showToast, addToCart, updateQuantity, removeFromCart, clearCart, subtotal } = useCart();
-  const { isBangla } = useThemeLanguage();
+  const { isBangla, theme, toggleTheme } = useThemeLanguage();
 
   const [activeMenu, setActiveMenu] = useState('dashboard'); // 'dashboard' | 'profile' | 'orders' | 'addresses' | 'wishlist' | 'cart' | 'notifications' | 'support'
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
@@ -241,6 +248,72 @@ export default function CustomerDashboardPage() {
     setTicketMsg('');
   };
 
+  // Dynamic calculations for Customer Charts & Visualizations
+  const customerSpendingData = React.useMemo(() => {
+    const days = [];
+    const now = new Date();
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(now.getDate() - i);
+      const dateStr = d.toISOString().split('T')[0];
+      const dayNameBn = ['রবি', 'সোম', 'মঙ্গল', 'বুধ', 'বৃহঃ', 'শুক্র', 'শনি'][d.getDay()];
+      const dayNameEn = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][d.getDay()];
+      
+      const dayOrders = (myOrders || []).filter(o => {
+        const oDate = o.createdAt ? new Date(o.createdAt).toISOString().split('T')[0] : (o.date ? new Date(o.date).toISOString().split('T')[0] : '');
+        return oDate === dateStr;
+      });
+
+      const daySpent = dayOrders.reduce((sum, o) => sum + (Number(o.total_amount || o.totalPrice || o.total || 0)), 0);
+      days.push({
+        date: dateStr,
+        dayLabel: isBangla ? dayNameBn : dayNameEn,
+        ordersCount: dayOrders.length,
+        spent: daySpent,
+      });
+    }
+
+    const maxSpent = Math.max(...days.map(d => d.spent), 500);
+    return { days, maxSpent };
+  }, [myOrders, isBangla]);
+
+  const customerOrderJourney = React.useMemo(() => {
+    const total = myOrders.length || 1;
+    const delivered = myOrders.filter(o => (o.status || '').toLowerCase() === 'delivered' || (o.status || '').toLowerCase() === 'completed').length;
+    const inTransit = myOrders.filter(o => ['shipped', 'processing', 'confirmed', 'packed'].includes((o.status || '').toLowerCase())).length;
+    const pending = myOrders.filter(o => (o.status || '').toLowerCase() === 'pending').length;
+    const cancelled = myOrders.filter(o => ['cancelled', 'returned'].includes((o.status || '').toLowerCase())).length;
+
+    return {
+      delivered: { count: delivered, pct: Math.round((delivered / total) * 100) },
+      inTransit: { count: inTransit, pct: Math.round((inTransit / total) * 100) },
+      pending: { count: pending, pct: Math.round((pending / total) * 100) },
+      cancelled: { count: cancelled, pct: Math.round((cancelled / total) * 100) },
+      total: myOrders.length
+    };
+  }, [myOrders]);
+
+  const loyaltySavingsData = React.useMemo(() => {
+    const totalSpent = (myOrders || []).reduce((sum, o) => sum + (Number(o.total_amount || o.totalPrice || o.total || 0)), 0);
+    const estimatedSavings = Math.round(totalSpent * 0.12); // ~12% overall discount savings
+    const loyaltyPoints = Math.floor(totalSpent / 100); // 1 point per ৳100 spent
+    const nextTierGoal = 10000;
+    const progressPct = Math.min(Math.round((totalSpent / nextTierGoal) * 100), 100);
+
+    let tierName = 'Bronze Member';
+    if (totalSpent >= 15000) tierName = 'VIP Platinum 👑';
+    else if (totalSpent >= 7000) tierName = 'Gold Member 🥇';
+    else if (totalSpent >= 2500) tierName = 'Silver Member 🥈';
+
+    return {
+      totalSpent,
+      estimatedSavings,
+      loyaltyPoints,
+      progressPct,
+      tierName
+    };
+  }, [myOrders]);
+
   if (!user) {
     return (
       <div className="min-h-screen bg-slate-900 text-white flex items-center justify-center p-4">
@@ -248,22 +321,57 @@ export default function CustomerDashboardPage() {
           <div className="w-16 h-16 rounded-2xl bg-amber-500/20 text-amber-400 flex items-center justify-center text-3xl mx-auto mb-4 border border-amber-500/30">
             🔒
           </div>
-          <h2 className="text-2xl font-black mb-2">Login Required</h2>
+          <h2 className="text-2xl font-black mb-2">{isBangla ? 'লগইন প্রয়োজন' : 'Login Required'}</h2>
           <p className="text-slate-400 text-sm mb-6">
-            ড্যাশবোর্ডে প্রবেশ করতে অনুগ্রহ করে আপনার একাউন্টে লগইন অথবা রেজিস্ট্রেশন করুন।
+            {isBangla
+              ? 'ড্যাশবোর্ডে প্রবেশ করতে অনুগ্রহ করে আপনার একাউন্টে লগইন অথবা রেজিস্ট্রেশন করুন।'
+              : 'Please login or register with your account to access your customer dashboard.'}
           </p>
           <div className="flex flex-col gap-3">
             <Link
               href="/auth"
-              className="w-full py-3.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold rounded-2xl shadow-lg transition-all"
+              className="w-full py-3.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold rounded-2xl shadow-lg transition-all text-center text-sm"
             >
-              Login / Register Now
+              🔐 {isBangla ? 'লগইন / রেজিস্ট্রেশন করুন' : 'Login / Register Now'}
             </Link>
             <Link
               href="/"
-              className="w-full py-3 bg-slate-700 hover:bg-slate-600 text-slate-300 font-bold rounded-2xl transition-all"
+              className="w-full py-3 bg-slate-700 hover:bg-slate-600 text-slate-300 font-bold rounded-2xl transition-all text-center text-sm"
             >
-              Back to Home
+              🏠 {isBangla ? 'হোমপেজে ফিরে যান' : 'Back to Home'}
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Strict Role Guard: Sellers cannot view Customer Dashboard
+  if (user && user.role === 'seller') {
+    return (
+      <div className="min-h-screen bg-slate-900 text-white flex items-center justify-center p-4">
+        <div className="max-w-md w-full bg-slate-800/90 border border-slate-700 rounded-3xl p-8 text-center shadow-2xl backdrop-blur-xl">
+          <div className="w-16 h-16 rounded-2xl bg-amber-500/20 text-amber-400 flex items-center justify-center text-3xl mx-auto mb-4 border border-amber-500/30">
+            🏪
+          </div>
+          <h2 className="text-2xl font-black mb-2">{isBangla ? 'সেলার একাউন্ট সনাক্ত হয়েছে' : 'Seller Account Detected'}</h2>
+          <p className="text-slate-400 text-sm mb-6">
+            {isBangla
+              ? 'কাস্টমার ড্যাশবোর্ড শুধুমাত্র ক্রেতা ও এডমিনের জন্য। সেলারদের জন্য আলাদা সেলার ড্যাশবোর্ড রয়েছে।'
+              : 'Customer Dashboard is reserved for customers and admin. Please use your designated Seller Dashboard.'}
+          </p>
+          <div className="flex flex-col gap-3">
+            <Link
+              href="/seller"
+              className="w-full py-3.5 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-black rounded-2xl shadow-lg transition-all text-center text-sm"
+            >
+              🏪 {isBangla ? 'সেলার ড্যাশবোর্ডে প্রবেশ করুন' : 'Go to Seller Dashboard'}
+            </Link>
+            <Link
+              href="/"
+              className="w-full py-3 bg-slate-700 hover:bg-slate-600 text-slate-300 font-bold rounded-2xl transition-all text-center text-sm"
+            >
+              🏠 {isBangla ? 'হোমপেজে ফিরে যান' : 'Back to Home'}
             </Link>
           </div>
         </div>
@@ -320,7 +428,7 @@ export default function CustomerDashboardPage() {
           </div>
 
           {/* Navigation */}
-          <nav className="p-3 space-y-1">
+          <nav className="p-3 space-y-1 max-h-[calc(100vh-270px)] overflow-y-auto custom-scrollbar">
             {navMenuItems.map((item) => {
               const Icon = item.icon;
               const isActive = activeMenu === item.id;
@@ -353,8 +461,9 @@ export default function CustomerDashboardPage() {
           </nav>
         </div>
 
-        {/* Sidebar Footer */}
+        {/* Sidebar Footer & Quick Actions (Profile, Settings, Theme) */}
         <div className="p-3 border-t border-[#e0ebe2] dark:border-[#1d3b28] space-y-2">
+          {/* Avatar Card */}
           <div className="flex items-center gap-2.5 p-2 rounded-2xl bg-gray-50 dark:bg-black/30 border border-gray-100 dark:border-emerald-950">
             {user?.avatar ? (
               <img src={user.avatar} alt="Avatar" className="w-9 h-9 rounded-xl object-cover border" />
@@ -367,6 +476,43 @@ export default function CustomerDashboardPage() {
               <p className="text-xs font-bold truncate text-gray-900 dark:text-emerald-100">{user?.name || profile.name}</p>
               <p className="text-[10px] text-gray-500 truncate">{user?.email || user?.phone || profile.phone}</p>
             </div>
+          </div>
+
+          {/* Quick Action Toolbar (Profile, Settings, Theme) */}
+          <div className={`grid grid-cols-3 gap-1.5 p-1 bg-emerald-50/60 dark:bg-black/40 rounded-2xl border border-emerald-200/50 dark:border-emerald-900/40 ${!isSidebarOpen && 'lg:hidden'}`}>
+            <button
+              type="button"
+              onClick={() => setActiveMenu('profile')}
+              className="flex flex-col items-center justify-center py-1.5 px-1 rounded-xl text-[10px] font-bold text-gray-700 dark:text-emerald-200 hover:bg-white dark:hover:bg-emerald-900/60 shadow-sm transition-all"
+              title={isBangla ? 'প্রোফাইল' : 'Profile'}
+            >
+              <User className="w-3.5 h-3.5 text-brand-900 dark:text-emerald-400 mb-0.5" />
+              <span className="truncate">{isBangla ? 'প্রোফাইল' : 'Profile'}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveMenu('profile')}
+              className="flex flex-col items-center justify-center py-1.5 px-1 rounded-xl text-[10px] font-bold text-gray-700 dark:text-emerald-200 hover:bg-white dark:hover:bg-emerald-900/60 shadow-sm transition-all"
+              title={isBangla ? 'সেটিংস' : 'Settings'}
+            >
+              <Settings className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400 mb-0.5" />
+              <span className="truncate">{isBangla ? 'সেটিংস' : 'Settings'}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={toggleTheme}
+              className="flex flex-col items-center justify-center py-1.5 px-1 rounded-xl text-[10px] font-bold text-amber-700 dark:text-amber-300 hover:bg-white dark:hover:bg-emerald-900/60 shadow-sm transition-all"
+              title={isBangla ? 'থিম পরিবর্তন' : 'Toggle Theme'}
+            >
+              {theme === 'dark' ? (
+                <Sun className="w-3.5 h-3.5 text-amber-400 mb-0.5" />
+              ) : (
+                <Moon className="w-3.5 h-3.5 text-amber-600 mb-0.5" />
+              )}
+              <span className="truncate">{theme === 'dark' ? (isBangla ? 'লাইট' : 'Light') : (isBangla ? 'ডার্ক' : 'Dark')}</span>
+            </button>
           </div>
 
           <div className="grid grid-cols-2 gap-2 pt-1">
@@ -441,6 +587,16 @@ export default function CustomerDashboardPage() {
               🏪 {isBangla ? 'হোমপেজ' : 'Store'}
             </Link>
 
+            {/* Master Admin Switch */}
+            {user?.role === 'admin' && (
+              <Link
+                href="/admin"
+                className="text-xs font-bold bg-purple-700 hover:bg-purple-800 text-white px-3 py-2 rounded-xl transition-all shadow-sm"
+              >
+                {isBangla ? 'এডমিন' : 'Admin'}
+              </Link>
+            )}
+
             <Link
               href="/products"
               className="text-xs font-bold bg-secondary hover:bg-gold-600 text-brand-950 px-3.5 py-2 rounded-xl transition-all shadow-sm"
@@ -510,6 +666,231 @@ export default function CustomerDashboardPage() {
                     <h3 className="text-xl sm:text-2xl font-black">{addresses.length}</h3>
                   </div>
                 </div>
+              </div>
+
+              {/* ======================================================== */}
+              {/* 📈 3 INTERACTIVE CUSTOMER CHARTS & VISUALIZATIONS        */}
+              {/* ======================================================== */}
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                
+                {/* 1. Customer Spending Trend Chart */}
+                <div className="lg:col-span-2 bg-white dark:bg-[#112318] p-6 rounded-3xl border border-[#e0ebe2] dark:border-[#1d3b28] shadow-sm space-y-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[#e0ebe2] dark:border-[#1d3b28] pb-4">
+                    <div>
+                      <h3 className="text-base sm:text-lg font-black text-gray-900 dark:text-emerald-100 flex items-center gap-2">
+                        <TrendingUp className="w-5 h-5 text-emerald-600" />
+                        <span>{isBangla ? 'কেনাকাটার খরচ ও ব্যয় পরিসংখ্যান' : 'My Spending & Purchase Trend'}</span>
+                      </h3>
+                      <p className="text-xs text-gray-500 dark:text-emerald-400">
+                        {isBangla ? 'গত ৭ দিনে আপনার মোট কেনাকাটা ও খরচের হিসাব' : 'Daily spending pattern and purchase history'}
+                      </p>
+                    </div>
+                    <span className="text-xs font-black bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 px-3 py-1 rounded-full self-start sm:self-auto">
+                      {loyaltySavingsData.tierName}
+                    </span>
+                  </div>
+
+                  {/* SVG Bar Chart with Tooltips */}
+                  <div className="pt-2">
+                    <div className="h-48 w-full flex items-end justify-between gap-2 sm:gap-4 px-2 pb-4 pt-6 bg-[#f8faf8] dark:bg-black/20 rounded-2xl border border-gray-100 dark:border-emerald-950/80">
+                      {customerSpendingData.days.map((item, idx) => {
+                        const heightPct = Math.max(Math.round((item.spent / (customerSpendingData.maxSpent || 1)) * 100), item.spent > 0 ? 15 : 6);
+                        return (
+                          <div key={idx} className="flex-1 flex flex-col items-center h-full justify-end group relative">
+                            {/* Hover Tooltip */}
+                            <div className="absolute -top-10 opacity-0 group-hover:opacity-100 transition-all duration-200 pointer-events-none z-20 bg-slate-900 text-white text-[11px] font-bold py-1 px-2.5 rounded-xl shadow-xl whitespace-nowrap">
+                              <span>৳ {item.spent.toLocaleString()}</span>
+                              <span className="text-emerald-400 block text-[9px]">{item.ordersCount} {isBangla ? 'অর্ডার' : 'orders'}</span>
+                            </div>
+
+                            {/* Bar Pillar */}
+                            <div className="w-full max-w-[38px] bg-emerald-100/60 dark:bg-emerald-950/40 rounded-xl flex items-end p-1 h-full">
+                              <div
+                                style={{ height: `${heightPct}%` }}
+                                className={`w-full rounded-lg transition-all duration-500 relative ${
+                                  item.spent > 0
+                                    ? 'bg-gradient-to-t from-brand-900 via-emerald-600 to-teal-400 shadow-md group-hover:brightness-110'
+                                    : 'bg-gray-200 dark:bg-gray-800'
+                                }`}
+                              >
+                                {item.ordersCount > 0 && (
+                                  <span className="absolute -top-5 left-1/2 -translate-x-1/2 text-[9px] font-black text-emerald-800 dark:text-emerald-300">
+                                    {item.ordersCount}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* X-Axis Label */}
+                            <span className="text-[11px] font-extrabold text-gray-600 dark:text-emerald-300 mt-2">
+                              {item.dayLabel}
+                            </span>
+                            <span className="text-[9px] text-gray-400 font-medium">
+                              {item.date.split('-')[2]}/{item.date.split('-')[1]}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 pt-3">
+                      <div className="p-2.5 rounded-2xl bg-emerald-50/70 dark:bg-black/30 border border-emerald-200 dark:border-emerald-900/50">
+                        <span className="text-[10px] text-gray-500 font-semibold block">{isBangla ? '৭ দিনের খরচ' : '7-Day Total'}</span>
+                        <span className="text-xs sm:text-sm font-black text-emerald-700 dark:text-emerald-300">
+                          ৳ {customerSpendingData.days.reduce((s, d) => s + d.spent, 0).toLocaleString()}
+                        </span>
+                      </div>
+                      <div className="p-2.5 rounded-2xl bg-blue-50/70 dark:bg-black/30 border border-blue-200 dark:border-blue-900/50">
+                        <span className="text-[10px] text-gray-500 font-semibold block">{isBangla ? 'অর্ডারের সংখ্যা' : 'Orders Placed'}</span>
+                        <span className="text-xs sm:text-sm font-black text-blue-700 dark:text-blue-300">
+                          {customerSpendingData.days.reduce((s, d) => s + d.ordersCount, 0)} {isBangla ? 'টি' : 'orders'}
+                        </span>
+                      </div>
+                      <div className="p-2.5 rounded-2xl bg-purple-50/70 dark:bg-black/30 border border-purple-200 dark:border-purple-900/50 col-span-2 sm:col-span-1">
+                        <span className="text-[10px] text-gray-500 font-semibold block">{isBangla ? 'রিওয়ার্ড পয়েন্ট' : 'Reward Points'}</span>
+                        <span className="text-xs sm:text-sm font-black text-purple-700 dark:text-purple-300">
+                          🌟 {loyaltySavingsData.loyaltyPoints} Pts
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 2. Order Fulfillment Status Doughnut Chart */}
+                <div className="bg-white dark:bg-[#112318] p-6 rounded-3xl border border-[#e0ebe2] dark:border-[#1d3b28] shadow-sm space-y-4 flex flex-col justify-between">
+                  <div>
+                    <div className="border-b border-[#e0ebe2] dark:border-[#1d3b28] pb-4">
+                      <h3 className="text-base sm:text-lg font-black text-gray-900 dark:text-emerald-100 flex items-center gap-2">
+                        <PieChart className="w-5 h-5 text-blue-600" />
+                        <span>{isBangla ? 'অর্ডার প্রসেসিং অবস্থা' : 'Order Lifecycle Status'}</span>
+                      </h3>
+                      <p className="text-xs text-gray-500 dark:text-emerald-400">
+                        {isBangla ? 'আপনার সকল অর্ডারের বর্তমান অবস্থা' : 'Distribution of orders by journey stages'}
+                      </p>
+                    </div>
+
+                    {/* Doughnut SVG Ring */}
+                    <div className="py-3 flex flex-col items-center justify-center">
+                      <div className="relative w-32 h-32 flex items-center justify-center">
+                        <svg className="w-full h-full -rotate-90" viewBox="0 0 36 36">
+                          <circle cx="18" cy="18" r="15.915" fill="none" stroke="currentColor" strokeWidth="3.8" className="text-gray-100 dark:text-emerald-950" />
+                          <circle
+                            cx="18"
+                            cy="18"
+                            r="15.915"
+                            fill="none"
+                            stroke="#10b981"
+                            strokeWidth="3.8"
+                            strokeDasharray={`${customerOrderJourney.delivered.pct} 100`}
+                            strokeDashoffset="0"
+                            strokeLinecap="round"
+                            className="transition-all duration-700"
+                          />
+                          <circle
+                            cx="18"
+                            cy="18"
+                            r="15.915"
+                            fill="none"
+                            stroke="#3b82f6"
+                            strokeWidth="3.8"
+                            strokeDasharray={`${customerOrderJourney.inTransit.pct} 100`}
+                            strokeDashoffset={`-${customerOrderJourney.delivered.pct}`}
+                            strokeLinecap="round"
+                            className="transition-all duration-700"
+                          />
+                          <circle
+                            cx="18"
+                            cy="18"
+                            r="15.915"
+                            fill="none"
+                            stroke="#f59e0b"
+                            strokeWidth="3.8"
+                            strokeDasharray={`${customerOrderJourney.pending.pct} 100`}
+                            strokeDashoffset={`-${customerOrderJourney.delivered.pct + customerOrderJourney.inTransit.pct}`}
+                            strokeLinecap="round"
+                            className="transition-all duration-700"
+                          />
+                        </svg>
+                        <div className="absolute inset-0 flex flex-col items-center justify-center text-center pointer-events-none">
+                          <span className="text-xl font-black text-gray-900 dark:text-emerald-100">{myOrders.length}</span>
+                          <span className="text-[10px] text-gray-500 font-bold uppercase">{isBangla ? 'অর্ডার' : 'Orders'}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Order Journey Legends */}
+                    <div className="space-y-1.5 pt-1">
+                      <div className="flex items-center justify-between p-2 rounded-xl bg-emerald-50/70 dark:bg-black/30 border border-emerald-200/60 dark:border-emerald-900/40 text-xs">
+                        <div className="flex items-center gap-2 font-bold text-emerald-800 dark:text-emerald-300">
+                          <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block" />
+                          <span>{isBangla ? 'ডেলিভারড' : 'Delivered'}</span>
+                        </div>
+                        <span className="font-black text-gray-900 dark:text-emerald-100">{customerOrderJourney.delivered.count} ({customerOrderJourney.delivered.pct}%)</span>
+                      </div>
+
+                      <div className="flex items-center justify-between p-2 rounded-xl bg-blue-50/70 dark:bg-black/30 border border-blue-200/60 dark:border-blue-900/40 text-xs">
+                        <div className="flex items-center gap-2 font-bold text-blue-800 dark:text-blue-300">
+                          <span className="w-2.5 h-2.5 rounded-full bg-blue-500 inline-block" />
+                          <span>{isBangla ? 'শিপড / প্রসেসিং' : 'In Transit'}</span>
+                        </div>
+                        <span className="font-black text-gray-900 dark:text-emerald-100">{customerOrderJourney.inTransit.count} ({customerOrderJourney.inTransit.pct}%)</span>
+                      </div>
+
+                      <div className="flex items-center justify-between p-2 rounded-xl bg-amber-50/70 dark:bg-black/30 border border-amber-200/60 dark:border-amber-900/40 text-xs">
+                        <div className="flex items-center gap-2 font-bold text-amber-800 dark:text-amber-300">
+                          <span className="w-2.5 h-2.5 rounded-full bg-amber-500 inline-block" />
+                          <span>{isBangla ? 'পেন্ডিং' : 'Pending'}</span>
+                        </div>
+                        <span className="font-black text-gray-900 dark:text-emerald-100">{customerOrderJourney.pending.count} ({customerOrderJourney.pending.pct}%)</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 3. Customer Savings & Loyalty Rewards Visualizer */}
+                <div className="lg:col-span-3 bg-white dark:bg-[#112318] p-6 rounded-3xl border border-[#e0ebe2] dark:border-[#1d3b28] shadow-sm space-y-4">
+                  <div className="border-b border-[#e0ebe2] dark:border-[#1d3b28] pb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <div>
+                      <h3 className="text-base sm:text-lg font-black text-gray-900 dark:text-emerald-100 flex items-center gap-2">
+                        <Award className="w-5 h-5 text-amber-500" />
+                        <span>{isBangla ? 'ইহসান প্রিমিয়াম লয়ালটি ও সঞ্চয় ট্র্যাকার' : 'Ihsan Loyalty & Savings Tracker'}</span>
+                      </h3>
+                      <p className="text-xs text-gray-500 dark:text-emerald-400">
+                        {isBangla ? 'আপনার কেনাকাটায় মোট ছাড়, লয়ালটি রিওয়ার্ড পয়েন্ট এবং ভিআইপি লেভেল' : 'Total money saved, reward points balance, and loyalty progression'}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
+                    <div className="p-4 rounded-2xl bg-emerald-50/70 dark:bg-black/30 border border-emerald-200 dark:border-emerald-900/60">
+                      <p className="text-xs text-gray-500 font-bold">{isBangla ? 'মোট কেনাকাটা' : 'Total Spend'}</p>
+                      <h4 className="text-xl font-black text-gray-900 dark:text-emerald-100 mt-1">৳ {loyaltySavingsData.totalSpent.toLocaleString()}</h4>
+                      <div className="w-full bg-emerald-200 dark:bg-emerald-950 h-2 rounded-full mt-3 overflow-hidden">
+                        <div style={{ width: `${Math.max(loyaltySavingsData.progressPct, 10)}%` }} className="bg-emerald-500 h-full rounded-full" />
+                      </div>
+                      <span className="text-[10px] text-emerald-700 dark:text-emerald-300 font-extrabold mt-1 block">Tier Progress: {loyaltySavingsData.progressPct}%</span>
+                    </div>
+
+                    <div className="p-4 rounded-2xl bg-amber-50/70 dark:bg-black/30 border border-amber-200 dark:border-amber-900/60">
+                      <p className="text-xs text-gray-500 font-bold">{isBangla ? 'মোট সাশ্রয় (Savings)' : 'Estimated Savings'}</p>
+                      <h4 className="text-xl font-black text-amber-700 dark:text-amber-300 mt-1">৳ {loyaltySavingsData.estimatedSavings.toLocaleString()}</h4>
+                      <div className="w-full bg-amber-200 dark:bg-amber-950 h-2 rounded-full mt-3 overflow-hidden">
+                        <div className="bg-amber-500 h-full w-[65%] rounded-full" />
+                      </div>
+                      <span className="text-[10px] text-amber-700 dark:text-amber-300 font-extrabold mt-1 block">Discounts & Offers Saved</span>
+                    </div>
+
+                    <div className="p-4 rounded-2xl bg-purple-50/70 dark:bg-black/30 border border-purple-200 dark:border-purple-900/60">
+                      <p className="text-xs text-gray-500 font-bold">{isBangla ? 'রিওয়ার্ড ক্লাব স্ট্যাটাস' : 'Club Membership'}</p>
+                      <h4 className="text-xl font-black text-purple-700 dark:text-purple-300 mt-1">{loyaltySavingsData.tierName}</h4>
+                      <div className="w-full bg-purple-200 dark:bg-purple-950 h-2 rounded-full mt-3 overflow-hidden">
+                        <div className="bg-purple-500 h-full w-full rounded-full" />
+                      </div>
+                      <span className="text-[10px] text-purple-700 dark:text-purple-300 font-extrabold mt-1 block">🌟 {loyaltySavingsData.loyaltyPoints} Reward Points Active</span>
+                    </div>
+                  </div>
+                </div>
+
               </div>
 
               {/* Recent Orders List */}
