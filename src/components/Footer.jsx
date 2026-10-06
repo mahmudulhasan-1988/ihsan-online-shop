@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { PhoneCall, Mail, MapPin, Facebook, Instagram, Youtube, ShieldCheck, Heart } from 'lucide-react';
 import { useThemeLanguage } from '@/context/ThemeLanguageContext';
+import Image from 'next/image';
 
 export default function Footer() {
   const pathname = usePathname();
@@ -17,23 +18,23 @@ export default function Footer() {
   return (
     <footer className="bg-[#08150d] text-gray-300 pt-12 pb-24 md:pb-12 border-t border-[#162e1e] transition-colors duration-300">
       <div className="max-w-7xl mx-auto px-4">
-        
+
         {/* Main Footer Content */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 mb-10">
-          
+
           {/* Brand Info */}
           <div className="space-y-4">
             <div className="flex items-center gap-2.5">
-              <div className="w-10 h-10 rounded-2xl bg-brand-800 flex items-center justify-center text-white shadow-md border border-emerald-600/30">
-                <span className="text-xl">🌿</span>
+              <div>
+                <Image src="https://i.ibb.co.com/7dMKpCNL/Ihsan-Logo.png" className="w-15 h-15 sm:w-12 sm:h-12 rounded-2xl bg-gradient-to-br from-brand-800 to-emerald-950 flex items-center justify-center text-white shadow-md group-hover:scale-105 transition-transform border border-emerald-600/30" alt="Ihsan Logo" width={70} height={70} />
               </div>
               <span className="text-2xl font-black text-white tracking-tight">
                 {t('appName')}
               </span>
             </div>
             <p className="text-xs sm:text-sm text-gray-400 leading-relaxed">
-              {isBangla 
-                ? 'ইহসান অনলাইন শপ - নিরাপদ ও খাঁটি খাদ্যের নির্ভরযোগ্য ঠিকানা। আমরা সরাসরি উৎস থেকে সংগৃহীত নির্ভেজাল মধু, গাওয়া ঘি, ঘানি ভাঙা তেল ও অন্যান্য পুষ্টিকর খাবার আপনার দোরগোড়ায় পৌঁছে দিতে প্রতিশ্রুতিবদ্ধ।' 
+              {isBangla
+                ? 'ইহসান অনলাইন শপ - নিরাপদ ও খাঁটি খাদ্যের নির্ভরযোগ্য ঠিকানা। আমরা সরাসরি উৎস থেকে সংগৃহীত নির্ভেজাল মধু, গাওয়া ঘি, ঘানি ভাঙা তেল ও অন্যান্য পুষ্টিকর খাবার আপনার দোরগোড়ায় পৌঁছে দিতে প্রতিশ্রুতিবদ্ধ।'
                 : 'Ihsan Online Shop - Your trusted source for authentic organic food. Pure honey, cow ghee, cold-pressed mustard oil, and premium dates delivered safely at your doorstep.'}
             </p>
             <div className="flex items-center gap-3 text-white">
@@ -126,7 +127,7 @@ export default function Footer() {
             <h4 className="text-white font-bold text-sm sm:text-base uppercase tracking-wider mb-4 border-l-4 border-secondary pl-2">
               {isBangla ? 'যোগাযোগ ও হটলাইন' : 'Contact & Support'}
             </h4>
-            
+
             <a href="tel:09613827282" className="flex items-start gap-3 p-3 bg-[#112417] rounded-2xl border border-[#1d3d28] hover:border-secondary transition-colors">
               <PhoneCall className="w-5 h-5 text-secondary flex-shrink-0 mt-0.5" />
               <div>

@@ -278,7 +278,6 @@ export default function Header() {
           {/* Brand Logo */}
           <Link href="/" className="flex items-center gap-2.5 group flex-shrink-0">
             <div>
-              {/* <span className="text-xl sm:text-2xl">🌿</span> */}
               <Image src="https://i.ibb.co.com/7dMKpCNL/Ihsan-Logo.png" className="w-15 h-15 sm:w-12 sm:h-12 rounded-2xl bg-gradient-to-br from-brand-800 to-emerald-950 flex items-center justify-center text-white shadow-md group-hover:scale-105 transition-transform border border-emerald-600/30" alt="Ihsan Logo" width={70} height={70} />
             </div>
             <div className="flex flex-col">
