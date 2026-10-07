@@ -4,7 +4,7 @@ import TrustBadges from '@/components/TrustBadges';
 import ProductSection from '@/components/ProductSection';
 import HomePromoBanner from '@/components/HomePromoBanner';
 import HomeReviews from '@/components/HomeReviews';
-import { getProducts, getCategories, getBanners, getReviews } from '@/lib/api';
+import { getProducts, getCategories, getBanners, getReviews, getSiteSettings } from '@/lib/api';
 
 export const revalidate = 0; // Always fresh MongoDB dynamic data
 
@@ -101,17 +101,33 @@ const CATEGORY_METADATA = {
 };
 
 export default async function HomePage() {
-  const [productsRes, categoriesRes, bannersRes, reviewsRes] = await Promise.all([
+  const [productsRes, categoriesRes, bannersRes, reviewsRes, settingsRes] = await Promise.all([
     getProducts({ limit: 100 }),
     getCategories(),
     getBanners(),
-    getReviews('all')
+    getReviews('all'),
+    getSiteSettings()
   ]);
 
   const products = productsRes?.data || [];
   const categories = categoriesRes?.data || [];
   const banners = bannersRes?.data || [];
   const reviews = reviewsRes?.data || [];
+  const siteSettings = settingsRes?.data || {};
+
+  const sectionsConfig = siteSettings.homepageSections || [
+    { id: 'hero_slider', key: 'heroSlider', enabled: true },
+    { id: 'trust_badges', key: 'trustBadges', enabled: true },
+    { id: 'category_sections', key: 'categorySections', enabled: true },
+    { id: 'special_collection', key: 'specialCollection', enabled: true },
+    { id: 'promo_banner', key: 'promoBanner', enabled: true },
+    { id: 'customer_reviews', key: 'customerReviews', enabled: true }
+  ];
+
+  const isSectionActive = (id) => {
+    const sec = sectionsConfig.find(s => s.id === id || s.key === id);
+    return sec ? sec.enabled !== false : true;
+  };
 
   // =========================================================================
   // 🔒 STRICT CATEGORY ISOLATION
@@ -179,13 +195,17 @@ export default async function HomePage() {
     <div className="space-y-6 sm:space-y-10 pb-12">
       
       {/* 1. Hero Slider Banner */}
-      <HeroSlider banners={banners} />
+      {isSectionActive('hero_slider') && (
+        <HeroSlider banners={banners} />
+      )}
 
       {/* 2. Trust Badges & Guarantee */}
-      <TrustBadges />
+      {isSectionActive('trust_badges') && (
+        <TrustBadges />
+      )}
 
       {/* 3. Dynamic Category-Wise Product Sections (With Dedicated Cover Images) */}
-      {categorySections.map((section) => (
+      {isSectionActive('category_sections') && categorySections.map((section) => (
         <ProductSection
           key={section.slug}
           title={section.title}
@@ -202,7 +222,7 @@ export default async function HomePage() {
       ))}
 
       {/* 4. Unassigned / Special Featured Collection (If any exist) */}
-      {unassignedProducts.length > 0 && (
+      {isSectionActive('special_collection') && unassignedProducts.length > 0 && (
         <ProductSection
           title="অন্যান্য স্পেশাল পণ্যসমূহ"
           titleEn="Other Special Products"
@@ -218,10 +238,14 @@ export default async function HomePage() {
       )}
 
       {/* 5. Promo Banner / Palestine & Humanitarian Support Notice */}
-      <HomePromoBanner />
+      {isSectionActive('promo_banner') && (
+        <HomePromoBanner />
+      )}
 
       {/* 6. Customer Reviews & Social Proof */}
-      <HomeReviews reviews={reviews} />
+      {isSectionActive('customer_reviews') && (
+        <HomeReviews reviews={reviews} />
+      )}
     </div>
   );
 }

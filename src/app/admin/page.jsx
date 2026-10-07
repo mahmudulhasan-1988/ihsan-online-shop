@@ -56,7 +56,18 @@ import {
   Moon,
   PieChart,
   Activity,
-  User
+  User,
+  Layers,
+  LayoutGrid,
+  Sliders,
+  ArrowDown,
+  ArrowUp,
+  Download,
+  BarChart2,
+  Filter,
+  Info,
+  ShieldAlert,
+  Award
 } from 'lucide-react';
 import { 
   getStats, 
@@ -82,7 +93,12 @@ import {
   updateWithdrawalStatus, 
   getCoupons, 
   createCoupon, 
-  getBanners, 
+  getBanners,
+  createBanner,
+  updateBanner,
+  deleteBanner,
+  getPages,
+  updatePageContent,
   getSupportTickets, 
   getSiteSettings,
   getReviews,
@@ -250,6 +266,67 @@ export default function AdminDashboardPage() {
     status: 'active',
   });
   const [isUploadingUserImg, setIsUploadingUserImg] = useState(false);
+
+  // 📝 CMS & Homepage Configuration States
+  const [cmsSubTab, setCmsSubTab] = useState('sections'); // 'sections' | 'banners' | 'pages'
+  const [isSavingCms, setIsSavingCms] = useState(false);
+  const [homepageSections, setHomepageSections] = useState([
+    { id: 'hero_slider', key: 'heroSlider', name: 'হিরো স্লাইডার ও প্রধান ব্যানার', nameEn: 'Hero Banner Slider', enabled: true, icon: '🖼️', desc: 'ওয়েবসাইটের প্রধান আকর্ষণী স্লাইডার ও ব্যানার কালেকশন' },
+    { id: 'trust_badges', key: 'trustBadges', name: 'সিকিউরিটি ও ট্রাস্ট গ্যারান্টি বার', nameEn: 'Trust Badges & Guarantee', enabled: true, icon: '🛡️', desc: '১০০% খাঁটি পণ্য, দ্রুত ডেলিভারি ও মান নিশ্চিয়তা ব্যাজ' },
+    { id: 'category_sections', key: 'categorySections', name: 'ক্যাটাগরি ভিত্তিক পণ্য সেকশন', nameEn: 'Category-wise Product Catalog', enabled: true, icon: '📦', desc: 'মধু, ঘি, তেল, বাদাম ইত্যাদি ক্যাটাগরি ও পণ্য প্রদর্শন' },
+    { id: 'special_collection', key: 'specialCollection', name: 'অন্যান্য স্পেশাল কালেকশন', nameEn: 'Special Featured Products', enabled: true, icon: '✨', desc: 'নির্বাচিত স্পেশাল ও ফিচার্ড আইটেমস' },
+    { id: 'promo_banner', key: 'promoBanner', name: 'ফিলিস্তিন ও মানবিক সহায়তা ব্যানার', nameEn: 'Charity & Humanitarian Banner', enabled: true, icon: '🇵🇸', desc: 'ব্যবসায়িক লাভের অংশ দান সংক্রান্ত মানবিক নোটিশ' },
+    { id: 'customer_reviews', key: 'customerReviews', name: 'ভেরিফাইড কাস্টমার রিভিউ ও টেস্টিমোনিয়াল', nameEn: 'Customer Reviews & Social Proof', enabled: true, icon: '⭐', desc: 'প্রকৃত ক্রেতাদের রেটিং, ছবি ও মন্তব্য প্রদর্শন' },
+  ]);
+
+  // Form State: Add / Edit Banner
+  const [newBannerData, setNewBannerData] = useState({
+    title: '',
+    title_bn: '',
+    title_en: '',
+    subtitle: '',
+    subtitle_bn: '',
+    subtitle_en: '',
+    badge: '🌿 ১০০% খাঁটি পণ্য',
+    badge_en: '🌿 100% Pure & Authentic',
+    image: '',
+    bgImage: '',
+    link: '/products',
+    buttonText: 'অর্ডার করুন এখনই',
+    buttonTextEn: 'Order Now',
+    discount: '১০% ছাড়',
+    price: '৳ ৯৫০',
+    regularPrice: '৳ ১১০০',
+    status: 'active',
+  });
+  const [editingBanner, setEditingBanner] = useState(null);
+  const [isSavingBanner, setIsSavingBanner] = useState(false);
+
+  // Policy & Static Pages State
+  const [selectedStaticPage, setSelectedStaticPage] = useState('about');
+  const [staticPagesData, setStaticPagesData] = useState({
+    about: {
+      title: 'আমাদের সম্পর্কে (About Us)',
+      content: '‘ইহসান অনলাইন শপ’ বাংলাদেশের একটি বিশ্বস্ত অর্গানিক ও প্রাকৃতিক পণ্য সরবরাহকারী প্রতিষ্ঠান। আমরা সরাসরি খামারি ও সুন্দরবনের মৌয়ালদের থেকে সংগ্রহ করে শতভাগ নির্ভেজাল মধু, ঘানি ভাঙা সরিষার তেল, খাঁটি গাওয়া ঘি ও অর্গানিক সুপারফুড পৌঁছে দিই আপনার দোরগোড়ায়।',
+    },
+    terms: {
+      title: 'ব্যবহারের শর্তাবলী (Terms & Conditions)',
+      content: 'ইহসান অনলাইন শপ প্ল্যাটফর্ম ব্যবহার করার মাধ্যমে আপনি আমাদের পরিষেবার সকল শর্তাবলীর সাথে সম্মত হচ্ছেন। সমস্ত অর্ডার ও পেমেন্ট সততা ও স্বচ্ছতার সাথে সম্পন্ন করা হয়।',
+    },
+    privacy: {
+      title: 'গোপনীয়তা নীতি (Privacy Policy)',
+      content: 'আপনার ব্যক্তিগত তথ্য ও নিরাপত্তার সুরক্ষা আমাদের সর্বোচ্চ অগ্রাধিকার। গ্রাহকদের ফোন নম্বর, ঠিকানা বা পেমেন্ট সংক্রান্ত তথ্য সম্পূর্ণ সুরক্ষিত ও এনক্রিপ্টেড থাকে।',
+    },
+    refund: {
+      title: 'রিটার্ন ও রিফান্ড পলিসি (Return & Refund Policy)',
+      content: 'পণ্য গ্রহণের সময় কোনো ক্ষতি বা ত্রুটি পরিলক্ষিত হলে ডেলিভারিম্যানের সামনেই আনবক্সিং ভিডিওসহ যোগাযোগ করুন। ৩ থেকে ৭ কর্মদিবসের মধ্যে সহজ রিটার্ন ও শতভাগ রিফান্ড নিশ্চিত করা হয়।',
+    },
+  });
+  const [isSavingStaticPage, setIsSavingStaticPage] = useState(false);
+
+  // 📊 Reports & Sales Analytics States
+  const [reportsSubTab, setReportsSubTab] = useState('sales'); // 'sales' | 'products' | 'export'
+  const [reportsTimeRange, setReportsTimeRange] = useState('30days'); // '7days' | '30days' | 'this_month' | 'all'
 
   const loadAllData = async (showLoading = false) => {
     if (showLoading) setLoading(true);
@@ -709,6 +786,274 @@ export default function AdminDashboardPage() {
     } finally {
       setSavingPopup(false);
     }
+  };
+
+  // ── CMS & Homepage Config Handlers ─────────────────────────────────────
+  const handleToggleSection = (index) => {
+    setHomepageSections(prev => {
+      const updated = [...prev];
+      updated[index] = { ...updated[index], enabled: !updated[index].enabled };
+      return updated;
+    });
+  };
+
+  const handleMoveSection = (index, direction) => {
+    setHomepageSections(prev => {
+      const updated = [...prev];
+      const targetIndex = direction === 'up' ? index - 1 : index + 1;
+      if (targetIndex < 0 || targetIndex >= updated.length) return prev;
+      const temp = updated[index];
+      updated[index] = updated[targetIndex];
+      updated[targetIndex] = temp;
+      return updated;
+    });
+  };
+
+  const handleSaveHomepageSections = async () => {
+    setIsSavingCms(true);
+    try {
+      const updatedSettings = {
+        ...siteSettings,
+        homepageSections: homepageSections
+      };
+      await updateSiteSettings(updatedSettings);
+      setSiteSettings(updatedSettings);
+      showToast(isBangla ? '🎉 হোমপেজ সেকশন কনফিগারেশন ডাটাবেসে সেভ হয়েছে!' : 'Homepage layout configuration saved to MongoDB!');
+    } catch (err) {
+      showToast(isBangla ? 'হোমপেজ সেটিংস সেভ করতে সমস্যা হয়েছে' : 'Failed to save homepage settings', 'error');
+    } finally {
+      setIsSavingCms(false);
+    }
+  };
+
+  const handleCreateBannerSubmit = async (e) => {
+    e.preventDefault();
+    if (!newBannerData.title || !newBannerData.image) {
+      showToast(isBangla ? 'ব্যানারের শিরোনাম ও ছবি দিন' : 'Please provide banner title and image', 'error');
+      return;
+    }
+    setIsSavingBanner(true);
+    try {
+      const payload = {
+        ...newBannerData,
+        title_bn: newBannerData.title_bn || newBannerData.title,
+        title_en: newBannerData.title_en || newBannerData.title,
+        subtitle_bn: newBannerData.subtitle_bn || newBannerData.subtitle,
+        subtitle_en: newBannerData.subtitle_en || newBannerData.subtitle,
+        badge_bn: newBannerData.badge,
+        badge_en: newBannerData.badge_en,
+      };
+      const res = await createBanner(payload);
+      if (res?.success !== false) {
+        showToast(isBangla ? '🎉 নতুন ব্যানার সফলভাবে তৈরি হয়েছে!' : 'Banner created successfully in MongoDB!');
+        setNewBannerData({
+          title: '',
+          title_bn: '',
+          title_en: '',
+          subtitle: '',
+          subtitle_bn: '',
+          subtitle_en: '',
+          badge: '🌿 ১০০% খাঁটি পণ্য',
+          badge_en: '🌿 100% Pure & Authentic',
+          image: '',
+          bgImage: '',
+          link: '/products',
+          buttonText: 'অর্ডার করুন এখনই',
+          buttonTextEn: 'Order Now',
+          discount: '১০% ছাড়',
+          price: '৳ ৯৫০',
+          regularPrice: '৳ ১১০০',
+          status: 'active',
+        });
+        loadAllData();
+      } else {
+        showToast(res?.message || 'Failed to create banner', 'error');
+      }
+    } catch (err) {
+      showToast('Error saving banner', 'error');
+    } finally {
+      setIsSavingBanner(false);
+    }
+  };
+
+  const handleUpdateBannerSubmit = async (e) => {
+    e.preventDefault();
+    if (!editingBanner) return;
+    setIsSavingBanner(true);
+    try {
+      const bannerId = editingBanner._id || editingBanner.id;
+      const res = await updateBanner(bannerId, editingBanner);
+      if (res?.success !== false) {
+        showToast(isBangla ? 'ব্যানার সফলভাবে আপডেট হয়েছে!' : 'Banner updated successfully!');
+        setEditingBanner(null);
+        loadAllData();
+      } else {
+        showToast(res?.message || 'Failed to update banner', 'error');
+      }
+    } catch (err) {
+      showToast('Error updating banner', 'error');
+    } finally {
+      setIsSavingBanner(false);
+    }
+  };
+
+  const handleDeleteBannerAction = async (id) => {
+    if (confirm(isBangla ? 'আপনি কি নিশ্চিত এই ব্যানারটি মুছে ফেলতে চান?' : 'Are you sure you want to delete this banner?')) {
+      const res = await deleteBanner(id);
+      if (res?.success !== false) {
+        showToast(isBangla ? 'ব্যানার মুছে ফেলা হয়েছে!' : 'Banner deleted successfully!');
+        loadAllData();
+      }
+    }
+  };
+
+  const handleSaveStaticPageContent = async (e) => {
+    e.preventDefault();
+    setIsSavingStaticPage(true);
+    try {
+      const updatedSettings = {
+        ...siteSettings,
+        staticPages: staticPagesData
+      };
+      await updateSiteSettings(updatedSettings);
+      setSiteSettings(updatedSettings);
+      showToast(isBangla ? '🎉 পেজ কনটেন্ট ডাটাবেসে সেভ হয়েছে!' : 'Page content saved to MongoDB!');
+    } catch (err) {
+      showToast(isBangla ? 'পেজ সেভ করতে সমস্যা হয়েছে' : 'Failed to save page', 'error');
+    } finally {
+      setIsSavingStaticPage(false);
+    }
+  };
+
+  // ── Reports & Sales Analytics Computed Calculations ─────────────────────
+  const filteredOrdersByTime = React.useMemo(() => {
+    if (!ordersList || ordersList.length === 0) return [];
+    if (reportsTimeRange === 'all') return ordersList;
+
+    const now = new Date();
+    const daysLimit = reportsTimeRange === '7days' ? 7 : reportsTimeRange === '30days' ? 30 : 31;
+    
+    return ordersList.filter(o => {
+      const oDate = new Date(o.createdAt || o.date || o.orderDate || now);
+      if (reportsTimeRange === 'this_month') {
+        return oDate.getMonth() === now.getMonth() && oDate.getFullYear() === now.getFullYear();
+      }
+      const diffTime = Math.abs(now - oDate);
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      return diffDays <= daysLimit;
+    });
+  }, [ordersList, reportsTimeRange]);
+
+  const salesAnalyticsMetrics = React.useMemo(() => {
+    const list = filteredOrdersByTime;
+    const totalOrders = list.length;
+    const completedOrders = list.filter(o => ['delivered', 'completed'].includes((o.status || '').toLowerCase()));
+    const cancelledOrders = list.filter(o => ['cancelled', 'returned'].includes((o.status || '').toLowerCase()));
+    const processingOrders = list.filter(o => ['processing', 'confirmed', 'packed', 'shipped'].includes((o.status || '').toLowerCase()));
+    const pendingOrders = list.filter(o => (o.status || '').toLowerCase() === 'pending');
+
+    const totalGrossRevenue = list.reduce((sum, o) => sum + Number(o.total_amount || o.totalPrice || o.total || 0), 0);
+    const deliveredRevenue = completedOrders.reduce((sum, o) => sum + Number(o.total_amount || o.totalPrice || o.total || 0), 0);
+    const cancelledLoss = cancelledOrders.reduce((sum, o) => sum + Number(o.total_amount || o.totalPrice || o.total || 0), 0);
+    const aov = totalOrders > 0 ? Math.round(totalGrossRevenue / totalOrders) : 0;
+    
+    // Platform commission earned (approx 10% default)
+    const commissionEarned = Math.round(deliveredRevenue * 0.10);
+
+    // Payment methods
+    const codOrders = list.filter(o => !o.paymentMethod || o.paymentMethod.toLowerCase() === 'cod' || o.paymentMethod.toLowerCase().includes('cash'));
+    const onlineOrders = list.filter(o => o.paymentMethod && (o.paymentMethod.toLowerCase().includes('bkash') || o.paymentMethod.toLowerCase().includes('nagad') || o.paymentMethod.toLowerCase().includes('online') || o.paymentMethod.toLowerCase().includes('card')));
+
+    const codAmount = codOrders.reduce((s, o) => s + Number(o.total_amount || o.totalPrice || o.total || 0), 0);
+    const onlineAmount = onlineOrders.reduce((s, o) => s + Number(o.total_amount || o.totalPrice || o.total || 0), 0);
+
+    return {
+      totalOrders,
+      completedOrdersCount: completedOrders.length,
+      cancelledOrdersCount: cancelledOrders.length,
+      processingOrdersCount: processingOrders.length,
+      pendingOrdersCount: pendingOrders.length,
+      deliverySuccessRate: totalOrders > 0 ? Math.round((completedOrders.length / totalOrders) * 100) : 0,
+      totalGrossRevenue,
+      deliveredRevenue,
+      cancelledLoss,
+      aov,
+      commissionEarned,
+      codOrdersCount: codOrders.length,
+      onlineOrdersCount: onlineOrders.length,
+      codAmount,
+      onlineAmount,
+      onlinePct: totalGrossRevenue > 0 ? Math.round((onlineAmount / totalGrossRevenue) * 100) : 0,
+      codPct: totalGrossRevenue > 0 ? Math.round((codAmount / totalGrossRevenue) * 100) : 100,
+    };
+  }, [filteredOrdersByTime]);
+
+  const productPerformanceAnalytics = React.useMemo(() => {
+    const map = {};
+    (filteredOrdersByTime || []).forEach(order => {
+      (order.items || []).forEach(item => {
+        const pId = item.id || item._id || item.productId || item.name;
+        if (!map[pId]) {
+          map[pId] = {
+            id: pId,
+            name: item.name || 'খাঁটি অর্গানিক পণ্য',
+            image: item.image || item.thumbnail || 'https://images.unsplash.com/photo-1587049352846-4a222e784d38?auto=format&fit=crop&w=150&q=80',
+            price: Number(item.price || 0),
+            unitsSold: 0,
+            grossRevenue: 0,
+            ordersCount: 0,
+            seller: item.seller_name || order.seller_name || 'ইহসান ফার্মস'
+          };
+        }
+        const qty = Number(item.quantity || 1);
+        map[pId].unitsSold += qty;
+        map[pId].grossRevenue += (qty * Number(item.price || 0));
+        map[pId].ordersCount += 1;
+      });
+    });
+
+    const sorted = Object.values(map).sort((a, b) => b.grossRevenue - a.grossRevenue);
+    
+    // Inventory Stock Health (< 15 units low stock)
+    const lowStockList = (productsList || []).filter(p => Number(p.stock_quantity !== undefined ? p.stock_quantity : (p.stock || 0)) <= 15).sort((a, b) => (a.stock_quantity || 0) - (b.stock_quantity || 0));
+
+    return {
+      topProducts: sorted,
+      lowStockList,
+    };
+  }, [filteredOrdersByTime, productsList]);
+
+  // Export Sales Report to CSV File
+  const handleExportCSV = () => {
+    if (!ordersList || ordersList.length === 0) {
+      showToast(isBangla ? 'এক্সপোর্ট করার মতো কোনো অর্ডার নেই' : 'No orders found to export', 'error');
+      return;
+    }
+
+    const headers = ['Order ID', 'Customer Name', 'Phone', 'Address', 'Status', 'Payment Method', 'Payment Status', 'Items Count', 'Total Amount (BDT)', 'Date'];
+    const rows = ordersList.map(o => [
+      `"${o.orderId || o.id || ''}"`,
+      `"${(o.customerName || '').replace(/"/g, '""')}"`,
+      `"${o.customerPhone || ''}"`,
+      `"${(o.deliveryAddress || '').replace(/"/g, '""')}"`,
+      `"${o.status || 'Pending'}"`,
+      `"${o.paymentMethod || 'COD'}"`,
+      `"${o.paymentStatus || 'Pending'}"`,
+      o.items ? o.items.length : 1,
+      o.totalAmount || o.totalPrice || o.total || 0,
+      `"${new Date(o.createdAt || o.date || Date.now()).toLocaleDateString('en-GB')}"`
+    ]);
+
+    const csvContent = '\uFEFF' + [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `Ihsan_Sales_Report_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    showToast(isBangla ? '🎉 সেলস রিপোর্ট CSV ফাইলে ডাউনলোড হয়েছে!' : 'Sales report CSV downloaded successfully!');
   };
 
   // Nav Items Menu Configuration (Admin Profile & System Settings at Bottom as requested)
@@ -4982,18 +5327,815 @@ export default function AdminDashboardPage() {
           )}
 
           
-          {/* Fallback for other sections (CMS, Reports) */}
-          {(activeMenu === 'cms' || activeMenu === 'reports') && (
-            <div className="bg-white dark:bg-[#112318] rounded-3xl p-8 border border-[#e0ebe2] dark:border-[#1d3b28] shadow-sm text-center space-y-4">
-              <div className="w-16 h-16 rounded-full bg-emerald-100 dark:bg-emerald-950 text-brand-900 dark:text-emerald-300 flex items-center justify-center mx-auto text-2xl">
-                📈
+          {/* ======================================================== */}
+          {/* 9. 📝 CONTENT MANAGEMENT SYSTEM (CMS)                    */}
+          {/* ======================================================== */}
+          {activeMenu === 'cms' && (
+            <div className="space-y-6">
+              
+              {/* Header & Sub-tabs */}
+              <div className="bg-white dark:bg-[#112318] rounded-3xl p-6 border border-[#e0ebe2] dark:border-[#1d3b28] shadow-sm space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-100 dark:border-emerald-950 pb-4">
+                  <div>
+                    <h3 className="text-xl font-black text-gray-900 dark:text-emerald-100 flex items-center gap-2.5">
+                      <span className="p-2 rounded-2xl bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300">📝</span>
+                      <span>{isBangla ? 'কনটেন্ট ম্যানেজমেন্ট সিস্টেম (CMS)' : 'Content Management System (CMS)'}</span>
+                    </h3>
+                    <p className="text-xs text-gray-500 dark:text-emerald-400 mt-1">
+                      {isBangla 
+                        ? 'হোমপেজ সেকশন কনফিগারেশন, হিরো ব্যানার স্লাইডার এবং স্ট্যাটিক পলিসি পেজসমূহ সরাসরি নিয়ন্ত্রণ করুন।' 
+                        : 'Manage homepage layout sections, hero slider banners, and static policy pages live.'}
+                    </p>
+                  </div>
+
+                  <span className="px-3.5 py-1.5 rounded-xl bg-emerald-50 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 text-xs font-black flex items-center gap-1.5 self-start sm:self-auto">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                    <span>MongoDB CMS Active</span>
+                  </span>
+                </div>
+
+                {/* Sub Tab Navigation */}
+                <div className="flex items-center gap-2 flex-wrap pt-1">
+                  <button
+                    onClick={() => setCmsSubTab('sections')}
+                    className={`px-4 py-2.5 rounded-2xl font-black text-xs sm:text-sm flex items-center gap-2 transition-all ${
+                      cmsSubTab === 'sections'
+                        ? 'bg-brand-900 text-white shadow-md shadow-brand-950/20 dark:bg-emerald-600'
+                        : 'bg-gray-100 dark:bg-emerald-950/50 text-gray-700 dark:text-emerald-200 hover:bg-emerald-50'
+                    }`}
+                  >
+                    <LayoutGrid className="w-4 h-4" />
+                    <span>{isBangla ? 'হোমপেজ সেকশন কনফিগারেশন' : 'Homepage Sections'}</span>
+                  </button>
+
+                  <button
+                    onClick={() => setCmsSubTab('banners')}
+                    className={`px-4 py-2.5 rounded-2xl font-black text-xs sm:text-sm flex items-center gap-2 transition-all ${
+                      cmsSubTab === 'banners'
+                        ? 'bg-brand-900 text-white shadow-md shadow-brand-950/20 dark:bg-emerald-600'
+                        : 'bg-gray-100 dark:bg-emerald-950/50 text-gray-700 dark:text-emerald-200 hover:bg-emerald-50'
+                    }`}
+                  >
+                    <ImageIcon className="w-4 h-4" />
+                    <span>{isBangla ? 'হিরো ব্যানার স্লাইডার' : 'Hero Banners'}</span>
+                    <span className="px-2 py-0.5 rounded-full bg-white/20 text-[10px]">{bannersList.length}</span>
+                  </button>
+
+                  <button
+                    onClick={() => setCmsSubTab('pages')}
+                    className={`px-4 py-2.5 rounded-2xl font-black text-xs sm:text-sm flex items-center gap-2 transition-all ${
+                      cmsSubTab === 'pages'
+                        ? 'bg-brand-900 text-white shadow-md shadow-brand-950/20 dark:bg-emerald-600'
+                        : 'bg-gray-100 dark:bg-emerald-950/50 text-gray-700 dark:text-emerald-200 hover:bg-emerald-50'
+                    }`}
+                  >
+                    <FileText className="w-4 h-4" />
+                    <span>{isBangla ? 'পলিসি ও স্ট্যাটিক পেজ' : 'Policy & Pages'}</span>
+                  </button>
+                </div>
               </div>
-              <h3 className="text-xl font-extrabold text-gray-900 dark:text-emerald-100">
-                {activeMenu === 'cms' ? (isBangla ? 'কনটেন্ট ম্যানেজমেন্ট মডিউল (CMS)' : 'Content Management') : (isBangla ? 'রিপোর্টস ও এক্সপোর্ট হাব' : 'Reports Hub')}
-              </h3>
-              <p className="text-xs sm:text-sm text-gray-500 dark:text-emerald-400 max-w-md mx-auto">
-                {isBangla ? 'সেলস রিপোর্ট, প্রোডাক্ট রিপোর্ট, হোমপেজ সেকশন ও পলিসি পেজ ম্যানেজমেন্ট সক্রিয় রয়েছে।' : 'Sales analytics, product performance, and homepage content configuration active.'}
-              </p>
+
+              {/* ── SUB-TAB 1: HOMEPAGE SECTIONS CONFIGURATION ──────────── */}
+              {cmsSubTab === 'sections' && (
+                <div className="bg-white dark:bg-[#112318] rounded-3xl p-6 border border-[#e0ebe2] dark:border-[#1d3b28] shadow-sm space-y-6">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-100 dark:border-emerald-950 pb-3.5">
+                    <div>
+                      <h4 className="text-base font-black text-gray-900 dark:text-emerald-100 flex items-center gap-2">
+                        <Sliders className="w-4 h-4 text-emerald-600" />
+                        <span>{isBangla ? 'হোমপেজ লেআউট ও সেকশন সক্রিয়করণ' : 'Homepage Layout & Section Ordering'}</span>
+                      </h4>
+                      <p className="text-xs text-gray-500 dark:text-emerald-400 mt-0.5">
+                        {isBangla ? 'যেকোনো সেকশন অন/অফ করতে টগল ব্যবহার করুন এবং উপরে-নিচে নিয়ে ক্রম পরিবর্তন করুন।' : 'Enable/disable sections or reorder them on the homepage.'}
+                      </p>
+                    </div>
+
+                    <button
+                      onClick={handleSaveHomepageSections}
+                      disabled={isSavingCms}
+                      className="px-5 py-2.5 bg-gradient-to-r from-brand-900 to-emerald-800 hover:from-brand-800 hover:to-emerald-700 text-white font-black text-xs sm:text-sm rounded-2xl shadow-md transition-all flex items-center gap-2 self-start sm:self-auto disabled:opacity-50"
+                    >
+                      {isSavingCms ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                      <span>{isBangla ? 'কনফিগারেশন সংরক্ষণ করুন' : 'Save Homepage Layout'}</span>
+                    </button>
+                  </div>
+
+                  <div className="space-y-3">
+                    {homepageSections.map((sec, idx) => (
+                      <div
+                        key={sec.id}
+                        className={`p-4 sm:p-5 rounded-2xl border transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-4 ${
+                          sec.enabled 
+                            ? 'bg-gray-50 dark:bg-black/30 border-gray-200 dark:border-emerald-900/60' 
+                            : 'bg-gray-100/50 dark:bg-black/10 border-dashed border-gray-300 dark:border-emerald-950 opacity-60'
+                        }`}
+                      >
+                        <div className="flex items-center gap-3.5">
+                          <span className="w-10 h-10 rounded-2xl bg-white dark:bg-black/40 border border-gray-200 dark:border-emerald-900 flex items-center justify-center text-lg flex-shrink-0 shadow-sm">
+                            {sec.icon}
+                          </span>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="w-5 h-5 rounded-full bg-brand-900 text-white dark:bg-emerald-600 text-[11px] font-black flex items-center justify-center flex-shrink-0">
+                                {idx + 1}
+                              </span>
+                              <h5 className="font-extrabold text-sm sm:text-base text-gray-900 dark:text-emerald-100">
+                                {isBangla ? sec.name : sec.nameEn}
+                              </h5>
+                              <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase ${
+                                sec.enabled ? 'bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300' : 'bg-gray-200 text-gray-600'
+                              }`}>
+                                {sec.enabled ? (isBangla ? 'সক্রিয়' : 'Active') : (isBangla ? 'লুকানো' : 'Hidden')}
+                              </span>
+                            </div>
+                            <p className="text-xs text-gray-500 dark:text-emerald-400/80 mt-1">{sec.desc}</p>
+                          </div>
+                        </div>
+
+                        {/* Controls (Up / Down & Toggle) */}
+                        <div className="flex items-center gap-2.5 self-end sm:self-auto">
+                          <div className="flex items-center gap-1 bg-white dark:bg-black/40 p-1 rounded-xl border border-gray-200 dark:border-emerald-900">
+                            <button
+                              onClick={() => handleMoveSection(idx, 'up')}
+                              disabled={idx === 0}
+                              className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-emerald-950 text-gray-600 dark:text-emerald-300 disabled:opacity-30"
+                              title="Move Up"
+                            >
+                              <ArrowUp className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => handleMoveSection(idx, 'down')}
+                              disabled={idx === homepageSections.length - 1}
+                              className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-emerald-950 text-gray-600 dark:text-emerald-300 disabled:opacity-30"
+                              title="Move Down"
+                            >
+                              <ArrowDown className="w-4 h-4" />
+                            </button>
+                          </div>
+
+                          <label className="relative inline-flex items-center cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={sec.enabled}
+                              onChange={() => handleToggleSection(idx)}
+                              className="sr-only peer"
+                            />
+                            <div className="w-11 h-6 bg-gray-300 peer-focus:outline-none rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-emerald-600"></div>
+                          </label>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* ── SUB-TAB 2: HERO BANNERS MANAGEMENT ─────────────────── */}
+              {cmsSubTab === 'banners' && (
+                <div className="space-y-6">
+                  {/* Create Banner Form Card */}
+                  <div className="bg-white dark:bg-[#112318] rounded-3xl p-6 border border-[#e0ebe2] dark:border-[#1d3b28] shadow-sm space-y-4">
+                    <div className="border-b border-gray-100 dark:border-emerald-950 pb-3">
+                      <h4 className="font-black text-base text-gray-900 dark:text-emerald-100 flex items-center gap-2">
+                        <Plus className="w-4 h-4 text-emerald-600" />
+                        <span>{isBangla ? 'নতুন হিরো ব্যানার স্লাইড তৈরি করুন' : 'Create New Hero Banner Slide'}</span>
+                      </h4>
+                    </div>
+
+                    <form onSubmit={handleCreateBannerSubmit} className="space-y-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-xs font-bold mb-1">{isBangla ? 'ব্যানার শিরোনাম (বাংলা) *' : 'Banner Title (Bangla) *'}</label>
+                          <input
+                            type="text"
+                            required
+                            placeholder="১০০% খাঁটি সুন্দরবনের মধু"
+                            value={newBannerData.title}
+                            onChange={(e) => setNewBannerData({ ...newBannerData, title: e.target.value })}
+                            className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-black/30 border border-gray-200 dark:border-emerald-900 rounded-xl text-xs sm:text-sm font-bold"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-bold mb-1">{isBangla ? 'ব্যানার শিরোনাম (English)' : 'Banner Title (English)'}</label>
+                          <input
+                            type="text"
+                            placeholder="100% Pure Sundarban Honey"
+                            value={newBannerData.title_en}
+                            onChange={(e) => setNewBannerData({ ...newBannerData, title_en: e.target.value })}
+                            className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-black/30 border border-gray-200 dark:border-emerald-900 rounded-xl text-xs sm:text-sm"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-xs font-bold mb-1">{isBangla ? 'সাবটাইটেল / বিবরণ (বাংলা)' : 'Subtitle / Description'}</label>
+                          <input
+                            type="text"
+                            placeholder="সরাসরি সুন্দরবনের চাক থেকে সংগৃহীত কাঁচা মধু"
+                            value={newBannerData.subtitle}
+                            onChange={(e) => setNewBannerData({ ...newBannerData, subtitle: e.target.value })}
+                            className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-black/30 border border-gray-200 dark:border-emerald-900 rounded-xl text-xs sm:text-sm"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-bold mb-1">{isBangla ? 'রিবন / ব্যাজ টেক্সট' : 'Ribbon / Badge Text'}</label>
+                          <input
+                            type="text"
+                            placeholder="🌿 ১০০% খাঁটি পণ্য"
+                            value={newBannerData.badge}
+                            onChange={(e) => setNewBannerData({ ...newBannerData, badge: e.target.value })}
+                            className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-black/30 border border-gray-200 dark:border-emerald-900 rounded-xl text-xs sm:text-sm"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                        <div>
+                          <label className="block text-xs font-bold mb-1">{isBangla ? 'ডিসকাউন্ট ট্যাগ' : 'Discount Tag'}</label>
+                          <input
+                            type="text"
+                            placeholder="১৪% ছাড়"
+                            value={newBannerData.discount}
+                            onChange={(e) => setNewBannerData({ ...newBannerData, discount: e.target.value })}
+                            className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-black/30 border border-gray-200 dark:border-emerald-900 rounded-xl text-xs sm:text-sm"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-bold mb-1">{isBangla ? 'অফার মূল্য' : 'Offer Price'}</label>
+                          <input
+                            type="text"
+                            placeholder="৳ ৯৫০"
+                            value={newBannerData.price}
+                            onChange={(e) => setNewBannerData({ ...newBannerData, price: e.target.value })}
+                            className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-black/30 border border-gray-200 dark:border-emerald-900 rounded-xl text-xs sm:text-sm font-bold"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-bold mb-1">{isBangla ? 'বাটন রিডাইরেক্ট লিংক' : 'Button Target Link'}</label>
+                          <input
+                            type="text"
+                            placeholder="/products?category=pure-honey"
+                            value={newBannerData.link}
+                            onChange={(e) => setNewBannerData({ ...newBannerData, link: e.target.value })}
+                            className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-black/30 border border-gray-200 dark:border-emerald-900 rounded-xl text-xs sm:text-sm"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Image Uploaders */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <ImageUploader
+                          label={isBangla ? 'ব্যানার শোকেস ছবি (ImgBB CDN) *' : 'Banner Product Showcase Image *'}
+                          value={newBannerData.image}
+                          onChange={(url) => setNewBannerData({ ...newBannerData, image: url })}
+                        />
+                        <ImageUploader
+                          label={isBangla ? 'ব্যাকগ্রাউন্ড ব্যাকড্রপ ছবি (ঐচ্ছিক)' : 'Background Backdrop Image (Optional)'}
+                          value={newBannerData.bgImage}
+                          onChange={(url) => setNewBannerData({ ...newBannerData, bgImage: url })}
+                        />
+                      </div>
+
+                      <div className="pt-2">
+                        <button
+                          type="submit"
+                          disabled={isSavingBanner}
+                          className="px-6 py-3 bg-gradient-to-r from-brand-900 to-emerald-800 hover:from-brand-800 hover:to-emerald-700 text-white font-black text-xs sm:text-sm rounded-2xl shadow-md transition-all flex items-center gap-2 disabled:opacity-50"
+                        >
+                          {isSavingBanner ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                          <span>{isBangla ? 'ব্যানার স্লাইড সেভ করুন (Save to MongoDB)' : 'Save Banner to MongoDB'}</span>
+                        </button>
+                      </div>
+                    </form>
+                  </div>
+
+                  {/* Existing Banners Grid */}
+                  <div className="space-y-4">
+                    <h4 className="text-sm font-black text-gray-900 dark:text-emerald-100 flex items-center gap-2">
+                      <ImageIcon className="w-4 h-4 text-emerald-600" />
+                      <span>{isBangla ? 'বর্তমানে সক্রিয় ব্যানারসমূহ' : 'Active Hero Banners'} ({bannersList.length})</span>
+                    </h4>
+
+                    {bannersList.length === 0 ? (
+                      <div className="text-center py-12 bg-white dark:bg-[#112318] rounded-3xl border border-gray-200 dark:border-emerald-950 p-6">
+                        <ImageIcon className="w-10 h-10 text-gray-300 mx-auto mb-2" />
+                        <p className="text-xs text-gray-500">{isBangla ? 'কোনো কাস্টম ব্যানার ডাটাবেসে পাওয়া যায়নি। ডিফল্ট স্লাইডার লাইভ রয়েছে।' : 'No custom banners in MongoDB. Default fallback slider active.'}</p>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {bannersList.map((banner) => {
+                          const bId = banner._id || banner.id;
+                          return (
+                            <div
+                              key={bId}
+                              className="bg-white dark:bg-[#112318] rounded-3xl overflow-hidden border border-gray-200 dark:border-emerald-950 shadow-sm space-y-3 flex flex-col justify-between"
+                            >
+                              <div className="relative h-40 bg-gray-100 dark:bg-black/50 overflow-hidden">
+                                <img
+                                  src={banner.image || banner.bgImage || 'https://images.unsplash.com/photo-1587049352846-4a222e784d38?auto=format&fit=crop&w=600&q=80'}
+                                  alt={banner.title}
+                                  className="w-full h-full object-cover"
+                                />
+                                {banner.badge && (
+                                  <span className="absolute top-2.5 left-2.5 px-2.5 py-1 bg-brand-900/90 text-white rounded-xl text-[10px] font-black backdrop-blur-sm">
+                                    {banner.badge}
+                                  </span>
+                                )}
+                                {banner.discount && (
+                                  <span className="absolute top-2.5 right-2.5 px-2.5 py-1 bg-amber-500 text-brand-950 rounded-xl text-[10px] font-black shadow">
+                                    {banner.discount}
+                                  </span>
+                                )}
+                              </div>
+
+                              <div className="p-4 space-y-2 flex-1 flex flex-col justify-between">
+                                <div>
+                                  <h5 className="font-black text-sm text-gray-900 dark:text-emerald-100 line-clamp-1">{banner.title}</h5>
+                                  <p className="text-xs text-gray-500 dark:text-emerald-400/80 line-clamp-2 mt-0.5">{banner.subtitle}</p>
+                                  {banner.price && (
+                                    <p className="text-xs font-extrabold text-emerald-700 dark:text-emerald-300 mt-2">মূল্য: {banner.price}</p>
+                                  )}
+                                </div>
+
+                                <div className="flex items-center justify-between pt-3 border-t border-gray-100 dark:border-emerald-950/60">
+                                  <span className="text-[11px] text-gray-400 font-mono truncate max-w-[150px]">{banner.link || '/products'}</span>
+                                  <button
+                                    onClick={() => handleDeleteBannerAction(bId)}
+                                    className="p-1.5 rounded-xl text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors"
+                                    title="Delete Banner"
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* ── SUB-TAB 3: STATIC & POLICY PAGES ───────────────────── */}
+              {cmsSubTab === 'pages' && (
+                <div className="bg-white dark:bg-[#112318] rounded-3xl p-6 border border-[#e0ebe2] dark:border-[#1d3b28] shadow-sm space-y-6">
+                  <div className="border-b border-gray-100 dark:border-emerald-950 pb-3">
+                    <h4 className="font-black text-base text-gray-900 dark:text-emerald-100 flex items-center gap-2">
+                      <FileText className="w-4 h-4 text-emerald-600" />
+                      <span>{isBangla ? 'পলিসি ও স্ট্যাটিক পেজ কনটেন্ট এডিটর' : 'Static & Policy Pages Content Editor'}</span>
+                    </h4>
+                  </div>
+
+                  {/* Page Selector Tabs */}
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {[
+                      { key: 'about', label: isBangla ? 'আমাদের সম্পর্কে' : 'About Us' },
+                      { key: 'terms', label: isBangla ? 'ব্যবহারের শর্তাবলী' : 'Terms of Service' },
+                      { key: 'privacy', label: isBangla ? 'গোপনীয়তা নীতি' : 'Privacy Policy' },
+                      { key: 'refund', label: isBangla ? 'রিটার্ন ও রিফান্ড নীতি' : 'Refund Policy' },
+                    ].map((pg) => (
+                      <button
+                        key={pg.key}
+                        onClick={() => setSelectedStaticPage(pg.key)}
+                        className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+                          selectedStaticPage === pg.key
+                            ? 'bg-brand-900 text-white dark:bg-emerald-600 shadow'
+                            : 'bg-gray-100 dark:bg-emerald-950/40 text-gray-700 dark:text-emerald-300'
+                        }`}
+                      >
+                        {pg.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Active Page Editor Form */}
+                  <form onSubmit={handleSaveStaticPageContent} className="space-y-4">
+                    <div>
+                      <label className="block text-xs font-bold mb-1">{isBangla ? 'পেজ শিরোনাম *' : 'Page Title *'}</label>
+                      <input
+                        type="text"
+                        required
+                        value={staticPagesData[selectedStaticPage]?.title || ''}
+                        onChange={(e) => setStaticPagesData({
+                          ...staticPagesData,
+                          [selectedStaticPage]: {
+                            ...staticPagesData[selectedStaticPage],
+                            title: e.target.value
+                          }
+                        })}
+                        className="w-full px-4 py-2.5 bg-gray-50 dark:bg-black/30 border border-gray-200 dark:border-emerald-900 rounded-xl text-xs sm:text-sm font-bold"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold mb-1">{isBangla ? 'পেজ কনটেন্ট ও বিবরণ *' : 'Page Content *'}</label>
+                      <textarea
+                        rows={8}
+                        required
+                        value={staticPagesData[selectedStaticPage]?.content || ''}
+                        onChange={(e) => setStaticPagesData({
+                          ...staticPagesData,
+                          [selectedStaticPage]: {
+                            ...staticPagesData[selectedStaticPage],
+                            content: e.target.value
+                          }
+                        })}
+                        className="w-full px-4 py-3 bg-gray-50 dark:bg-black/30 border border-gray-200 dark:border-emerald-900 rounded-2xl text-xs sm:text-sm leading-relaxed"
+                        placeholder="পেজের বিস্তারিত বিবরণ ও তথ্য লিখুন..."
+                      />
+                    </div>
+
+                    <div className="flex items-center justify-between pt-2">
+                      <button
+                        type="submit"
+                        disabled={isSavingStaticPage}
+                        className="px-6 py-3 bg-gradient-to-r from-brand-900 to-emerald-800 hover:from-brand-800 hover:to-emerald-700 text-white font-black text-xs sm:text-sm rounded-2xl shadow-md transition-all flex items-center gap-2 disabled:opacity-50"
+                      >
+                        {isSavingStaticPage ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                        <span>{isBangla ? 'পেজ কনটেন্ট সেভ করুন (Save to MongoDB)' : 'Save Page Content'}</span>
+                      </button>
+
+                      <Link
+                        href={`/${selectedStaticPage}`}
+                        target="_blank"
+                        className="text-xs font-bold text-emerald-700 dark:text-emerald-400 hover:underline flex items-center gap-1"
+                      >
+                        <span>{isBangla ? 'ওয়েবসাইটে লাইভ পেজ দেখুন' : 'View Live Page'}</span>
+                        <ExternalLink className="w-3.5 h-3.5" />
+                      </Link>
+                    </div>
+                  </form>
+                </div>
+              )}
+
+            </div>
+          )}
+
+          {/* ======================================================== */}
+          {/* 10. 📊 SALES ANALYTICS & PRODUCT PERFORMANCE (REPORTS)   */}
+          {/* ======================================================== */}
+          {activeMenu === 'reports' && (
+            <div className="space-y-6">
+              
+              {/* Header & Sub-tab Bar */}
+              <div className="bg-white dark:bg-[#112318] rounded-3xl p-6 border border-[#e0ebe2] dark:border-[#1d3b28] shadow-sm space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-100 dark:border-emerald-950 pb-4">
+                  <div>
+                    <h3 className="text-xl font-black text-gray-900 dark:text-emerald-100 flex items-center gap-2.5">
+                      <span className="p-2 rounded-2xl bg-purple-100 dark:bg-purple-950 text-purple-800 dark:text-purple-300">📈</span>
+                      <span>{isBangla ? 'সেলস অ্যানালিটিক্স ও প্রোডাক্ট পারফরম্যান্স রিপোর্ট' : 'Sales Analytics & Product Performance Hub'}</span>
+                    </h3>
+                    <p className="text-xs text-gray-500 dark:text-emerald-400 mt-1">
+                      {isBangla 
+                        ? 'মোট বিক্রয়, লাভ, স্টক অবস্থা, শীর্ষ বিক্রিত পণ্য এবং রিয়েল-টাইম বিজনেস গ্রোথ মেট্রিক্স।' 
+                        : 'Real-time sales revenue, product inventory velocity, and downloadable financial reports.'}
+                    </p>
+                  </div>
+
+                  {/* Time Range Selector */}
+                  <div className="flex items-center gap-1.5 bg-gray-100 dark:bg-black/40 p-1.5 rounded-2xl border border-gray-200 dark:border-emerald-900 self-start sm:self-auto">
+                    {[
+                      { id: '7days', label: isBangla ? 'গত ৭ দিন' : '7 Days' },
+                      { id: '30days', label: isBangla ? 'গত ৩০ দিন' : '30 Days' },
+                      { id: 'this_month', label: isBangla ? 'চলতি মাস' : 'This Month' },
+                      { id: 'all', label: isBangla ? 'সকল' : 'All Time' },
+                    ].map((t) => (
+                      <button
+                        key={t.id}
+                        onClick={() => setReportsTimeRange(t.id)}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all ${
+                          reportsTimeRange === t.id
+                            ? 'bg-white dark:bg-emerald-600 text-brand-900 dark:text-white shadow-sm'
+                            : 'text-gray-600 dark:text-emerald-300 hover:text-gray-900'
+                        }`}
+                      >
+                        {t.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Sub Tab Buttons */}
+                <div className="flex items-center justify-between gap-2 flex-wrap pt-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <button
+                      onClick={() => setReportsSubTab('sales')}
+                      className={`px-4 py-2.5 rounded-2xl font-black text-xs sm:text-sm flex items-center gap-2 transition-all ${
+                        reportsSubTab === 'sales'
+                          ? 'bg-brand-900 text-white shadow-md shadow-brand-950/20 dark:bg-emerald-600'
+                          : 'bg-gray-100 dark:bg-emerald-950/50 text-gray-700 dark:text-emerald-200 hover:bg-emerald-50'
+                      }`}
+                    >
+                      <BarChart3 className="w-4 h-4" />
+                      <span>{isBangla ? 'সেলস ও রেভিনিউ অ্যানালিটিক্স' : 'Sales Revenue'}</span>
+                    </button>
+
+                    <button
+                      onClick={() => setReportsSubTab('products')}
+                      className={`px-4 py-2.5 rounded-2xl font-black text-xs sm:text-sm flex items-center gap-2 transition-all ${
+                        reportsSubTab === 'products'
+                          ? 'bg-brand-900 text-white shadow-md shadow-brand-950/20 dark:bg-emerald-600'
+                          : 'bg-gray-100 dark:bg-emerald-950/50 text-gray-700 dark:text-emerald-200 hover:bg-emerald-50'
+                      }`}
+                    >
+                      <Package className="w-4 h-4" />
+                      <span>{isBangla ? 'প্রোডাক্ট পারফরম্যান্স ও স্টক' : 'Product Performance'}</span>
+                      {productPerformanceAnalytics.lowStockList.length > 0 && (
+                        <span className="px-2 py-0.5 rounded-full bg-red-500 text-white text-[10px] font-black animate-pulse">
+                          {productPerformanceAnalytics.lowStockList.length} Low
+                        </span>
+                      )}
+                    </button>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={handleExportCSV}
+                      className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-black shadow flex items-center gap-1.5 transition-all"
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                      <span>{isBangla ? 'CSV রিপোর্ট ডাউনলোড' : 'Export CSV'}</span>
+                    </button>
+
+                    <button
+                      onClick={() => window.print()}
+                      className="px-4 py-2 bg-gray-100 dark:bg-emerald-950 text-gray-700 dark:text-emerald-200 hover:bg-gray-200 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 print:hidden"
+                    >
+                      <Printer className="w-3.5 h-3.5" />
+                      <span>{isBangla ? 'প্রিন্ট' : 'Print'}</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* ── SUB-TAB 1: SALES ANALYTICS ─────────────────────────── */}
+              {reportsSubTab === 'sales' && (
+                <div className="space-y-6">
+                  
+                  {/* Metric Stat Cards (4 Cards) */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    {/* Gross Revenue */}
+                    <div className="bg-white dark:bg-[#112318] rounded-3xl p-5 border border-[#e0ebe2] dark:border-[#1d3b28] shadow-sm space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-gray-500 dark:text-emerald-400">{isBangla ? 'মোট বিক্রয় (Gross Sales)' : 'Gross Revenue'}</span>
+                        <span className="p-2 rounded-2xl bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300">
+                          <DollarSign className="w-4 h-4" />
+                        </span>
+                      </div>
+                      <h3 className="text-2xl font-black text-brand-950 dark:text-emerald-100">
+                        ৳ {salesAnalyticsMetrics.totalGrossRevenue.toLocaleString()}
+                      </h3>
+                      <p className="text-[11px] text-emerald-700 dark:text-emerald-400 font-semibold flex items-center gap-1">
+                        <span>✓</span>
+                        <span>{salesAnalyticsMetrics.totalOrders} {isBangla ? 'টি মোট অর্ডার' : 'Total Orders'}</span>
+                      </p>
+                    </div>
+
+                    {/* Platform Commission */}
+                    <div className="bg-white dark:bg-[#112318] rounded-3xl p-5 border border-[#e0ebe2] dark:border-[#1d3b28] shadow-sm space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-gray-500 dark:text-emerald-400">{isBangla ? 'প্ল্যাটফর্ম কমিশন রেভিনিউ' : 'Platform Commission'}</span>
+                        <span className="p-2 rounded-2xl bg-purple-100 dark:bg-purple-950 text-purple-800 dark:text-purple-300">
+                          <Percent className="w-4 h-4" />
+                        </span>
+                      </div>
+                      <h3 className="text-2xl font-black text-purple-900 dark:text-purple-300">
+                        ৳ {salesAnalyticsMetrics.commissionEarned.toLocaleString()}
+                      </h3>
+                      <p className="text-[11px] text-purple-700 dark:text-purple-400 font-semibold">
+                        {isBangla ? '১০% ডিফল্ট কমিশন ভিত্তিতে' : 'Estimated 10% rate'}
+                      </p>
+                    </div>
+
+                    {/* Completed Orders & Delivery Success Rate */}
+                    <div className="bg-white dark:bg-[#112318] rounded-3xl p-5 border border-[#e0ebe2] dark:border-[#1d3b28] shadow-sm space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-gray-500 dark:text-emerald-400">{isBangla ? 'ডেলিভারি সম্পন্ন ও রেট' : 'Delivered Orders'}</span>
+                        <span className="p-2 rounded-2xl bg-blue-100 dark:bg-blue-950 text-blue-800 dark:text-blue-300">
+                          <Truck className="w-4 h-4" />
+                        </span>
+                      </div>
+                      <h3 className="text-2xl font-black text-blue-900 dark:text-blue-300">
+                        {salesAnalyticsMetrics.completedOrdersCount} <span className="text-sm font-bold text-gray-400">/ {salesAnalyticsMetrics.totalOrders}</span>
+                      </h3>
+                      <p className="text-[11px] text-blue-700 dark:text-blue-400 font-semibold">
+                        {salesAnalyticsMetrics.deliverySuccessRate}% {isBangla ? 'সফল ডেলিভারি রেট' : 'Success Rate'}
+                      </p>
+                    </div>
+
+                    {/* Average Order Value (AOV) */}
+                    <div className="bg-white dark:bg-[#112318] rounded-3xl p-5 border border-[#e0ebe2] dark:border-[#1d3b28] shadow-sm space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-gray-500 dark:text-emerald-400">{isBangla ? 'গড় অর্ডার ভ্যালু (AOV)' : 'Avg Order Value'}</span>
+                        <span className="p-2 rounded-2xl bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300">
+                          <Activity className="w-4 h-4" />
+                        </span>
+                      </div>
+                      <h3 className="text-2xl font-black text-amber-900 dark:text-amber-300">
+                        ৳ {salesAnalyticsMetrics.aov.toLocaleString()}
+                      </h3>
+                      <p className="text-[11px] text-amber-700 dark:text-amber-400 font-semibold">
+                        {isBangla ? 'প্রতি অর্ডারে গড় আয়' : 'Per order average'}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Revenue Chart & Payment Method Split Grid */}
+                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                    
+                    {/* Weekly / Period Revenue Chart (8 cols) */}
+                    <div className="lg:col-span-8 bg-white dark:bg-[#112318] rounded-3xl p-6 border border-[#e0ebe2] dark:border-[#1d3b28] shadow-sm space-y-4">
+                      <div className="flex items-center justify-between border-b border-gray-100 dark:border-emerald-950 pb-3">
+                        <h4 className="font-black text-sm text-gray-900 dark:text-emerald-100 flex items-center gap-2">
+                          <TrendingUp className="w-4 h-4 text-emerald-600" />
+                          <span>{isBangla ? 'দৈনিক বিক্রয় ও অর্ডারের গ্রাফিকাল চিত্র' : 'Daily Sales Trend & Velocity'}</span>
+                        </h4>
+                        <span className="text-xs text-gray-400 font-mono">
+                          Max: ৳ {last7DaysData.maxRev.toLocaleString()}
+                        </span>
+                      </div>
+
+                      {/* Bar Chart Visualization */}
+                      <div className="h-48 flex items-end justify-between gap-2 pt-6 px-2">
+                        {last7DaysData.days.map((d, idx) => {
+                          const heightPct = Math.max(12, Math.round((d.revenue / last7DaysData.maxRev) * 100));
+                          return (
+                            <div key={idx} className="flex-1 flex flex-col items-center gap-2 group relative">
+                              {/* Hover Tooltip */}
+                              <div className="absolute -top-10 opacity-0 group-hover:opacity-100 transition-opacity bg-brand-950 text-white text-[10px] font-bold py-1 px-2 rounded-lg whitespace-nowrap pointer-events-none z-10 shadow-lg">
+                                ৳ {d.revenue.toLocaleString()} ({d.ordersCount} orders)
+                              </div>
+
+                              <div className="w-full bg-emerald-50 dark:bg-black/30 rounded-xl h-36 flex items-end p-1">
+                                <div
+                                  style={{ height: `${heightPct}%` }}
+                                  className="w-full bg-gradient-to-t from-brand-900 to-emerald-500 dark:from-emerald-700 dark:to-teal-400 rounded-lg transition-all duration-500 shadow-sm group-hover:brightness-110"
+                                />
+                              </div>
+                              <span className="text-[11px] font-extrabold text-gray-600 dark:text-emerald-300">
+                                {d.dayLabel}
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Payment Method Breakdown (4 cols) */}
+                    <div className="lg:col-span-4 bg-white dark:bg-[#112318] rounded-3xl p-6 border border-[#e0ebe2] dark:border-[#1d3b28] shadow-sm space-y-4">
+                      <div className="border-b border-gray-100 dark:border-emerald-950 pb-3">
+                        <h4 className="font-black text-sm text-gray-900 dark:text-emerald-100 flex items-center gap-2">
+                          <CreditCard className="w-4 h-4 text-emerald-600" />
+                          <span>{isBangla ? 'পেমেন্ট চ্যানেল অনুপাত' : 'Payment Methods'}</span>
+                        </h4>
+                      </div>
+
+                      <div className="space-y-4">
+                        {/* COD Card */}
+                        <div className="p-4 rounded-2xl bg-gray-50 dark:bg-black/20 border border-gray-200 dark:border-emerald-950 space-y-2">
+                          <div className="flex items-center justify-between text-xs font-bold">
+                            <span className="flex items-center gap-1.5">
+                              <span>💵</span>
+                              <span>Cash on Delivery (COD)</span>
+                            </span>
+                            <span className="text-emerald-800 dark:text-emerald-300 font-mono font-black">{salesAnalyticsMetrics.codPct}%</span>
+                          </div>
+                          <div className="w-full h-2 rounded-full bg-gray-200 dark:bg-emerald-950 overflow-hidden">
+                            <div style={{ width: `${salesAnalyticsMetrics.codPct}%` }} className="h-full bg-brand-900 dark:bg-emerald-500 rounded-full" />
+                          </div>
+                          <p className="text-[11px] text-gray-400">
+                            ৳ {salesAnalyticsMetrics.codAmount.toLocaleString()} ({salesAnalyticsMetrics.codOrdersCount} orders)
+                          </p>
+                        </div>
+
+                        {/* Online Banking Card */}
+                        <div className="p-4 rounded-2xl bg-gray-50 dark:bg-black/20 border border-gray-200 dark:border-emerald-950 space-y-2">
+                          <div className="flex items-center justify-between text-xs font-bold">
+                            <span className="flex items-center gap-1.5">
+                              <span>📱</span>
+                              <span>Online (bKash / Nagad / Card)</span>
+                            </span>
+                            <span className="text-purple-800 dark:text-purple-300 font-mono font-black">{salesAnalyticsMetrics.onlinePct}%</span>
+                          </div>
+                          <div className="w-full h-2 rounded-full bg-gray-200 dark:bg-emerald-950 overflow-hidden">
+                            <div style={{ width: `${salesAnalyticsMetrics.onlinePct}%` }} className="h-full bg-purple-600 rounded-full" />
+                          </div>
+                          <p className="text-[11px] text-gray-400">
+                            ৳ {salesAnalyticsMetrics.onlineAmount.toLocaleString()} ({salesAnalyticsMetrics.onlineOrdersCount} orders)
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                  </div>
+                </div>
+              )}
+
+              {/* ── SUB-TAB 2: PRODUCT PERFORMANCE & INVENTORY ─────────── */}
+              {reportsSubTab === 'products' && (
+                <div className="space-y-6">
+                  
+                  {/* Top Selling Products Leaderboard */}
+                  <div className="bg-white dark:bg-[#112318] rounded-3xl p-6 border border-[#e0ebe2] dark:border-[#1d3b28] shadow-sm space-y-4">
+                    <div className="flex items-center justify-between border-b border-gray-100 dark:border-emerald-950 pb-3">
+                      <div>
+                        <h4 className="font-black text-base text-gray-900 dark:text-emerald-100 flex items-center gap-2">
+                          <Award className="w-4 h-4 text-amber-500" />
+                          <span>{isBangla ? 'শীর্ষ বিক্রিত পণ্যের তালিকা (Best Performing Products)' : 'Top Selling Products Leaderboard'}</span>
+                        </h4>
+                        <p className="text-xs text-gray-500 dark:text-emerald-400 mt-0.5">
+                          {isBangla ? 'সবচেয়ে বেশি বিক্রিত পণ্য, মোট বিক্রয় সংখ্যা ও উপার্জিত আয়।' : 'Ranked by sales volume and gross revenue generated.'}
+                        </p>
+                      </div>
+                    </div>
+
+                    {productPerformanceAnalytics.topProducts.length === 0 ? (
+                      <div className="text-center py-12 text-xs text-gray-400">
+                        {isBangla ? 'এই সময়সীমার মধ্যে কোনো সেলস ডাটা পাওয়া যায়নি' : 'No sales records for selected timeframe'}
+                      </div>
+                    ) : (
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-left text-xs sm:text-sm">
+                          <thead className="bg-[#f4f7f4] dark:bg-black/30 text-gray-600 dark:text-emerald-300 font-bold border-b border-gray-200 dark:border-emerald-900/60">
+                            <tr>
+                              <th className="p-3.5">#</th>
+                              <th className="p-3.5">{isBangla ? 'পণ্য' : 'Product'}</th>
+                              <th className="p-3.5">{isBangla ? 'সেলার / স্টোর' : 'Seller / Shop'}</th>
+                              <th className="p-3.5 text-center">{isBangla ? 'বিক্রিত ইউনিট' : 'Units Sold'}</th>
+                              <th className="p-3.5 text-right">{isBangla ? 'মোট আয়' : 'Total Revenue'}</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-100 dark:divide-emerald-900/40">
+                            {productPerformanceAnalytics.topProducts.slice(0, 10).map((prod, idx) => (
+                              <tr key={idx} className="hover:bg-gray-50 dark:hover:bg-emerald-950/20">
+                                <td className="p-3.5 font-black text-brand-900 dark:text-emerald-300">
+                                  {idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `${idx + 1}`}
+                                </td>
+                                <td className="p-3.5 flex items-center gap-3">
+                                  <img src={prod.image} alt={prod.name} className="w-10 h-10 rounded-xl object-cover border border-gray-200 dark:border-emerald-900 flex-shrink-0" />
+                                  <div>
+                                    <h5 className="font-bold text-gray-900 dark:text-emerald-100">{prod.name}</h5>
+                                    <span className="text-[10px] text-gray-400 font-mono">৳ {prod.price}</span>
+                                  </div>
+                                </td>
+                                <td className="p-3.5 text-xs text-gray-600 dark:text-emerald-300 font-semibold">{prod.seller}</td>
+                                <td className="p-3.5 text-center font-black text-brand-900 dark:text-secondary">{prod.unitsSold} টি</td>
+                                <td className="p-3.5 text-right font-black text-brand-950 dark:text-emerald-100">৳ {prod.grossRevenue.toLocaleString()}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Low Stock Inventory Health Alert Box */}
+                  <div className="bg-white dark:bg-[#112318] rounded-3xl p-6 border border-[#e0ebe2] dark:border-[#1d3b28] shadow-sm space-y-4">
+                    <div className="flex items-center justify-between border-b border-gray-100 dark:border-emerald-950 pb-3">
+                      <div>
+                        <h4 className="font-black text-base text-gray-900 dark:text-emerald-100 flex items-center gap-2">
+                          <ShieldAlert className="w-4 h-4 text-rose-500" />
+                          <span>{isBangla ? 'স্টক সতর্কবার্তা ও ইনভেন্টরি স্বাস্থ্য' : 'Low Stock Inventory Alerts'}</span>
+                        </h4>
+                        <p className="text-xs text-gray-500 dark:text-emerald-400 mt-0.5">
+                          {isBangla ? 'যে সকল পণ্যের মজুদ ১৫ বা তার কম রয়েছে সেগুলো দ্রুত রিস্টক করুন।' : 'Products with stock remaining <= 15 requiring restock.'}
+                        </p>
+                      </div>
+                      <span className="px-3 py-1 rounded-full bg-red-100 dark:bg-red-950 text-red-800 dark:text-red-300 text-xs font-black">
+                        {productPerformanceAnalytics.lowStockList.length} {isBangla ? 'টি পণ্যে স্বল্প স্টক' : 'Items'}
+                      </span>
+                    </div>
+
+                    {productPerformanceAnalytics.lowStockList.length === 0 ? (
+                      <div className="text-center py-8 text-xs text-emerald-600 font-bold">
+                        {isBangla ? '✅ সকল পণ্যে পর্যাপ্ত স্টক মজুদ রয়েছে!' : 'All products have healthy inventory levels!'}
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                        {productPerformanceAnalytics.lowStockList.map((prod) => (
+                          <div
+                            key={prod.id || prod._id}
+                            className="p-3.5 rounded-2xl bg-rose-50/50 dark:bg-rose-950/20 border border-rose-200 dark:border-rose-900/40 flex items-center justify-between gap-3"
+                          >
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              <img src={prod.thumbnail || prod.images?.[0] || 'https://images.unsplash.com/photo-1587049352846-4a222e784d38?auto=format&fit=crop&w=150&q=80'} alt={prod.name} className="w-10 h-10 rounded-xl object-cover border flex-shrink-0" />
+                              <div className="min-w-0">
+                                <h5 className="font-bold text-xs text-gray-900 dark:text-emerald-100 truncate">{prod.name_bn || prod.name}</h5>
+                                <span className="text-[10px] text-gray-500 font-mono">৳ {prod.price}</span>
+                              </div>
+                            </div>
+                            <span className="px-2.5 py-1 rounded-xl bg-red-500 text-white font-black text-xs flex-shrink-0 shadow">
+                              {prod.stock_quantity || prod.stock || 0} টি
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                </div>
+              )}
+
             </div>
           )}
 

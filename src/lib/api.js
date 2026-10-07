@@ -379,6 +379,54 @@ export const getBanners = async () => {
   }
 };
 
+export const createBanner = async (bannerData) => {
+  try {
+    const res = await apiClient.post('/banners', bannerData);
+    return res.data;
+  } catch (error) {
+    console.error('createBanner error:', error);
+    return { success: false, message: error.response?.data?.message || 'Failed to create banner in MongoDB' };
+  }
+};
+
+export const updateBanner = async (id, bannerData) => {
+  try {
+    const res = await apiClient.put(`/banners/${id}`, bannerData);
+    return res.data;
+  } catch (error) {
+    console.error('updateBanner error:', error);
+    return { success: false, message: error.response?.data?.message || 'Failed to update banner in MongoDB' };
+  }
+};
+
+export const deleteBanner = async (id) => {
+  try {
+    const res = await apiClient.delete(`/banners/${id}`);
+    return res.data;
+  } catch (error) {
+    console.error('deleteBanner error:', error);
+    return { success: false, message: error.response?.data?.message || 'Failed to delete banner from MongoDB' };
+  }
+};
+
+export const getPages = async () => {
+  try {
+    const res = await apiClient.get('/pages');
+    return res.data;
+  } catch (error) {
+    return { success: false, data: [] };
+  }
+};
+
+export const updatePageContent = async (slug, pageData) => {
+  try {
+    const res = await apiClient.put(`/pages/${slug}`, pageData);
+    return res.data;
+  } catch (error) {
+    return { success: false, message: error.response?.data?.message || 'Failed to update page' };
+  }
+};
+
 // ==========================================
 // 8. Notifications & Support Tickets API
 // ==========================================
