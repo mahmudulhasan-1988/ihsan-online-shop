@@ -154,7 +154,36 @@ export default function AdminDashboardPage() {
   const [couponsList, setCouponsList] = useState([]);
   const [bannersList, setBannersList] = useState([]);
   const [ticketsList, setTicketsList] = useState([]);
-  const [siteSettings, setSiteSettings] = useState(null);
+  const [siteSettings, setSiteSettings] = useState({
+    siteName: 'ইহসান অনলাইন শপ',
+    siteTagline: '১০০% খাঁটি ও প্রাকৃতিক পণ্য',
+    contactPhone: '09613-827282',
+    contactEmail: 'support@ihsan.com',
+    maintenanceMode: false,
+    // 🏪 Seller Permissions & Controls
+    allowSellerRegistration: true,
+    autoApproveProducts: false,
+    allowSellerCoupons: true,
+    allowSellerDeleteProducts: true,
+    allowSellerOrderStatusUpdate: true,
+    defaultCommissionRate: 10,
+    minWithdrawalAmount: 500,
+    maxProductsPerSeller: 100,
+    // 👥 Customer Permissions & Features
+    allowCustomerRegistration: true,
+    allowCustomerReviews: true,
+    allowGuestCheckout: true,
+    allowCashOnDelivery: true,
+    allowOnlinePayment: true,
+    allowCustomerCancelOrder: true,
+    allowWishlist: true,
+    // 🚚 Shipping & Rates
+    insideDhakaShipping: 70,
+    outsideDhakaShipping: 130,
+    freeDeliveryThreshold: 2000,
+    taxRate: 0,
+    currency: 'BDT (৳)',
+  });
   const [popupSettings, setPopupSettings] = useState({
     isActive: true,
     title: 'ইহসান অনলাইন শপ',
@@ -272,7 +301,34 @@ export default function AdminDashboardPage() {
       setCouponsList(coupRes?.data || []);
       setBannersList(banRes?.data || []);
       setTicketsList(tickRes?.data || []);
-      setSiteSettings(setRes?.data || null);
+      const defaultSettings = {
+        siteName: 'ইহসান অনলাইন শপ',
+        siteTagline: '১০০% খাঁটি ও প্রাকৃতিক পণ্য',
+        contactPhone: '09613-827282',
+        contactEmail: 'support@ihsan.com',
+        maintenanceMode: false,
+        allowSellerRegistration: true,
+        autoApproveProducts: false,
+        allowSellerCoupons: true,
+        allowSellerDeleteProducts: true,
+        allowSellerOrderStatusUpdate: true,
+        defaultCommissionRate: 10,
+        minWithdrawalAmount: 500,
+        maxProductsPerSeller: 100,
+        allowCustomerRegistration: true,
+        allowCustomerReviews: true,
+        allowGuestCheckout: true,
+        allowCashOnDelivery: true,
+        allowOnlinePayment: true,
+        allowCustomerCancelOrder: true,
+        allowWishlist: true,
+        insideDhakaShipping: 70,
+        outsideDhakaShipping: 130,
+        freeDeliveryThreshold: 2000,
+        taxRate: 0,
+        currency: 'BDT (৳)',
+      };
+      setSiteSettings(setRes?.data && Object.keys(setRes.data).length > 0 ? { ...defaultSettings, ...setRes.data } : defaultSettings);
       if (popupRes?.data) {
         setPopupSettings(popupRes.data);
       }
@@ -655,22 +711,22 @@ export default function AdminDashboardPage() {
     }
   };
 
-  // Nav Items Menu Configuration
+  // Nav Items Menu Configuration (Admin Profile & System Settings at Bottom as requested)
   const navMenuItems = [
     { id: 'dashboard', label: isBangla ? 'ড্যাশবোর্ড ওভারভিউ' : 'Dashboard', icon: BarChart3, count: null },
-    { id: 'profile', label: isBangla ? 'অ্যাডমিন প্রোফাইল' : 'Admin Profile', icon: User, count: null },
-    { id: 'settings', label: isBangla ? 'সিস্টেম সেটিংস' : 'System Settings', icon: Settings, count: null },
     { id: 'users', label: isBangla ? 'ইউজার ম্যানেজমেন্ট' : 'User Management', icon: Users, count: usersList.length },
     { id: 'sellers', label: isBangla ? 'সেলার ম্যানেজমেন্ট' : 'Seller Management', icon: Store, count: sellersList.filter(s => s.status === 'pending').length || null, countColor: 'bg-amber-500' },
     { id: 'products', label: isBangla ? 'পণ্য ব্যবস্থাপনা' : 'Product Management', icon: Package, count: productsList.length },
-    { id: 'reviews', label: isBangla ? 'রিভিউ ও ফিডব্যাক' : 'Reviews & Replies', icon: Star, count: reviewsList.length, countColor: 'bg-amber-600' },
     { id: 'orders', label: isBangla ? 'অর্ডার ম্যানেজমেন্ট' : 'Order Management', icon: ShoppingCart, count: ordersList.filter(o => o.status === 'Pending').length || null, countColor: 'bg-red-500' },
     { id: 'payments', label: isBangla ? 'পেমেন্ট ও উইথড্রয়াল' : 'Payment Management', icon: CreditCard, count: withdrawalsList.filter(w => w.status === 'pending').length || null },
+    { id: 'reviews', label: isBangla ? 'রিভিউ ও ফিডব্যাক' : 'Reviews & Replies', icon: Star, count: reviewsList.length, countColor: 'bg-amber-600' },
     { id: 'popup', label: isBangla ? 'পপআপ বার্তা' : 'Popup Message', icon: MessageSquare, count: popupSettings.isActive ? 'Active' : 'Off', countColor: popupSettings.isActive ? 'bg-emerald-600 text-white' : 'bg-gray-400 text-white' },
     { id: 'marketing', label: isBangla ? 'মার্কেটিং ও অফার' : 'Marketing & Offers', icon: Megaphone, count: couponsList.length },
     { id: 'cms', label: isBangla ? 'কনটেন্ট (CMS)' : 'Content Management', icon: FileText, count: null },
     { id: 'reports', label: isBangla ? 'রিপোর্টস ও অ্যানালিটিক্স' : 'Reports & Export', icon: TrendingUp, count: null },
     { id: 'support', label: isBangla ? 'সাপোর্ট ও টিকেটস' : 'Support Tickets', icon: Headphones, count: ticketsList.filter(t => t.status === 'open').length || null, countColor: 'bg-emerald-500' },
+    { id: 'settings', label: isBangla ? '⚙️ সিস্টেম ও পারমিশন সেটিংস' : 'System & Permissions', icon: Settings, count: null },
+    { id: 'profile', label: isBangla ? '👤 অ্যাডমিন প্রোফাইল ও সিকিউরিটি' : 'Admin Profile & Security', icon: User, count: null },
   ];
 
   // Dynamic calculations for Charts & Data Visualization
@@ -875,28 +931,6 @@ export default function AdminDashboardPage() {
             </div>
           </div>
 
-          {/* Theme Toggle Button */}
-          <div className={`${!isSidebarOpen && 'lg:hidden'}`}>
-            <button
-              type="button"
-              onClick={toggleTheme}
-              className="w-full flex items-center justify-between py-2.5 px-3 bg-emerald-50/70 hover:bg-emerald-100 dark:bg-black/40 dark:hover:bg-emerald-950/60 text-emerald-900 dark:text-emerald-200 text-xs font-bold rounded-2xl border border-emerald-200/60 dark:border-emerald-900/40 transition-all shadow-sm"
-              title={isBangla ? 'থিম পরিবর্তন' : 'Toggle Theme'}
-            >
-              <div className="flex items-center gap-2">
-                {theme === 'dark' ? (
-                  <Sun className="w-4 h-4 text-amber-400" />
-                ) : (
-                  <Moon className="w-4 h-4 text-amber-600" />
-                )}
-                <span>{theme === 'dark' ? (isBangla ? 'লাইট মোড' : 'Light Mode') : (isBangla ? 'ডার্ক মোড' : 'Dark Mode')}</span>
-              </div>
-              <span className="text-[10px] px-2 py-0.5 rounded-full bg-white dark:bg-emerald-900 font-extrabold uppercase shadow-sm">
-                {theme === 'dark' ? 'Dark 🌙' : 'Light ☀️'}
-              </span>
-            </button>
-          </div>
-
           {/* Quick Footer Links */}
           <div className={`flex flex-col gap-1.5 ${!isSidebarOpen && 'lg:hidden'}`}>
             <Link
@@ -970,6 +1004,26 @@ export default function AdminDashboardPage() {
           </div>
 
           <div className="flex items-center gap-2 sm:gap-3">
+            {/* 🌙 / ☀️ Theme Toggle Button in Admin Navbar */}
+            <button
+              type="button"
+              onClick={toggleTheme}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-2xl bg-emerald-50 hover:bg-emerald-100 dark:bg-black/40 dark:hover:bg-emerald-950 text-emerald-900 dark:text-emerald-200 border border-emerald-200/80 dark:border-emerald-900/60 text-xs font-bold transition-all shadow-sm active:scale-95"
+              title={theme === 'dark' ? (isBangla ? 'লাইট মোড অন করুন' : 'Switch to Light Mode') : (isBangla ? 'ডার্ক মোড অন করুন' : 'Switch to Dark Mode')}
+            >
+              {theme === 'dark' ? (
+                <>
+                  <Sun className="w-4 h-4 text-amber-400" />
+                  <span className="hidden sm:inline text-[11px] font-extrabold">{isBangla ? 'লাইট' : 'Light'}</span>
+                </>
+              ) : (
+                <>
+                  <Moon className="w-4 h-4 text-emerald-700" />
+                  <span className="hidden sm:inline text-[11px] font-extrabold">{isBangla ? 'ডার্ক' : 'Dark'}</span>
+                </>
+              )}
+            </button>
+
             <Link
               href="/"
               className="text-xs font-bold bg-gray-100 dark:bg-emerald-950 text-gray-800 dark:text-emerald-200 hover:bg-gray-200 px-3 py-2 rounded-xl transition-all flex items-center gap-1"
@@ -4144,41 +4198,340 @@ export default function AdminDashboardPage() {
           )}
 
           {/* ======================================================== */}
-          {/* ⚙️ SYSTEM SETTINGS (ENHANCED & CONNECTED TO MONGODB)     */}
+          {/* ⚙️ SYSTEM & PERMISSION SETTINGS (CONNECTED TO MONGODB)   */}
           {/* ======================================================== */}
           {activeMenu === 'settings' && siteSettings && (
             <div className="space-y-6 max-w-5xl">
               {/* Header */}
               <div className="bg-white dark:bg-[#112318] rounded-3xl p-6 border border-[#e0ebe2] dark:border-[#1d3b28] shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="p-2 rounded-2xl bg-blue-100 dark:bg-blue-950 text-blue-800 dark:text-blue-300">
+                  <div className="flex items-center gap-2.5 mb-1">
+                    <span className="p-2 rounded-2xl bg-purple-100 dark:bg-purple-950 text-purple-800 dark:text-purple-300">
                       <Settings className="w-5 h-5" />
                     </span>
                     <h3 className="text-xl font-black text-gray-900 dark:text-emerald-100">
-                      {isBangla ? 'সিস্টেম ও প্ল্যাটফর্ম কনফিগারেশন' : 'System & Platform Settings'}
+                      {isBangla ? 'সিস্টেম ও পারমিশন কনফিগারেশন' : 'System & Permission Settings'}
                     </h3>
                   </div>
                   <p className="text-xs text-gray-500 dark:text-emerald-400">
-                    {isBangla ? 'ডেলিভারি চার্জ, সেলার কমিশন ও প্ল্যাটফর্ম কনফিগারেশন সরাসরি MongoDB-তে সংরক্ষিত হয়।' : 'Configure shipping rates, seller commissions, and platform parameters with live MongoDB sync.'}
+                    {isBangla ? 'সেলার ও কাস্টমারদের পারমিশন, ডেলিভারি চার্জ, কমিশন এবং পুরো ওয়েবসাইটের সিস্টেম কনফিগারেশন পরিবর্তন করুন।' : 'Configure seller & customer permissions, shipping rates, commission, and global website system controls.'}
                   </p>
                 </div>
                 <div className="flex items-center gap-2 self-start sm:self-auto">
-                  <span className="px-3 py-1 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 text-xs font-black flex items-center gap-1.5">
+                  <span className="px-3.5 py-1.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 text-xs font-black flex items-center gap-1.5">
                     <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                    <span>MongoDB Atlas Connected</span>
+                    <span>MongoDB Live Connected</span>
                   </span>
                 </div>
               </div>
 
               <form onSubmit={handleSaveSettings} className="space-y-6">
                 
-                {/* 1. General Branding */}
-                <div className="bg-white dark:bg-[#112318] rounded-3xl p-6 border border-[#e0ebe2] dark:border-[#1d3b28] shadow-sm space-y-4">
-                  <h4 className="text-sm font-black text-gray-900 dark:text-emerald-100 flex items-center gap-2 border-b border-gray-100 dark:border-emerald-950 pb-3">
-                    <Store className="w-4 h-4 text-brand-900 dark:text-emerald-400" />
-                    <span>{isBangla ? '১. স্টোর ও ব্র্যান্ডিং তথ্য' : '1. Store & Branding Information'}</span>
-                  </h4>
+                {/* 🏪 1. Seller Permissions & Access Controls */}
+                <div className="bg-white dark:bg-[#112318] rounded-3xl p-6 border border-[#e0ebe2] dark:border-[#1d3b28] shadow-sm space-y-5">
+                  <div className="flex items-center justify-between border-b border-gray-100 dark:border-emerald-950 pb-3.5">
+                    <h4 className="text-sm font-black text-gray-900 dark:text-emerald-100 flex items-center gap-2">
+                      <span className="p-1.5 rounded-xl bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300">🏪</span>
+                      <span>{isBangla ? '১. সেলার পারমিশন ও অনুমতি সেটিংস (Seller Permissions)' : '1. Seller Permissions & Controls'}</span>
+                    </h4>
+                    <span className="text-[11px] font-bold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 px-2.5 py-1 rounded-xl border border-amber-200 dark:border-amber-900/40">
+                      {isBangla ? 'সেলার অ্যাক্সেস রুলস' : 'Seller Rules'}
+                    </span>
+                  </div>
+
+                  {/* Toggle Grid */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                    {/* Allow Seller Self Registration */}
+                    <div className="p-4 rounded-2xl bg-gray-50 dark:bg-black/30 border border-gray-200 dark:border-emerald-950 flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-xs font-black text-gray-900 dark:text-emerald-100">
+                          {isBangla ? 'সেলার সেলফ রেজিস্ট্রেশন' : 'Seller Registration'}
+                        </p>
+                        <p className="text-[11px] text-gray-500 dark:text-emerald-400/80">
+                          {isBangla ? 'নতুন সেলাররা সরাসরি সাইনআপ ও আবেদন করতে পারবে' : 'Allow new sellers to register & apply'}
+                        </p>
+                      </div>
+                      <input
+                        type="checkbox"
+                        checked={siteSettings.allowSellerRegistration !== false}
+                        onChange={(e) => setSiteSettings({ ...siteSettings, allowSellerRegistration: e.target.checked })}
+                        className="toggle toggle-success"
+                      />
+                    </div>
+
+                    {/* Auto-Approve Seller Products */}
+                    <div className="p-4 rounded-2xl bg-gray-50 dark:bg-black/30 border border-gray-200 dark:border-emerald-950 flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-xs font-black text-gray-900 dark:text-emerald-100">
+                          {isBangla ? 'পণ্য স্বয়ংক্রিয় লাইভ (Auto-Approve)' : 'Auto-Approve Products'}
+                        </p>
+                        <p className="text-[11px] text-gray-500 dark:text-emerald-400/80">
+                          {isBangla ? 'অনুমোদন ছাড়াই পণ্য সরাসরি ওয়েবসাইটে লাইভ হবে' : 'Publish products without admin review'}
+                        </p>
+                      </div>
+                      <input
+                        type="checkbox"
+                        checked={Boolean(siteSettings.autoApproveProducts)}
+                        onChange={(e) => setSiteSettings({ ...siteSettings, autoApproveProducts: e.target.checked })}
+                        className="toggle toggle-success"
+                      />
+                    </div>
+
+                    {/* Allow Seller to Create Coupons */}
+                    <div className="p-4 rounded-2xl bg-gray-50 dark:bg-black/30 border border-gray-200 dark:border-emerald-950 flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-xs font-black text-gray-900 dark:text-emerald-100">
+                          {isBangla ? 'সেলার ডিসকাউন্ট কুপন তৈরি' : 'Seller Coupon Creation'}
+                        </p>
+                        <p className="text-[11px] text-gray-500 dark:text-emerald-400/80">
+                          {isBangla ? 'সেলার নিজ পণ্যের জন্য প্রোমো কোড তৈরি করতে পারবে' : 'Allow sellers to create discount coupons'}
+                        </p>
+                      </div>
+                      <input
+                        type="checkbox"
+                        checked={siteSettings.allowSellerCoupons !== false}
+                        onChange={(e) => setSiteSettings({ ...siteSettings, allowSellerCoupons: e.target.checked })}
+                        className="toggle toggle-success"
+                      />
+                    </div>
+
+                    {/* Allow Seller Product Deletion */}
+                    <div className="p-4 rounded-2xl bg-gray-50 dark:bg-black/30 border border-gray-200 dark:border-emerald-950 flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-xs font-black text-gray-900 dark:text-emerald-100">
+                          {isBangla ? 'সেলার পণ্য মুছে ফেলার অনুমতি' : 'Seller Product Deletion'}
+                        </p>
+                        <p className="text-[11px] text-gray-500 dark:text-emerald-400/80">
+                          {isBangla ? 'সেলার নিজ শপ থেকে পণ্য ডিলিট করতে পারবে' : 'Allow sellers to delete listed products'}
+                        </p>
+                      </div>
+                      <input
+                        type="checkbox"
+                        checked={siteSettings.allowSellerDeleteProducts !== false}
+                        onChange={(e) => setSiteSettings({ ...siteSettings, allowSellerDeleteProducts: e.target.checked })}
+                        className="toggle toggle-success"
+                      />
+                    </div>
+
+                    {/* Allow Seller Order Status Update */}
+                    <div className="p-4 rounded-2xl bg-gray-50 dark:bg-black/30 border border-gray-200 dark:border-emerald-950 flex items-center justify-between gap-3 sm:col-span-2">
+                      <div>
+                        <p className="text-xs font-black text-gray-900 dark:text-emerald-100">
+                          {isBangla ? 'সেলার অর্ডার প্রসেসিং ও প্যাকিং স্ট্যাটাস আপডেট' : 'Seller Order Fulfillment Status'}
+                        </p>
+                        <p className="text-[11px] text-gray-500 dark:text-emerald-400/80">
+                          {isBangla ? 'সেলার নিশ্চিত অর্ডারগুলোকে প্যাকিং সম্পন্ন ও প্রসেসিং করতে পারবে' : 'Allow sellers to mark confirmed orders as Packed & ready'}
+                        </p>
+                      </div>
+                      <input
+                        type="checkbox"
+                        checked={siteSettings.allowSellerOrderStatusUpdate !== false}
+                        onChange={(e) => setSiteSettings({ ...siteSettings, allowSellerOrderStatusUpdate: e.target.checked })}
+                        className="toggle toggle-success"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Numerical Rules for Sellers */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-1">
+                    <div>
+                      <label className="block text-xs font-bold text-gray-700 dark:text-emerald-300 mb-1.5">
+                        {isBangla ? 'ডিফল্ট সেলার কমিশন রেট (%)' : 'Default Commission Rate (%)'}
+                      </label>
+                      <div className="relative">
+                        <input
+                          type="number"
+                          value={siteSettings.defaultCommissionRate ?? 10}
+                          onChange={(e) => setSiteSettings({ ...siteSettings, defaultCommissionRate: Number(e.target.value) })}
+                          className="w-full px-4 py-2.5 bg-gray-50 dark:bg-black/30 border border-gray-200 dark:border-emerald-900 rounded-xl text-xs sm:text-sm font-black text-purple-700 dark:text-purple-300 focus:outline-none focus:border-brand-900"
+                        />
+                        <span className="absolute right-3.5 top-1/2 -translate-y-1/2 font-black text-gray-400">%</span>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-gray-700 dark:text-emerald-300 mb-1.5">
+                        {isBangla ? 'সর্বনিম্ন উইথড্রয়াল লিমিট (৳)' : 'Min Withdrawal Limit (৳)'}
+                      </label>
+                      <div className="relative">
+                        <span className="absolute left-3.5 top-1/2 -translate-y-1/2 font-black text-gray-400">৳</span>
+                        <input
+                          type="number"
+                          value={siteSettings.minWithdrawalAmount ?? 500}
+                          onChange={(e) => setSiteSettings({ ...siteSettings, minWithdrawalAmount: Number(e.target.value) })}
+                          className="w-full pl-8 pr-4 py-2.5 bg-gray-50 dark:bg-black/30 border border-gray-200 dark:border-emerald-900 rounded-xl text-xs sm:text-sm font-black text-emerald-700 dark:text-emerald-300 focus:outline-none focus:border-brand-900"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-gray-700 dark:text-emerald-300 mb-1.5">
+                        {isBangla ? 'সর্বোচ্চ পণ্য আপলোড লিমিট' : 'Max Product Upload Limit'}
+                      </label>
+                      <input
+                        type="number"
+                        value={siteSettings.maxProductsPerSeller ?? 100}
+                        onChange={(e) => setSiteSettings({ ...siteSettings, maxProductsPerSeller: Number(e.target.value) })}
+                        className="w-full px-4 py-2.5 bg-gray-50 dark:bg-black/30 border border-gray-200 dark:border-emerald-900 rounded-xl text-xs sm:text-sm font-bold text-gray-900 dark:text-emerald-50 focus:outline-none focus:border-brand-900"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* 👥 2. Customer Permissions & Feature Access */}
+                <div className="bg-white dark:bg-[#112318] rounded-3xl p-6 border border-[#e0ebe2] dark:border-[#1d3b28] shadow-sm space-y-5">
+                  <div className="flex items-center justify-between border-b border-gray-100 dark:border-emerald-950 pb-3.5">
+                    <h4 className="text-sm font-black text-gray-900 dark:text-emerald-100 flex items-center gap-2">
+                      <span className="p-1.5 rounded-xl bg-blue-100 dark:bg-blue-950 text-blue-800 dark:text-blue-300">👥</span>
+                      <span>{isBangla ? '২. কাস্টমার পারমিশন ও সুবিধা সেটিংস (Customer Features)' : '2. Customer Permissions & Features'}</span>
+                    </h4>
+                    <span className="text-[11px] font-bold text-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/40 px-2.5 py-1 rounded-xl border border-blue-200 dark:border-blue-900/40">
+                      {isBangla ? 'কাস্টমার পলিসি' : 'Customer Policy'}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                    {/* Allow Customer Self Registration */}
+                    <div className="p-4 rounded-2xl bg-gray-50 dark:bg-black/30 border border-gray-200 dark:border-emerald-950 flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-xs font-black text-gray-900 dark:text-emerald-100">
+                          {isBangla ? 'কাস্টমার রেজিস্ট্রেশন ও সাইনআপ' : 'Customer Self-Registration'}
+                        </p>
+                        <p className="text-[11px] text-gray-500 dark:text-emerald-400/80">
+                          {isBangla ? 'নতুন গ্রাহকরা একাউন্ট তৈরি করতে পারবে' : 'Allow new customers to sign up'}
+                        </p>
+                      </div>
+                      <input
+                        type="checkbox"
+                        checked={siteSettings.allowCustomerRegistration !== false}
+                        onChange={(e) => setSiteSettings({ ...siteSettings, allowCustomerRegistration: e.target.checked })}
+                        className="toggle toggle-success"
+                      />
+                    </div>
+
+                    {/* Allow Customer Reviews */}
+                    <div className="p-4 rounded-2xl bg-gray-50 dark:bg-black/30 border border-gray-200 dark:border-emerald-950 flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-xs font-black text-gray-900 dark:text-emerald-100">
+                          {isBangla ? 'পণ্য রিভিউ ও রেটিং দেওয়ার অনুমতি' : 'Product Reviews & Ratings'}
+                        </p>
+                        <p className="text-[11px] text-gray-500 dark:text-emerald-400/80">
+                          {isBangla ? 'ডেলিভারি পাওয়া ক্রেতারা পণ্যে রিভিউ দিতে পারবে' : 'Allow verified buyers to post reviews'}
+                        </p>
+                      </div>
+                      <input
+                        type="checkbox"
+                        checked={siteSettings.allowCustomerReviews !== false}
+                        onChange={(e) => setSiteSettings({ ...siteSettings, allowCustomerReviews: e.target.checked })}
+                        className="toggle toggle-success"
+                      />
+                    </div>
+
+                    {/* Allow Fast Guest Checkout */}
+                    <div className="p-4 rounded-2xl bg-gray-50 dark:bg-black/30 border border-gray-200 dark:border-emerald-950 flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-xs font-black text-gray-900 dark:text-emerald-100">
+                          {isBangla ? 'ফাস্ট অর্ডার (লগইন ছাড়া দ্রুত চেকআউট)' : 'Fast / Guest Checkout'}
+                        </p>
+                        <p className="text-[11px] text-gray-500 dark:text-emerald-400/80">
+                          {isBangla ? 'লগইন না করে শুধুমাত্র নাম ও ফোন নম্বর দিয়ে অর্ডার' : 'Allow 1-click orders without user login'}
+                        </p>
+                      </div>
+                      <input
+                        type="checkbox"
+                        checked={siteSettings.allowGuestCheckout !== false}
+                        onChange={(e) => setSiteSettings({ ...siteSettings, allowGuestCheckout: e.target.checked })}
+                        className="toggle toggle-success"
+                      />
+                    </div>
+
+                    {/* Allow Cash on Delivery (COD) */}
+                    <div className="p-4 rounded-2xl bg-gray-50 dark:bg-black/30 border border-gray-200 dark:border-emerald-950 flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-xs font-black text-gray-900 dark:text-emerald-100">
+                          {isBangla ? 'ক্যাশ অন ডেলিভারি (Cash on Delivery)' : 'Cash on Delivery (COD)'}
+                        </p>
+                        <p className="text-[11px] text-gray-500 dark:text-emerald-400/80">
+                          {isBangla ? 'পণ্য হাতে পেয়ে মূল্য পরিশোধের সুবিধা' : 'Enable cash on delivery payment method'}
+                        </p>
+                      </div>
+                      <input
+                        type="checkbox"
+                        checked={siteSettings.allowCashOnDelivery !== false}
+                        onChange={(e) => setSiteSettings({ ...siteSettings, allowCashOnDelivery: e.target.checked })}
+                        className="toggle toggle-success"
+                      />
+                    </div>
+
+                    {/* Allow Online Payment (bKash/Nagad) */}
+                    <div className="p-4 rounded-2xl bg-gray-50 dark:bg-black/30 border border-gray-200 dark:border-emerald-950 flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-xs font-black text-gray-900 dark:text-emerald-100">
+                          {isBangla ? 'বিকাশ ও অনলাইন পেমেন্ট (Online Payment)' : 'Online Payment (bKash/Nagad)'}
+                        </p>
+                        <p className="text-[11px] text-gray-500 dark:text-emerald-400/80">
+                          {isBangla ? 'ডিজিটাল পেমেন্ট গেটওয়ে সুবিধা চালু রাখা' : 'Enable mobile wallets & cards'}
+                        </p>
+                      </div>
+                      <input
+                        type="checkbox"
+                        checked={siteSettings.allowOnlinePayment !== false}
+                        onChange={(e) => setSiteSettings({ ...siteSettings, allowOnlinePayment: e.target.checked })}
+                        className="toggle toggle-success"
+                      />
+                    </div>
+
+                    {/* Allow Customer to Cancel Order */}
+                    <div className="p-4 rounded-2xl bg-gray-50 dark:bg-black/30 border border-gray-200 dark:border-emerald-950 flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-xs font-black text-gray-900 dark:text-emerald-100">
+                          {isBangla ? 'অর্ডার বাতিলের সুযোগ (Order Cancellation)' : 'Customer Order Cancellation'}
+                        </p>
+                        <p className="text-[11px] text-gray-500 dark:text-emerald-400/80">
+                          {isBangla ? 'অর্ডার পেন্ডিং অবস্থায় কাস্টমার নিজে বাতিল করতে পারবে' : 'Allow customers to cancel pending orders'}
+                        </p>
+                      </div>
+                      <input
+                        type="checkbox"
+                        checked={siteSettings.allowCustomerCancelOrder !== false}
+                        onChange={(e) => setSiteSettings({ ...siteSettings, allowCustomerCancelOrder: e.target.checked })}
+                        className="toggle toggle-success"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* 🌐 3. Global Website & Operational Configuration */}
+                <div className="bg-white dark:bg-[#112318] rounded-3xl p-6 border border-[#e0ebe2] dark:border-[#1d3b28] shadow-sm space-y-5">
+                  <div className="flex items-center justify-between border-b border-gray-100 dark:border-emerald-950 pb-3.5">
+                    <h4 className="text-sm font-black text-gray-900 dark:text-emerald-100 flex items-center gap-2">
+                      <span className="p-1.5 rounded-xl bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300">🌐</span>
+                      <span>{isBangla ? '৩. পুরো ওয়েবসাইটের সার্বিক কনফিগারেশন (Store Configuration)' : '3. Global Store Configuration'}</span>
+                    </h4>
+                    {siteSettings.maintenanceMode && (
+                      <span className="text-[11px] font-black text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/40 px-2.5 py-1 rounded-xl border border-red-200 animate-pulse">
+                        ⚠️ {isBangla ? 'মেইনটেন্যান্স মোড অন' : 'Maintenance Mode ON'}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Maintenance Mode Toggle */}
+                  <div className="p-4 rounded-2xl bg-amber-50/70 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/50 flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-xs font-black text-amber-950 dark:text-amber-200">
+                        {isBangla ? 'ওয়েবসাইট রক্ষণাবেক্ষণ মোড (Maintenance Mode)' : 'Website Maintenance Mode'}
+                      </p>
+                      <p className="text-[11px] text-amber-800/80 dark:text-amber-300/80">
+                        {isBangla ? 'অন করলে সাধারণ গ্রাহকদের জন্য সাইট সাময়িক বন্ধের বার্তা দেখানো হবে' : 'Temporarily display under-maintenance notice to store visitors'}
+                      </p>
+                    </div>
+                    <input
+                      type="checkbox"
+                      checked={Boolean(siteSettings.maintenanceMode)}
+                      onChange={(e) => setSiteSettings({ ...siteSettings, maintenanceMode: e.target.checked })}
+                      className="toggle toggle-warning"
+                    />
+                  </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
@@ -4192,28 +4545,46 @@ export default function AdminDashboardPage() {
                         className="w-full px-4 py-3 bg-gray-50 dark:bg-black/30 border border-gray-200 dark:border-emerald-900 rounded-2xl text-xs sm:text-sm font-bold text-gray-900 dark:text-emerald-50 focus:outline-none focus:border-brand-900"
                       />
                     </div>
+
                     <div>
                       <label className="block text-xs font-bold text-gray-700 dark:text-emerald-300 mb-1.5">
-                        {isBangla ? 'অফিসিয়াল হেল্পলাইন নম্বর' : 'Official Helpline Phone'}
+                        {isBangla ? 'অফিসিয়াল হেল্পলাইন নম্বর' : 'Helpline Phone'}
                       </label>
                       <input
                         type="text"
-                        value={siteSettings.contactPhone || '01977-882233'}
+                        value={siteSettings.contactPhone || '09613-827282'}
                         onChange={(e) => setSiteSettings({ ...siteSettings, contactPhone: e.target.value })}
                         className="w-full px-4 py-3 bg-gray-50 dark:bg-black/30 border border-gray-200 dark:border-emerald-900 rounded-2xl text-xs sm:text-sm font-medium text-gray-900 dark:text-emerald-50 focus:outline-none focus:border-brand-900"
                       />
                     </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-gray-700 dark:text-emerald-300 mb-1.5">
+                        {isBangla ? 'অফিসিয়াল সাপোর্ট ইমেইল' : 'Support Email'}
+                      </label>
+                      <input
+                        type="email"
+                        value={siteSettings.contactEmail || 'support@ihsan.com'}
+                        onChange={(e) => setSiteSettings({ ...siteSettings, contactEmail: e.target.value })}
+                        className="w-full px-4 py-3 bg-gray-50 dark:bg-black/30 border border-gray-200 dark:border-emerald-900 rounded-2xl text-xs sm:text-sm font-medium text-gray-900 dark:text-emerald-50 focus:outline-none focus:border-brand-900"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-gray-700 dark:text-emerald-300 mb-1.5">
+                        {isBangla ? 'সাইট ট্যাগলাইন / স্লোগান' : 'Tagline'}
+                      </label>
+                      <input
+                        type="text"
+                        value={siteSettings.siteTagline || '১০০% খাঁটি ও প্রাকৃতিক পণ্য'}
+                        onChange={(e) => setSiteSettings({ ...siteSettings, siteTagline: e.target.value })}
+                        className="w-full px-4 py-3 bg-gray-50 dark:bg-black/30 border border-gray-200 dark:border-emerald-900 rounded-2xl text-xs sm:text-sm font-medium text-gray-900 dark:text-emerald-50 focus:outline-none focus:border-brand-900"
+                      />
+                    </div>
                   </div>
-                </div>
 
-                {/* 2. Shipping & Delivery Charges */}
-                <div className="bg-white dark:bg-[#112318] rounded-3xl p-6 border border-[#e0ebe2] dark:border-[#1d3b28] shadow-sm space-y-4">
-                  <h4 className="text-sm font-black text-gray-900 dark:text-emerald-100 flex items-center gap-2 border-b border-gray-100 dark:border-emerald-950 pb-3">
-                    <Truck className="w-4 h-4 text-emerald-600" />
-                    <span>{isBangla ? '২. ডেলিভারি ও শিপিং চার্জ (Shipping Rates)' : '2. Shipping & Delivery Rates'}</span>
-                  </h4>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  {/* Shipping Rates */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-1">
                     <div className="p-4 rounded-2xl bg-emerald-50/50 dark:bg-black/20 border border-emerald-100 dark:border-emerald-950">
                       <label className="block text-xs font-bold text-emerald-950 dark:text-emerald-300 mb-1.5">
                         {isBangla ? 'ঢাকার ভিতরে ডেলিভারি (৳)' : 'Inside Dhaka (৳)'}
@@ -4261,46 +4632,6 @@ export default function AdminDashboardPage() {
                   </div>
                 </div>
 
-                {/* 3. Multi-Vendor Commission */}
-                <div className="bg-white dark:bg-[#112318] rounded-3xl p-6 border border-[#e0ebe2] dark:border-[#1d3b28] shadow-sm space-y-4">
-                  <h4 className="text-sm font-black text-gray-900 dark:text-emerald-100 flex items-center gap-2 border-b border-gray-100 dark:border-emerald-950 pb-3">
-                    <Percent className="w-4 h-4 text-purple-600" />
-                    <span>{isBangla ? '৩. মাল্টি-ভেন্ডর সেলার কমিশন রেট' : '3. Multi-Vendor Seller Commission'}</span>
-                  </h4>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-xs font-bold text-gray-700 dark:text-emerald-300 mb-1.5">
-                        {isBangla ? 'ডিফল্ট সেলার কমিশন রেট (%)' : 'Default Seller Commission Rate (%)'}
-                      </label>
-                      <div className="relative">
-                        <input
-                          type="number"
-                          value={siteSettings.defaultCommissionRate ?? 10}
-                          onChange={(e) => setSiteSettings({ ...siteSettings, defaultCommissionRate: Number(e.target.value) })}
-                          className="w-full px-4 py-3 bg-gray-50 dark:bg-black/30 border border-gray-200 dark:border-emerald-900 rounded-2xl text-xs sm:text-sm font-bold text-gray-900 dark:text-emerald-50 focus:outline-none focus:border-brand-900"
-                        />
-                        <span className="absolute right-4 top-1/2 -translate-y-1/2 font-black text-gray-400">%</span>
-                      </div>
-                      <p className="text-[11px] text-gray-400 mt-1">
-                        {isBangla ? 'নতুন সেলারদের প্রতিটি অর্ডারের উপর প্ল্যাটফর্ম ফি।' : 'Platform fee applicable for seller orders.'}
-                      </p>
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-bold text-gray-700 dark:text-emerald-300 mb-1.5">
-                        {isBangla ? 'পেমেন্ট গেটওয়ে কারেন্সি' : 'Default Currency'}
-                      </label>
-                      <input
-                        type="text"
-                        disabled
-                        value="BDT (৳) - Bangladeshi Taka"
-                        className="w-full px-4 py-3 bg-gray-100 dark:bg-black/50 border border-gray-200 dark:border-emerald-950 rounded-2xl text-xs sm:text-sm font-bold text-gray-500 cursor-not-allowed"
-                      />
-                    </div>
-                  </div>
-                </div>
-
                 {/* Save Button */}
                 <div>
                   <button
@@ -4308,7 +4639,7 @@ export default function AdminDashboardPage() {
                     className="w-full bg-gradient-to-r from-brand-900 via-emerald-800 to-teal-800 hover:from-brand-800 hover:to-teal-700 text-white font-black py-4 px-6 rounded-2xl shadow-xl flex items-center justify-center gap-2.5 transition-all text-sm"
                   >
                     <Save className="w-5 h-5" />
-                    <span>{isBangla ? 'সিস্টেম সেটিংস সংরক্ষণ করুন (Save to MongoDB)' : 'Save System Settings to MongoDB'}</span>
+                    <span>{isBangla ? 'সিস্টেম ও পারমিশন সেটিংস সংরক্ষণ করুন (Save to MongoDB)' : 'Save System & Permission Settings to MongoDB'}</span>
                   </button>
                 </div>
 

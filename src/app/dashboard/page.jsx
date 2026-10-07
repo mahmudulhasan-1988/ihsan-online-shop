@@ -485,28 +485,6 @@ export default function CustomerDashboardPage() {
             </div>
           </div>
 
-          {/* Theme Toggle Button */}
-          <div className={`${!isSidebarOpen && 'lg:hidden'}`}>
-            <button
-              type="button"
-              onClick={toggleTheme}
-              className="w-full flex items-center justify-between py-2.5 px-3 bg-emerald-50/70 hover:bg-emerald-100 dark:bg-black/40 dark:hover:bg-emerald-950/60 text-emerald-900 dark:text-emerald-200 text-xs font-bold rounded-2xl border border-emerald-200/60 dark:border-emerald-900/40 transition-all shadow-sm"
-              title={isBangla ? 'থিম পরিবর্তন' : 'Toggle Theme'}
-            >
-              <div className="flex items-center gap-2">
-                {theme === 'dark' ? (
-                  <Sun className="w-4 h-4 text-amber-400" />
-                ) : (
-                  <Moon className="w-4 h-4 text-amber-600" />
-                )}
-                <span>{theme === 'dark' ? (isBangla ? 'লাইট মোড' : 'Light Mode') : (isBangla ? 'ডার্ক মোড' : 'Dark Mode')}</span>
-              </div>
-              <span className="text-[10px] px-2 py-0.5 rounded-full bg-white dark:bg-emerald-900 font-extrabold uppercase shadow-sm">
-                {theme === 'dark' ? 'Dark 🌙' : 'Light ☀️'}
-              </span>
-            </button>
-          </div>
-
           <div className="grid grid-cols-2 gap-2 pt-1">
             <Link
               href="/"
@@ -557,7 +535,27 @@ export default function CustomerDashboardPage() {
             </button>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3">
+            {/* 🌙 / ☀️ Theme Toggle Button in Navbar */}
+            <button
+              type="button"
+              onClick={toggleTheme}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-2xl bg-emerald-50 hover:bg-emerald-100 dark:bg-black/40 dark:hover:bg-emerald-950 text-emerald-900 dark:text-emerald-200 border border-emerald-200/80 dark:border-emerald-900/60 text-xs font-bold transition-all shadow-sm active:scale-95"
+              title={theme === 'dark' ? (isBangla ? 'লাইট মোড অন করুন' : 'Switch to Light Mode') : (isBangla ? 'ডার্ক মোড অন করুন' : 'Switch to Dark Mode')}
+            >
+              {theme === 'dark' ? (
+                <>
+                  <Sun className="w-4 h-4 text-amber-400" />
+                  <span className="hidden sm:inline text-[11px] font-extrabold">{isBangla ? 'লাইট' : 'Light'}</span>
+                </>
+              ) : (
+                <>
+                  <Moon className="w-4 h-4 text-emerald-700" />
+                  <span className="hidden sm:inline text-[11px] font-extrabold">{isBangla ? 'ডার্ক' : 'Dark'}</span>
+                </>
+              )}
+            </button>
+
             <div className="flex items-center gap-2 bg-emerald-100 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800 px-3 py-1.5 rounded-2xl">
               {user?.avatar ? (
                 <img src={user.avatar} alt="User Avatar" className="w-5 h-5 rounded-full object-cover border border-emerald-400" />

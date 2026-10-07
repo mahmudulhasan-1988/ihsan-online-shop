@@ -73,7 +73,7 @@ export default function SellerDashboardPage() {
   const { user, logout, showToast } = useCart();
   const { isBangla, theme, toggleTheme } = useThemeLanguage();
 
-  const [activeMenu, setActiveMenu] = useState('vendor_management'); // Default to 'vendor_management' or 'dashboard'
+  const [activeMenu, setActiveMenu] = useState('dashboard'); // Default to 'dashboard'
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [loading, setLoading] = useState(true);
 
@@ -90,6 +90,23 @@ export default function SellerDashboardPage() {
     total_sales: 0,
     rating: 5.0,
   });
+
+  // Dedicated Seller Profile & Security Form State
+  const [sellerProfileData, setSellerProfileData] = useState({
+    name: user?.name || '',
+    email: user?.email || '',
+    phone: user?.phone || '',
+    avatar: user?.avatar || '',
+    shop_name: '',
+    trade_license: '',
+    address: user?.address || '',
+    city: user?.city || 'Dhaka',
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: '',
+  });
+  const [isSavingSellerProfile, setIsSavingSellerProfile] = useState(false);
+  const [isUploadingSellerAvatar, setIsUploadingSellerAvatar] = useState(false);
 
   // Seller Information Entry Form State
   const [sellerFormData, setSellerFormData] = useState({
@@ -232,6 +249,20 @@ export default function SellerDashboardPage() {
           bank_account: sData.bank_account || '',
         });
 
+        setSellerProfileData({
+          name: sData.seller_name || user?.name || '',
+          email: sData.email || user?.email || '',
+          phone: sData.phone || user?.phone || '',
+          avatar: user?.avatar || sData.shop_logo || '',
+          shop_name: sData.shop_name || `${sData.seller_name || user?.name} Store`,
+          trade_license: sData.trade_license || '',
+          address: user?.address || '',
+          city: user?.city || 'Dhaka',
+          currentPassword: '',
+          newPassword: '',
+          confirmPassword: '',
+        });
+
         if (sData.phone || user?.phone) {
           setWithdrawAccount(sData.bkash_number || sData.phone || user?.phone || '');
         }
@@ -244,6 +275,19 @@ export default function SellerDashboardPage() {
           email: user.email || '',
           shop_logo: user.avatar || prev.shop_logo,
         }));
+        setSellerProfileData({
+          name: user.name || '',
+          email: user.email || '',
+          phone: user.phone || '',
+          avatar: user.avatar || '',
+          shop_name: `${user.name || 'সেলার'} Store`,
+          trade_license: '',
+          address: user.address || '',
+          city: user.city || 'Dhaka',
+          currentPassword: '',
+          newPassword: '',
+          confirmPassword: '',
+        });
       }
     } catch (err) {
       console.error('Error loading seller data', err);
@@ -311,6 +355,72 @@ export default function SellerDashboardPage() {
       showToast(isBangla ? 'ত্রুটি ঘটেছে' : 'Error occurred', 'error');
     } finally {
       setIsSavingSellerInfo(false);
+    }
+  };
+
+  // Handle Save Seller Personal Profile & Password to MongoDB
+  const handleSaveSellerProfile = async (e) => {
+    e.preventDefault();
+    if (!sellerProfileData.name || !sellerProfileData.name.trim()) {
+      showToast(isBangla ? 'অনুগ্রহ করে আপনার নাম দিন' : 'Please provide your name', 'error');
+      return;
+    }
+
+    if (sellerProfileData.newPassword) {
+      if (sellerProfileData.newPassword.length < 6) {
+        showToast(isBangla ? 'পাসওয়ার্ড কমপক্ষে ৬ অক্ষরের হতে হবে' : 'Password must be at least 6 characters', 'error');
+        return;
+      }
+      if (sellerProfileData.newPassword !== sellerProfileData.confirmPassword) {
+        showToast(isBangla ? 'নতুন পাসওয়ার্ড দুটি মিলছে না' : 'New passwords do not match', 'error');
+        return;
+      }
+    }
+
+    setIsSavingSellerProfile(true);
+    try {
+      const userRes = await updateUserProfile({
+        userId: user?.id || user?._id,
+        name: sellerProfileData.name.trim(),
+        email: sellerProfileData.email.trim(),
+        phone: sellerProfileData.phone.trim(),
+        avatar: sellerProfileData.avatar,
+        address: sellerProfileData.address,
+        city: sellerProfileData.city,
+        currentPassword: sellerProfileData.currentPassword,
+        newPassword: sellerProfileData.newPassword,
+      });
+
+      // Also sync seller name and shop logo in MongoDB
+      await updateSellerProfile({
+        userId: user?.id || user?._id,
+        email: sellerProfileData.email.trim(),
+        phone: sellerProfileData.phone.trim(),
+        seller_name: sellerProfileData.name.trim(),
+        shop_name: sellerProfileData.shop_name || sellerFormData.shop_name,
+        shop_logo: sellerProfileData.avatar || sellerFormData.shop_logo,
+      });
+
+      if (userRes?.success !== false) {
+        showToast(isBangla ? '🎉 সেলার প্রোফাইল ও সিকিউরিটি তথ্য সফলভাবে সংরক্ষিত হয়েছে!' : 'Seller profile & security saved successfully to MongoDB!');
+        if (typeof window !== 'undefined' && userRes.user) {
+          localStorage.setItem('gb_user', JSON.stringify(userRes.user));
+        }
+        setSellerProfileData(prev => ({
+          ...prev,
+          currentPassword: '',
+          newPassword: '',
+          confirmPassword: '',
+        }));
+        await loadSellerData(false);
+      } else {
+        showToast(userRes?.message || (isBangla ? 'প্রোফাইল আপডেট করতে সমস্যা হয়েছে' : 'Failed to update profile'), 'error');
+      }
+    } catch (err) {
+      console.error('Error saving seller profile:', err);
+      showToast(isBangla ? 'সার্ভার ত্রুটি ঘটেছে' : 'Server error occurred', 'error');
+    } finally {
+      setIsSavingSellerProfile(false);
     }
   };
 
@@ -690,12 +800,13 @@ export default function SellerDashboardPage() {
 
   const navMenuItems = [
     { id: 'dashboard', label: isBangla ? 'ড্যাশবোর্ড ওভারভিউ' : 'Dashboard', icon: BarChart3 },
-    { id: 'vendor_management', label: isBangla ? '🏪 সেলার ও শপ প্রোফাইল' : 'Seller & Shop Profile', icon: Store },
     { id: 'products', label: isBangla ? 'পণ্য ব্যবস্থাপনা' : 'Products & Stock', icon: Package, count: myProducts.length },
     { id: 'orders', label: isBangla ? 'অর্ডার প্রসেসিং' : 'Orders Fulfillment', icon: ShoppingCart, count: myOrders.length },
     { id: 'earnings', label: isBangla ? 'আর্নিংস ও উইথড্র' : 'Earnings & Payouts', icon: Wallet },
     { id: 'reviews', label: isBangla ? 'গ্রাহক রিভিউ ও রেটিং' : 'Reviews & Replies', icon: Star, count: myReviews.length },
     { id: 'support', label: isBangla ? 'সাপোর্ট ও সাহায্য' : 'Help & Support', icon: Headphones },
+    { id: 'vendor_management', label: isBangla ? '🏪 শপ ও ভেন্ডর সেটিংস' : 'Shop & Vendor Settings', icon: Store },
+    { id: 'seller_profile', label: isBangla ? '👤 সেলার প্রোফাইল ও সিকিউরিটি' : 'Seller Profile & Security', icon: User },
   ];
 
   return (
@@ -784,28 +895,6 @@ export default function SellerDashboardPage() {
             </div>
           </div>
 
-          {/* Theme Toggle Button */}
-          <div className={`${!isSidebarOpen && 'lg:hidden'}`}>
-            <button
-              type="button"
-              onClick={toggleTheme}
-              className="w-full flex items-center justify-between py-2.5 px-3 bg-amber-50/70 hover:bg-amber-100 dark:bg-black/40 dark:hover:bg-emerald-950/60 text-amber-950 dark:text-amber-200 text-xs font-bold rounded-2xl border border-amber-200/60 dark:border-emerald-900/40 transition-all shadow-sm"
-              title={isBangla ? 'থিম পরিবর্তন' : 'Toggle Theme'}
-            >
-              <div className="flex items-center gap-2">
-                {theme === 'dark' ? (
-                  <Sun className="w-4 h-4 text-amber-400" />
-                ) : (
-                  <Moon className="w-4 h-4 text-amber-600" />
-                )}
-                <span>{theme === 'dark' ? (isBangla ? 'লাইট মোড' : 'Light Mode') : (isBangla ? 'ডার্ক মোড' : 'Dark Mode')}</span>
-              </div>
-              <span className="text-[10px] px-2 py-0.5 rounded-full bg-white dark:bg-emerald-900 font-extrabold uppercase shadow-sm">
-                {theme === 'dark' ? 'Dark 🌙' : 'Light ☀️'}
-              </span>
-            </button>
-          </div>
-
           <div className="grid grid-cols-2 gap-2 pt-1">
             <Link
               href="/"
@@ -854,7 +943,27 @@ export default function SellerDashboardPage() {
             </button>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3">
+            {/* 🌙 / ☀️ Theme Toggle Button in Seller Navbar */}
+            <button
+              type="button"
+              onClick={toggleTheme}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-2xl bg-amber-50 hover:bg-amber-100 dark:bg-black/40 dark:hover:bg-emerald-950 text-amber-950 dark:text-amber-200 border border-amber-200/80 dark:border-emerald-900/60 text-xs font-bold transition-all shadow-sm active:scale-95"
+              title={theme === 'dark' ? (isBangla ? 'লাইট মোড অন করুন' : 'Switch to Light Mode') : (isBangla ? 'ডার্ক মোড অন করুন' : 'Switch to Dark Mode')}
+            >
+              {theme === 'dark' ? (
+                <>
+                  <Sun className="w-4 h-4 text-amber-400" />
+                  <span className="hidden sm:inline text-[11px] font-extrabold">{isBangla ? 'লাইট' : 'Light'}</span>
+                </>
+              ) : (
+                <>
+                  <Moon className="w-4 h-4 text-amber-600" />
+                  <span className="hidden sm:inline text-[11px] font-extrabold">{isBangla ? 'ডার্ক' : 'Dark'}</span>
+                </>
+              )}
+            </button>
+
             <div className="flex items-center gap-2 bg-amber-100 dark:bg-amber-950/60 border border-amber-200 dark:border-amber-800 px-3 py-1.5 rounded-2xl">
               {user?.avatar && (
                 <img src={user.avatar} alt="Seller Avatar" className="w-5 h-5 rounded-full object-cover border border-amber-400" />
@@ -1490,6 +1599,256 @@ export default function SellerDashboardPage() {
                     )}
                   </button>
                 </div>
+              </form>
+            </div>
+          )}
+
+          {/* ======================================================== */}
+          {/* 👤 SELLER PROFILE & SECURITY (NEW - AVATAR & PASSWORD)    */}
+          {/* ======================================================== */}
+          {activeMenu === 'seller_profile' && (
+            <div className="space-y-6 max-w-4xl">
+              {/* Header */}
+              <div className="bg-white dark:bg-[#112318] rounded-3xl p-6 border border-[#e0ebe2] dark:border-[#1d3b28] shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                  <div className="flex items-center gap-2.5 mb-1">
+                    <span className="p-2 rounded-2xl bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300">
+                      <User className="w-5 h-5" />
+                    </span>
+                    <h3 className="text-xl font-black text-gray-900 dark:text-emerald-100">
+                      {isBangla ? 'সেলার প্রোফাইল ও নিরাপত্তা সেটিংস' : 'Seller Profile & Security'}
+                    </h3>
+                  </div>
+                  <p className="text-xs text-gray-500 dark:text-emerald-400">
+                    {isBangla ? 'আপনার প্রোফাইল ছবি, ব্যক্তিগত তথ্য ও সিকিউরিটি পাসওয়ার্ড পরিবর্তন করুন। সরাসরি MongoDB-তে সংরক্ষিত হবে।' : 'Update your profile photo, personal information, and account security password with live MongoDB sync.'}
+                  </p>
+                </div>
+                <span className="px-3.5 py-1.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 text-xs font-black self-start sm:self-auto flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                  <span>MongoDB Synced</span>
+                </span>
+              </div>
+
+              <form onSubmit={handleSaveSellerProfile} className="space-y-6">
+                
+                {/* 1. Profile Avatar Change */}
+                <div className="bg-white dark:bg-[#112318] rounded-3xl p-6 border border-[#e0ebe2] dark:border-[#1d3b28] shadow-sm space-y-4">
+                  <h4 className="text-sm font-black text-gray-900 dark:text-emerald-100 flex items-center gap-2 border-b border-gray-100 dark:border-emerald-950 pb-3">
+                    <span>📸</span>
+                    <span>{isBangla ? '১. সেলার প্রোফাইল ছবি (Profile Picture)' : '1. Seller Profile Photo'}</span>
+                  </h4>
+
+                  <div className="flex flex-col sm:flex-row items-center gap-5 pt-1">
+                    <div className="relative group">
+                      {sellerProfileData.avatar ? (
+                        <img
+                          src={sellerProfileData.avatar}
+                          alt="Seller Avatar Preview"
+                          className="w-24 h-24 rounded-3xl object-cover border-2 border-amber-500 shadow-lg group-hover:brightness-90 transition-all"
+                        />
+                      ) : (
+                        <div className="w-24 h-24 rounded-3xl bg-gradient-to-tr from-amber-500 to-orange-500 text-slate-950 flex items-center justify-center font-black text-3xl shadow-lg border-2 border-amber-400">
+                          {sellerProfileData.name?.charAt(0) || 'S'}
+                        </div>
+                      )}
+                      <div className="absolute -bottom-1 -right-1 bg-brand-900 text-white p-1.5 rounded-xl text-xs shadow">
+                        📷
+                      </div>
+                    </div>
+
+                    <div className="flex-1 w-full space-y-2">
+                      <label className="block text-xs font-bold text-gray-700 dark:text-emerald-300">
+                        {isBangla ? 'প্রোফাইল ছবির লিঙ্ক বা ফাইল আপলোড (ImgBB CDN)' : 'Profile Image URL or Direct Upload (ImgBB CDN)'}
+                      </label>
+                      <div className="flex flex-col sm:flex-row gap-2">
+                        <input
+                          type="url"
+                          placeholder="https://i.ibb.co/..."
+                          value={sellerProfileData.avatar}
+                          onChange={(e) => setSellerProfileData({ ...sellerProfileData, avatar: e.target.value })}
+                          className="flex-1 px-4 py-2.5 bg-gray-50 dark:bg-black/40 border border-gray-300 dark:border-emerald-900/70 rounded-2xl text-xs sm:text-sm font-medium focus:outline-none focus:border-amber-500"
+                        />
+                        <label className="cursor-pointer px-4 py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-2xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 flex-shrink-0 shadow-sm">
+                          <span>☁️</span>
+                          <span>{isUploadingSellerAvatar ? (isBangla ? 'আপলোড হচ্ছে...' : 'Uploading...') : (isBangla ? 'ImgBB আপলোড' : 'ImgBB Upload')}</span>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            disabled={isUploadingSellerAvatar}
+                            onChange={async (e) => {
+                              const file = e.target.files?.[0];
+                              if (!file) return;
+                              setIsUploadingSellerAvatar(true);
+                              try {
+                                const url = await uploadToImgBB(file);
+                                if (url) {
+                                  setSellerProfileData(prev => ({ ...prev, avatar: url }));
+                                  showToast(isBangla ? 'প্রোফাইল ছবি সফলভাবে ImgBB তে আপলোড হয়েছে! 🎉' : 'Profile image uploaded to ImgBB!');
+                                }
+                              } catch (err) {
+                                showToast(isBangla ? 'ছবি আপলোড করতে সমস্যা হয়েছে' : 'Image upload failed', 'error');
+                              } finally {
+                                setIsUploadingSellerAvatar(false);
+                              }
+                            }}
+                          />
+                        </label>
+                      </div>
+                      <p className="text-[11px] text-gray-400">
+                        {isBangla ? 'সুপারিশ: পরিষ্কার স্কয়ার ছবি (JPG/PNG, সর্বোচ্চ ৫ MB)' : 'Recommended: Square photo (JPG/PNG, max 5MB)'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 2. Personal & Account Information */}
+                <div className="bg-white dark:bg-[#112318] rounded-3xl p-6 border border-[#e0ebe2] dark:border-[#1d3b28] shadow-sm space-y-4">
+                  <h4 className="text-sm font-black text-gray-900 dark:text-emerald-100 flex items-center gap-2 border-b border-gray-100 dark:border-emerald-950 pb-3">
+                    <span>👤</span>
+                    <span>{isBangla ? '২. সেলার ব্যক্তিগত তথ্য (Personal Information)' : '2. Personal Information'}</span>
+                  </h4>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-bold text-gray-700 dark:text-emerald-300 mb-1.5">
+                        {isBangla ? 'আপনার পূর্ণ নাম *' : 'Full Name *'}
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={sellerProfileData.name}
+                        onChange={(e) => setSellerProfileData({ ...sellerProfileData, name: e.target.value })}
+                        className="w-full px-4 py-3 bg-gray-50 dark:bg-black/40 border border-gray-200 dark:border-emerald-900 rounded-2xl text-xs sm:text-sm font-bold text-gray-900 dark:text-emerald-50 focus:outline-none focus:border-amber-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-gray-700 dark:text-emerald-300 mb-1.5">
+                        {isBangla ? 'মোবাইল নম্বর *' : 'Phone Number *'}
+                      </label>
+                      <input
+                        type="tel"
+                        required
+                        value={sellerProfileData.phone}
+                        onChange={(e) => setSellerProfileData({ ...sellerProfileData, phone: e.target.value })}
+                        className="w-full px-4 py-3 bg-gray-50 dark:bg-black/40 border border-gray-200 dark:border-emerald-900 rounded-2xl text-xs sm:text-sm font-bold text-gray-900 dark:text-emerald-50 focus:outline-none focus:border-amber-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-gray-700 dark:text-emerald-300 mb-1.5">
+                        {isBangla ? 'ইমেইল অ্যাড্রেস *' : 'Email Address *'}
+                      </label>
+                      <input
+                        type="email"
+                        required
+                        value={sellerProfileData.email}
+                        onChange={(e) => setSellerProfileData({ ...sellerProfileData, email: e.target.value })}
+                        className="w-full px-4 py-3 bg-gray-50 dark:bg-black/40 border border-gray-200 dark:border-emerald-900 rounded-2xl text-xs sm:text-sm font-medium text-gray-900 dark:text-emerald-50 focus:outline-none focus:border-amber-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-gray-700 dark:text-emerald-300 mb-1.5">
+                        {isBangla ? 'দোকানের নাম (Shop Name)' : 'Shop Name'}
+                      </label>
+                      <input
+                        type="text"
+                        value={sellerProfileData.shop_name}
+                        onChange={(e) => setSellerProfileData({ ...sellerProfileData, shop_name: e.target.value })}
+                        className="w-full px-4 py-3 bg-gray-50 dark:bg-black/40 border border-gray-200 dark:border-emerald-900 rounded-2xl text-xs sm:text-sm font-bold text-amber-800 dark:text-amber-300 focus:outline-none focus:border-amber-500"
+                      />
+                    </div>
+
+                    <div className="sm:col-span-2">
+                      <label className="block text-xs font-bold text-gray-700 dark:text-emerald-300 mb-1.5">
+                        {isBangla ? 'ঠিকানা (Address)' : 'Address'}
+                      </label>
+                      <input
+                        type="text"
+                        value={sellerProfileData.address}
+                        onChange={(e) => setSellerProfileData({ ...sellerProfileData, address: e.target.value })}
+                        placeholder="e.g. দোকান নং ১২, ধানমন্ডি, ঢাকা"
+                        className="w-full px-4 py-3 bg-gray-50 dark:bg-black/40 border border-gray-200 dark:border-emerald-900 rounded-2xl text-xs sm:text-sm font-medium text-gray-900 dark:text-emerald-50 focus:outline-none focus:border-amber-500"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* 3. Password & Security Management */}
+                <div className="bg-white dark:bg-[#112318] rounded-3xl p-6 border border-[#e0ebe2] dark:border-[#1d3b28] shadow-sm space-y-4">
+                  <h4 className="text-sm font-black text-gray-900 dark:text-emerald-100 flex items-center gap-2 border-b border-gray-100 dark:border-emerald-950 pb-3">
+                    <span>🔐</span>
+                    <span>{isBangla ? '৩. পাসওয়ার্ড পরিবর্তন (Change Password)' : '3. Change Password'}</span>
+                  </h4>
+                  <p className="text-xs text-gray-400">
+                    {isBangla ? 'পাসওয়ার্ড পরিবর্তন না করতে চাইলে নিচের ঘরগুলো খালি রাখুন।' : 'Leave password fields empty if you do not want to change your password.'}
+                  </p>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-1">
+                    <div>
+                      <label className="block text-xs font-bold text-gray-700 dark:text-emerald-300 mb-1.5">
+                        {isBangla ? 'বর্তমান পাসওয়ার্ড' : 'Current Password'}
+                      </label>
+                      <input
+                        type="password"
+                        value={sellerProfileData.currentPassword}
+                        onChange={(e) => setSellerProfileData({ ...sellerProfileData, currentPassword: e.target.value })}
+                        placeholder="••••••••"
+                        className="w-full px-4 py-3 bg-gray-50 dark:bg-black/40 border border-gray-200 dark:border-emerald-900 rounded-2xl text-xs sm:text-sm font-medium focus:outline-none focus:border-amber-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-gray-700 dark:text-emerald-300 mb-1.5">
+                        {isBangla ? 'নতুন পাসওয়ার্ড' : 'New Password'}
+                      </label>
+                      <input
+                        type="password"
+                        value={sellerProfileData.newPassword}
+                        onChange={(e) => setSellerProfileData({ ...sellerProfileData, newPassword: e.target.value })}
+                        placeholder="••••••••"
+                        className="w-full px-4 py-3 bg-gray-50 dark:bg-black/40 border border-gray-200 dark:border-emerald-900 rounded-2xl text-xs sm:text-sm font-medium focus:outline-none focus:border-amber-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-gray-700 dark:text-emerald-300 mb-1.5">
+                        {isBangla ? 'নতুন পাসওয়ার্ড নিশ্চিত করুন' : 'Confirm New Password'}
+                      </label>
+                      <input
+                        type="password"
+                        value={sellerProfileData.confirmPassword}
+                        onChange={(e) => setSellerProfileData({ ...sellerProfileData, confirmPassword: e.target.value })}
+                        placeholder="••••••••"
+                        className="w-full px-4 py-3 bg-gray-50 dark:bg-black/40 border border-gray-200 dark:border-emerald-900 rounded-2xl text-xs sm:text-sm font-medium focus:outline-none focus:border-amber-500"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Submit Save Button */}
+                <div className="pt-2">
+                  <button
+                    type="submit"
+                    disabled={isSavingSellerProfile}
+                    className="w-full bg-gradient-to-r from-amber-500 via-amber-600 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-brand-950 font-black py-4 px-6 rounded-2xl shadow-xl flex items-center justify-center gap-2.5 transition-all text-sm disabled:opacity-50"
+                  >
+                    {isSavingSellerProfile ? (
+                      <>
+                        <RefreshCw className="w-5 h-5 animate-spin" />
+                        <span>{isBangla ? 'সংরক্ষণ করা হচ্ছে...' : 'Saving to MongoDB...'}</span>
+                      </>
+                    ) : (
+                      <>
+                        <Save className="w-5 h-5" />
+                        <span>{isBangla ? 'সেলার প্রোফাইল ও সিকিউরিটি সংরক্ষণ করুন (Save to MongoDB)' : 'Save Seller Profile & Security to MongoDB'}</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+
               </form>
             </div>
           )}
