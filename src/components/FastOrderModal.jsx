@@ -75,7 +75,7 @@ export default function FastOrderModal() {
     ? Math.round(((regularPrice - unitPrice) / regularPrice) * 100)
     : product.discountPercentage || 0;
 
-  const stock = product ? (product.stock_quantity !== undefined ? Number(product.stock_quantity) : (product.stock !== undefined ? Number(product.stock) : 50)) : 50;
+  const stock = product ? (product.stock_quantity != null ? Number(product.stock_quantity) : (product.stock != null ? Number(product.stock) : 0)) : 0;
 
   const handleIncreaseQty = () => {
     if (quantity + 1 > stock) {

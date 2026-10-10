@@ -21,6 +21,17 @@ export default function PopupMessage() {
       return;
     }
 
+    // Check if user has already seen the Palestine & Humanity Support popup
+    try {
+      const hasSeenPopup = typeof window !== 'undefined' ? localStorage.getItem('ihsan_palestine_popup_seen') : null;
+      if (hasSeenPopup) {
+        setLoading(false);
+        return;
+      }
+    } catch (e) {
+      console.error('Storage access error:', e);
+    }
+
     let isMounted = true;
     async function fetchPopup() {
       try {
@@ -28,9 +39,15 @@ export default function PopupMessage() {
         if (isMounted && res?.success && res?.data) {
           setPopupData(res.data);
           if (res.data.isActive !== false) {
-            // Slight delay for smooth entrance transition after page load/refresh
+            // Slight delay for smooth entrance transition after initial visit
             const timer = setTimeout(() => {
-              if (isMounted) setIsOpen(true);
+              if (isMounted) {
+                setIsOpen(true);
+                // Mark as seen so it does not reappear on refresh or subsequent visits
+                try {
+                  localStorage.setItem('ihsan_palestine_popup_seen', 'true');
+                } catch (e) {}
+              }
             }, 600);
             return () => clearTimeout(timer);
           }

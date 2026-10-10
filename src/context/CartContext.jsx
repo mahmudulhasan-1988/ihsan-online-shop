@@ -85,7 +85,7 @@ export function CartProvider({ children }) {
 
   // Add Item to Cart
   const addToCart = (product, variant = null, quantity = 1, openDrawer = true) => {
-    const stock = product.stock_quantity !== undefined ? Number(product.stock_quantity) : (product.stock !== undefined ? Number(product.stock) : 50);
+    const stock = product.stock_quantity != null ? Number(product.stock_quantity) : (product.stock != null ? Number(product.stock) : 0);
 
     // If Out of Stock
     if (stock <= 0) {
@@ -181,7 +181,7 @@ export function CartProvider({ children }) {
 
   // Fast Order Trigger (1-Click Buy Modal)
   const openFastOrder = (product, variant = null) => {
-    const stock = product.stock_quantity !== undefined ? Number(product.stock_quantity) : (product.stock !== undefined ? Number(product.stock) : 50);
+    const stock = product.stock_quantity != null ? Number(product.stock_quantity) : (product.stock != null ? Number(product.stock) : 0);
     if (stock <= 0) {
       showToast(`দুঃখিত, "${product.name}" বর্তমানে স্টক আউট (Out Of Stock)!`, 'error');
       return;

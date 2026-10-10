@@ -67,7 +67,8 @@ import {
   Filter,
   Info,
   ShieldAlert,
-  Award
+  Award,
+  ArrowLeftRight
 } from 'lucide-react';
 import { 
   getStats, 
@@ -83,6 +84,10 @@ import {
   createProduct, 
   updateProduct,
   deleteProduct, 
+  transferProductStock,
+  getStockRequests,
+  approveStockRequest,
+  rejectStockRequest,
   getCategories, 
   getBrands, 
   getOrders, 
@@ -170,6 +175,17 @@ export default function AdminDashboardPage() {
   const [couponsList, setCouponsList] = useState([]);
   const [bannersList, setBannersList] = useState([]);
   const [ticketsList, setTicketsList] = useState([]);
+
+  // 📢 Seller Stock Requests States
+  const [stockRequestsList, setStockRequestsList] = useState([]);
+  const [stockRequestFilter, setStockRequestFilter] = useState('all'); // 'all' | 'pending' | 'approved' | 'rejected'
+  const [selectedStockRequestForApproval, setSelectedStockRequestForApproval] = useState(null);
+  const [approvalTransferQty, setApprovalTransferQty] = useState(30);
+  const [approvalAdminNote, setApprovalAdminNote] = useState('');
+  const [isApprovingRequest, setIsApprovingRequest] = useState(false);
+  const [requestRejectModal, setRequestRejectModal] = useState({ isOpen: false, request: null, reason: '' });
+  const [isRejectingRequest, setIsRejectingRequest] = useState(false);
+
   const [siteSettings, setSiteSettings] = useState({
     siteName: 'ইহসান অনলাইন শপ',
     siteTagline: '১০০% খাঁটি ও প্রাকৃতিক পণ্য',
@@ -235,7 +251,8 @@ export default function AdminDashboardPage() {
     category_id: 1,
     price: '',
     regularPrice: '',
-    stock_quantity: 50,
+    admin_stock: 100,
+    stock_quantity: 0,
     sku: '',
     thumbnail: 'https://images.unsplash.com/photo-1587049352846-4a222e784d38?auto=format&fit=crop&w=600&q=80',
     description: '',
@@ -244,6 +261,17 @@ export default function AdminDashboardPage() {
 
   // State: Edit Product Modal
   const [editingProd, setEditingProd] = useState(null);
+
+  // State: Stock Transfer Modal (Admin Master Stock -> Seller Stock)
+  const [stockTransferModal, setStockTransferModal] = useState({
+    isOpen: false,
+    product: null,
+    quantity: 30,
+    sellerId: null,
+    sellerName: '',
+    note: ''
+  });
+  const [isTransferringStock, setIsTransferringStock] = useState(false);
 
   // Form State: Add Coupon
   const [newCoupon, setNewCoupon] = useState({
@@ -347,6 +375,7 @@ export default function AdminDashboardPage() {
         setRes,
         popupRes,
         revRes,
+        stockReqRes,
       ] = await Promise.all([
         getStats(),
         getUsers(),
@@ -363,6 +392,7 @@ export default function AdminDashboardPage() {
         getSiteSettings(),
         getPopupMessage(),
         getReviews('all'),
+        getStockRequests(),
       ]);
 
       setStats(statsRes?.data || null);
@@ -378,6 +408,7 @@ export default function AdminDashboardPage() {
       setCouponsList(coupRes?.data || []);
       setBannersList(banRes?.data || []);
       setTicketsList(tickRes?.data || []);
+      setStockRequestsList(stockReqRes?.data || []);
       const defaultSettings = {
         siteName: 'ইহসান অনলাইন শপ',
         siteTagline: '১০০% খাঁটি ও প্রাকৃতিক পণ্য',
@@ -419,12 +450,23 @@ export default function AdminDashboardPage() {
   useEffect(() => {
     loadAllData(true); // First load with initial loader
 
-    // Silent background auto-sync every 45 seconds without page flicker or buffering
+    const handleSync = () => {
+      loadAllData(false);
+    };
+
+    window.addEventListener('ihsan_stock_request_updated', handleSync);
+    window.addEventListener('storage', handleSync);
+
+    // Auto sync every 10 seconds for real-time order and stock request updates
     const interval = setInterval(() => {
       loadAllData(false);
-    }, 45000);
+    }, 10000);
 
-    return () => clearInterval(interval);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('ihsan_stock_request_updated', handleSync);
+      window.removeEventListener('storage', handleSync);
+    };
   }, []);
 
   // Format timestamp helper
@@ -633,13 +675,15 @@ export default function AdminDashboardPage() {
       nameEn: editingProd.name_en || editingProd.nameEn || editingProd.name,
       price: Number(editingProd.price),
       regularPrice: Number(editingProd.regularPrice || editingProd.price),
+      admin_stock: Number(editingProd.admin_stock !== undefined ? editingProd.admin_stock : (editingProd.adminStock !== undefined ? editingProd.adminStock : 70)),
+      adminStock: Number(editingProd.admin_stock !== undefined ? editingProd.admin_stock : (editingProd.adminStock !== undefined ? editingProd.adminStock : 70)),
       stock_quantity: Number(editingProd.stock_quantity !== undefined ? editingProd.stock_quantity : 0),
       stock: Number(editingProd.stock_quantity !== undefined ? editingProd.stock_quantity : 0),
     };
 
     const res = await updateProduct(targetId, payload);
     if (res?.success !== false) {
-      showToast(isBangla ? 'পণ্য ও ছবি সফলভাবে ডাটাবেসে আপডেট হয়েছে!' : 'Product and image updated successfully in database!');
+      showToast(isBangla ? 'পণ্য ও স্টক তথ্য সফলভাবে ডাটাবেসে আপডেট হয়েছে!' : 'Product and stock updated successfully in database!');
       setEditingProd(null);
       loadAllData();
     } else {
@@ -651,6 +695,138 @@ export default function AdminDashboardPage() {
     await updateWithdrawalStatus(withdrawId, status);
     showToast(isBangla ? `উইথড্র রিকোয়েস্ট ${status} করা হয়েছে` : `Withdrawal ${status}`);
     loadAllData();
+  };
+
+  // 🔄 Stock Transfer Handler (Admin Master Stock -> Seller Stock)
+  const handleExecuteStockTransfer = async (e) => {
+    if (e?.preventDefault) e.preventDefault();
+    if (!stockTransferModal.product) return;
+
+    const prod = stockTransferModal.product;
+    const prodId = prod._id || prod.id;
+    const transferQty = Number(stockTransferModal.quantity);
+
+    if (isNaN(transferQty) || transferQty <= 0) {
+      showToast(isBangla ? 'স্থানান্তরের সঠিক পরিমাণ দিন' : 'Please enter a valid transfer quantity', 'error');
+      return;
+    }
+
+    const currentAdminStock = Number(prod.admin_stock !== undefined ? prod.admin_stock : (prod.adminStock !== undefined ? prod.adminStock : 100));
+
+    if (transferQty > currentAdminStock) {
+      showToast(
+        isBangla
+          ? `অ্যাডমিন মাস্টার স্টকে মাত্র ${currentAdminStock} টি অবশিষ্ট আছে, ${transferQty} টি দেওয়া সম্ভব নয়!`
+          : `Admin master stock has only ${currentAdminStock} pcs available!`,
+        'error'
+      );
+      return;
+    }
+
+    setIsTransferringStock(true);
+    try {
+      const res = await transferProductStock({
+        productId: prodId,
+        transferQuantity: transferQty,
+        sellerId: stockTransferModal.sellerId || prod.seller_id || prod.sellerId,
+        sellerName: stockTransferModal.sellerName || prod.seller_name || prod.sellerName || prod.shop_name,
+        adminNote: stockTransferModal.note || 'অ্যাডমিন থেকে সেলারকে স্টক স্থানান্তর'
+      });
+
+      if (res?.success) {
+        showToast(
+          isBangla
+            ? `✅ সফলভাবে ${transferQty} টি স্টক সেলার (${stockTransferModal.sellerName || 'সেলার'})-কে স্থানান্তর করা হয়েছে! অ্যাডমিন স্টকে অবশিষ্ট: ${res.data?.admin_stock} টি`
+            : `Successfully transferred ${transferQty} pcs stock to seller! Remaining admin stock: ${res.data?.admin_stock}`
+        );
+        setStockTransferModal({
+          isOpen: false,
+          product: null,
+          quantity: 30,
+          sellerId: null,
+          sellerName: '',
+          note: ''
+        });
+        await loadAllData();
+      } else {
+        showToast(res?.message || (isBangla ? 'স্টক স্থানান্তর ব্যর্থ হয়েছে' : 'Stock transfer failed'), 'error');
+      }
+    } catch (err) {
+      console.error('Transfer error', err);
+      showToast(isBangla ? 'স্টক স্থানান্তর প্রক্রিয়ায় ত্রুটি হয়েছে' : 'Error executing stock transfer', 'error');
+    } finally {
+      setIsTransferringStock(false);
+    }
+  };
+
+  // 📢 Approve Seller Stock Request & Transfer Stock
+  const handleOpenApprovalModal = (req) => {
+    setSelectedStockRequestForApproval(req);
+    setApprovalTransferQty(Number(req.requestedQty) || 30);
+    setApprovalAdminNote(`সেলার (${req.sellerName || 'সেলার'})-এর স্টক রিকোয়েস্ট অনুমোদন ও স্থানান্তর`);
+  };
+
+  const handleExecuteApproval = async (e) => {
+    if (e?.preventDefault) e.preventDefault();
+    if (!selectedStockRequestForApproval) return;
+    setIsApprovingRequest(true);
+    try {
+      const res = await approveStockRequest({
+        requestId: selectedStockRequestForApproval.id || selectedStockRequestForApproval._id,
+        productId: selectedStockRequestForApproval.productId,
+        transferQuantity: Number(approvalTransferQty) || Number(selectedStockRequestForApproval.requestedQty) || 30,
+        adminNote: approvalAdminNote,
+        sellerId: selectedStockRequestForApproval.sellerId,
+        sellerName: selectedStockRequestForApproval.sellerName
+      });
+
+      if (res?.success) {
+        showToast(
+          isBangla 
+            ? `✅ সফলভাবে স্টক রিকোয়েস্ট অনুমোদন করা হয়েছে এবং ${approvalTransferQty} পিস স্টক সেলারের কাছে স্থানান্তর হয়েছে!`
+            : 'Stock request approved and stock transferred to seller successfully!'
+        );
+        setSelectedStockRequestForApproval(null);
+        loadAllData();
+      } else {
+        showToast(res?.message || (isBangla ? 'অনুমোদন ব্যর্থ হয়েছে' : 'Approval failed'), 'error');
+      }
+    } catch (err) {
+      console.error('Approve stock request error', err);
+      showToast(isBangla ? 'অনুমোদনে ত্রুটি হয়েছে' : 'Error approving request', 'error');
+    } finally {
+      setIsApprovingRequest(false);
+    }
+  };
+
+  // ❌ Reject Seller Stock Request & Delete from List & MongoDB
+  const handleExecuteRejection = async (e) => {
+    if (e?.preventDefault) e.preventDefault();
+    if (!requestRejectModal.request) return;
+    const req = requestRejectModal.request;
+    const reqId = req.id || req._id;
+
+    // Immediately remove from UI list optimistically
+    setStockRequestsList(prev => prev.filter(r => (r.id !== reqId && r._id !== reqId && r.requestId !== reqId)));
+
+    setIsRejectingRequest(true);
+    try {
+      const res = await rejectStockRequest({
+        requestId: reqId,
+        rejectReason: requestRejectModal.reason || 'এডমিন কর্তৃক বাতিল ও ডিলিট করা হয়েছে',
+        sellerId: req.sellerId,
+        productId: req.productId
+      });
+
+      showToast(isBangla ? '✅ স্টক রিকোয়েস্ট বাতিল করা হয়েছে এবং তালিকা থেকে মুছে ফেলা হয়েছে।' : 'Stock request rejected and removed from list.');
+      setRequestRejectModal({ isOpen: false, request: null, reason: '' });
+      await loadAllData();
+    } catch (err) {
+      console.error('Reject request error', err);
+      showToast(isBangla ? 'বাতিল করতে সমস্যা হয়েছে' : 'Error rejecting request', 'error');
+    } finally {
+      setIsRejectingRequest(false);
+    }
   };
 
   const handleCreateProduct = async (e) => {
@@ -675,13 +851,15 @@ export default function AdminDashboardPage() {
       slug: newProd.name_en ? newProd.name_en.toLowerCase().replace(/[^a-z0-9]+/g, '-') : `prod-${Date.now()}`,
       price: Number(newProd.price),
       regularPrice: Number(newProd.regularPrice || newProd.price),
-      stock_quantity: Number(newProd.stock_quantity || 50),
-      stock: Number(newProd.stock_quantity || 50),
+      admin_stock: Number(newProd.admin_stock !== undefined ? newProd.admin_stock : 100),
+      adminStock: Number(newProd.admin_stock !== undefined ? newProd.admin_stock : 100),
+      stock_quantity: Number(newProd.stock_quantity || 0),
+      stock: Number(newProd.stock_quantity || 0),
     };
 
     const res = await createProduct(payload);
     if (res?.success !== false) {
-      showToast(isBangla ? 'পণ্য ও ছবি সফলভাবে ডাটাবেসে যুক্ত হয়েছে!' : 'Product added successfully to database!');
+      showToast(isBangla ? 'পণ্য ও স্টক সফলভাবে ডাটাবেসে যুক্ত হয়েছে!' : 'Product added successfully to database!');
       setNewProd({
         name: '',
         name_bn: '',
@@ -689,16 +867,17 @@ export default function AdminDashboardPage() {
         category_id: 1,
         price: '',
         regularPrice: '',
-        stock_quantity: 50,
+        admin_stock: 100,
+        stock_quantity: 0,
         sku: '',
-        thumbnail: '',
+        thumbnail: 'https://images.unsplash.com/photo-1587049352846-4a222e784d38?auto=format&fit=crop&w=600&q=80',
         description: '',
         is_featured: true,
       });
       setActiveSubTab('all');
       loadAllData();
     } else {
-      showToast(res?.message || (isBangla ? 'পণ্য যুক্ত করতে সমস্যা হয়েছে' : 'Failed to add product'), 'error');
+      showToast(res?.message || (isBangla ? 'পণ্য সেভ করতে সমস্যা হয়েছে' : 'Failed to save product'), 'error');
     }
   };
 
@@ -1059,9 +1238,25 @@ export default function AdminDashboardPage() {
   // Nav Items Menu Configuration (Admin Profile & System Settings at Bottom as requested)
   const navMenuItems = [
     { id: 'dashboard', label: isBangla ? 'ড্যাশবোর্ড ওভারভিউ' : 'Dashboard', icon: BarChart3, count: null },
+    { 
+      id: 'stock_requests', 
+      label: isBangla ? '📢 সেলার স্টক রিকোয়েস্ট' : 'Stock Requests', 
+      icon: ArrowLeftRight, 
+      count: stockRequestsList.filter(r => r.status === 'pending').length > 0 
+        ? `${stockRequestsList.filter(r => r.status === 'pending').length} পেন্ডিং` 
+        : (stockRequestsList.length > 0 ? `${stockRequestsList.length}` : null), 
+      countColor: stockRequestsList.filter(r => r.status === 'pending').length > 0 
+        ? 'bg-amber-500 text-slate-950 font-black animate-pulse' 
+        : undefined 
+    },
     { id: 'users', label: isBangla ? 'ইউজার ম্যানেজমেন্ট' : 'User Management', icon: Users, count: usersList.length },
     { id: 'sellers', label: isBangla ? 'সেলার ম্যানেজমেন্ট' : 'Seller Management', icon: Store, count: sellersList.filter(s => s.status === 'pending').length || null, countColor: 'bg-amber-500' },
-    { id: 'products', label: isBangla ? 'পণ্য ব্যবস্থাপনা' : 'Product Management', icon: Package, count: productsList.length },
+    { 
+      id: 'products', 
+      label: isBangla ? 'পণ্য ও স্টক ব্যবস্থাপনা' : 'Product & Stock Management', 
+      icon: Package, 
+      count: productsList.length, 
+    },
     { id: 'orders', label: isBangla ? 'অর্ডার ম্যানেজমেন্ট' : 'Order Management', icon: ShoppingCart, count: ordersList.filter(o => o.status === 'Pending').length || null, countColor: 'bg-red-500' },
     { id: 'payments', label: isBangla ? 'পেমেন্ট ও উইথড্রয়াল' : 'Payment Management', icon: CreditCard, count: withdrawalsList.filter(w => w.status === 'pending').length || null },
     { id: 'reviews', label: isBangla ? 'রিভিউ ও ফিডব্যাক' : 'Reviews & Replies', icon: Star, count: reviewsList.length, countColor: 'bg-amber-600' },
@@ -1401,6 +1596,42 @@ export default function AdminDashboardPage() {
           {/* ======================================================== */}
           {activeMenu === 'dashboard' && (
             <div className="space-y-6">
+              
+              {/* 📢 MAJOR SELLER STOCK REQUEST ALERT BANNER */}
+              {stockRequestsList.filter(r => r.status === 'pending').length > 0 && (
+                <div className="bg-gradient-to-r from-amber-500 via-amber-600 to-orange-600 text-slate-950 p-5 rounded-3xl shadow-xl flex flex-col md:flex-row items-center justify-between gap-4 border border-amber-300 animate-in fade-in slide-in-from-top-2">
+                  <div className="flex items-center gap-3.5">
+                    <div className="w-12 h-12 rounded-2xl bg-slate-950 text-amber-400 flex items-center justify-center text-2xl font-black shadow-md flex-shrink-0">
+                      📢
+                    </div>
+                    <div>
+                      <h4 className="text-base sm:text-lg font-black text-slate-950 flex items-center gap-2">
+                        <span>{isBangla ? 'সেলারদের থেকে নতুন স্টক রিকোয়েস্ট এসেছে!' : 'New Seller Stock Requests Pending!'}</span>
+                        <span className="px-2.5 py-0.5 rounded-full bg-slate-950 text-amber-300 text-xs font-black animate-pulse">
+                          {stockRequestsList.filter(r => r.status === 'pending').length} {isBangla ? 'টি পেন্ডিং' : 'Pending'}
+                        </span>
+                      </h4>
+                      <p className="text-xs text-slate-950 font-bold mt-0.5">
+                        {isBangla 
+                          ? 'সেলারদের দোকানে স্টক শেষ হওয়ায় এডমিন মাস্টার স্টক থেকে হস্তান্তরের অনুরোধ পাঠানো হয়েছে।' 
+                          : 'Sellers have requested fresh inventory stock from master warehouse.'}
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActiveMenu('stock_requests');
+                      setStockRequestFilter('pending');
+                    }}
+                    className="px-6 py-3 bg-slate-950 hover:bg-slate-900 text-amber-300 font-black text-xs sm:text-sm rounded-2xl shadow-lg transition-all flex items-center gap-2 active:scale-95 flex-shrink-0"
+                  >
+                    <span>🔄 {isBangla ? 'রিকোয়েস্ট দেখুন ও স্টক হস্তান্তর করুন' : 'View Requests & Transfer Stock'}</span>
+                    <span>→</span>
+                  </button>
+                </div>
+              )}
+
               {/* Stat Cards */}
               {stats && (
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -1775,6 +2006,221 @@ export default function AdminDashboardPage() {
                   </table>
                 </div>
               </div>
+            </div>
+          )}
+
+          {/* ======================================================== */}
+          {/* 📢 SELLER STOCK REQUESTS MANAGEMENT CONSOLE               */}
+          {/* ======================================================== */}
+          {activeMenu === 'stock_requests' && (
+            <div className="bg-white dark:bg-[#112318] rounded-3xl p-6 border border-[#e0ebe2] dark:border-[#1d3b28] shadow-sm space-y-6">
+              {/* Header */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[#e0ebe2] dark:border-[#1d3b28] pb-4">
+                <div>
+                  <h3 className="text-xl font-black text-gray-900 dark:text-emerald-100 flex items-center gap-2">
+                    <ArrowLeftRight className="w-6 h-6 text-amber-600 dark:text-amber-400" />
+                    <span>{isBangla ? 'সেলার স্টক রিকোয়েস্ট ও ট্রান্সফার হাব' : 'Seller Restock Requests & Transfer Hub'}</span>
+                    <span className="text-xs px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-950 dark:bg-amber-950 dark:text-amber-200 font-bold border border-amber-300 dark:border-amber-800">
+                      Live MongoDB Synced 🟢
+                    </span>
+                  </h3>
+                  <p className="text-xs text-gray-500 dark:text-emerald-400 mt-1">
+                    {isBangla 
+                      ? 'সেলারদের স্টক শেষ হলে এডমিন থেকে পাঠানো অনুরোধ পর্যালোচনা করুন এবং ১-ক্লিকে স্টক অনুমোদন ও হস্তান্তর সম্পন্ন করুন।' 
+                      : 'Review incoming restock requests from sellers and transfer stock directly from Admin Master inventory.'}
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2 flex-wrap">
+                  {/* Filter Pills */}
+                  <div className="flex items-center gap-1.5 bg-gray-100 dark:bg-black/40 p-1.5 rounded-2xl border border-gray-200 dark:border-emerald-900">
+                    {[
+                      { id: 'all', label: isBangla ? 'সকল' : 'All', count: stockRequestsList.length },
+                      { id: 'pending', label: isBangla ? 'অপেক্ষমান' : 'Pending', count: stockRequestsList.filter(r => r.status === 'pending').length, badgeColor: 'bg-amber-500 text-slate-950' },
+                      { id: 'approved', label: isBangla ? 'অনুমোদিত' : 'Approved', count: stockRequestsList.filter(r => r.status === 'approved').length, badgeColor: 'bg-emerald-600 text-white' },
+                      { id: 'rejected', label: isBangla ? 'বাতিল' : 'Rejected', count: stockRequestsList.filter(r => r.status === 'rejected').length, badgeColor: 'bg-red-600 text-white' },
+                    ].map((tab) => (
+                      <button
+                        key={tab.id}
+                        type="button"
+                        onClick={() => setStockRequestFilter(tab.id)}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 ${
+                          stockRequestFilter === tab.id
+                            ? 'bg-brand-900 text-white shadow-sm'
+                            : 'text-gray-700 dark:text-emerald-200 hover:bg-white dark:hover:bg-emerald-950'
+                        }`}
+                      >
+                        <span>{tab.label}</span>
+                        <span className={`px-1.5 py-0.2 text-[10px] rounded-full ${tab.badgeColor || (stockRequestFilter === tab.id ? 'bg-white/30 text-white' : 'bg-gray-200 dark:bg-emerald-950 text-gray-700 dark:text-emerald-300')}`}>
+                          {tab.count}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={loadAllData}
+                    className="p-2.5 rounded-2xl border border-gray-200 dark:border-emerald-900 text-gray-600 dark:text-emerald-300 hover:bg-gray-100 dark:hover:bg-emerald-950 transition-colors"
+                    title="Refresh Data"
+                  >
+                    <RefreshCw className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Grid / Empty State */}
+              {stockRequestsList.filter(r => stockRequestFilter === 'all' || r.status === stockRequestFilter).length === 0 ? (
+                <div className="text-center py-20 bg-gray-50/50 dark:bg-black/20 rounded-3xl border border-dashed border-gray-300 dark:border-emerald-900/60 p-8 space-y-2">
+                  <span className="text-5xl block">📦</span>
+                  <h4 className="text-base font-bold text-gray-800 dark:text-emerald-100">
+                    {isBangla ? 'কোনো স্টক রিকোয়েস্ট পাওয়া যায়নি' : 'No stock requests found'}
+                  </h4>
+                  <p className="text-xs text-gray-500 max-w-md mx-auto">
+                    {stockRequestFilter === 'pending'
+                      ? (isBangla ? 'বর্তমানে কোনো পেন্ডিং স্টক রিকোয়েস্ট নেই। সকল অনুরোধ সম্পন্ন হয়েছে।' : 'No pending requests at the moment.')
+                      : (isBangla ? 'সেলার তার ড্যাশবোর্ড থেকে স্টক রিকোয়েস্ট পাঠালে তা এখানে প্রদর্শিত হবে।' : 'When sellers submit restock requests, they will appear here.')}
+                  </p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {stockRequestsList
+                    .filter(r => stockRequestFilter === 'all' || r.status === stockRequestFilter)
+                    .map((req) => {
+                      const matchingProd = productsList.find(p => String(p.id || p._id) === String(req.productId || req.product_id));
+                      const currentAdminStock = matchingProd 
+                        ? Number(matchingProd.admin_stock !== undefined ? matchingProd.admin_stock : (matchingProd.adminStock !== undefined ? matchingProd.adminStock : 70))
+                        : (req.adminStockAtRequest || 70);
+                      const currentSellerStock = matchingProd
+                        ? Number(matchingProd.stock_quantity !== undefined ? matchingProd.stock_quantity : (matchingProd.stock || 0))
+                        : (req.sellerStockAtRequest || 0);
+
+                      return (
+                        <div
+                          key={req.id || req._id}
+                          className={`p-5 rounded-3xl border shadow-sm transition-all relative overflow-hidden flex flex-col justify-between gap-4 ${
+                            req.status === 'pending'
+                              ? 'bg-white dark:bg-[#112318] border-amber-400 dark:border-amber-700/80 ring-2 ring-amber-400/20'
+                              : req.status === 'approved'
+                              ? 'bg-emerald-50/40 dark:bg-emerald-950/20 border-emerald-300 dark:border-emerald-900/60'
+                              : 'bg-rose-50/30 dark:bg-rose-950/20 border-rose-200 dark:border-rose-900/50'
+                          }`}
+                        >
+                          <div className="space-y-3">
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="flex items-center gap-3">
+                                <img
+                                  src={req.productImage || matchingProd?.thumbnail || 'https://images.unsplash.com/photo-1587049352846-4a222e784d38?auto=format&fit=crop&w=150&q=80'}
+                                  alt={req.productName}
+                                  className="w-14 h-14 rounded-2xl object-cover border border-emerald-900/20 flex-shrink-0 shadow-sm"
+                                />
+                                <div>
+                                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">
+                                    ID: #{req.id || req._id?.slice?.(-6)}
+                                  </span>
+                                  <h4 className="text-sm font-black text-gray-900 dark:text-emerald-100 line-clamp-1">
+                                    {req.productName}
+                                  </h4>
+                                  <p className="text-xs text-amber-700 dark:text-amber-400 font-bold flex items-center gap-1 mt-0.5">
+                                    <span>🏪 সেলার:</span>
+                                    <strong className="text-gray-900 dark:text-emerald-200">{req.sellerName || 'সেলার'}</strong>
+                                  </p>
+                                </div>
+                              </div>
+
+                              {/* Status Badge */}
+                              <div>
+                                {req.status === 'pending' && (
+                                  <span className="px-3 py-1 rounded-full bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-300 border border-amber-300 dark:border-amber-800 text-xs font-black flex items-center gap-1 shadow-sm">
+                                    <span className="w-2 h-2 rounded-full bg-amber-500 animate-ping" />
+                                    <span>অপেক্ষমান</span>
+                                  </span>
+                                )}
+                                {req.status === 'approved' && (
+                                  <span className="px-3 py-1 rounded-full bg-emerald-100 text-emerald-900 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-300 text-xs font-black flex items-center gap-1">
+                                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                                    <span>অনুমোদিত ({req.transferredQty || req.requestedQty} pcs)</span>
+                                  </span>
+                                )}
+                                {req.status === 'rejected' && (
+                                  <span className="px-3 py-1 rounded-full bg-rose-100 text-rose-900 dark:bg-rose-950 dark:text-rose-300 border border-rose-300 text-xs font-black flex items-center gap-1">
+                                    <XCircle className="w-3.5 h-3.5 text-rose-600" />
+                                    <span>বাতিলকৃত</span>
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Stock Details Box */}
+                            <div className="grid grid-cols-3 gap-2 p-3 rounded-2xl bg-gray-50 dark:bg-black/30 border border-gray-200/70 dark:border-emerald-950 text-center">
+                              <div>
+                                <span className="text-[10px] text-gray-500 dark:text-gray-400 font-bold block">অনুরোধকৃত স্টক</span>
+                                <span className="text-base font-black text-amber-700 dark:text-amber-300">
+                                  {req.requestedQty} pcs
+                                </span>
+                              </div>
+                              <div className="border-x border-gray-200 dark:border-emerald-900/60 px-1">
+                                <span className="text-[10px] text-blue-700 dark:text-blue-300 font-bold block">👑 এডমিন স্টক</span>
+                                <span className="text-base font-black text-blue-900 dark:text-blue-200">
+                                  {currentAdminStock} pcs
+                                </span>
+                              </div>
+                              <div>
+                                <span className="text-[10px] text-emerald-700 dark:text-emerald-300 font-bold block">🏪 সেলার স্টক</span>
+                                <span className={`text-base font-black ${currentSellerStock <= 0 ? 'text-red-600' : 'text-emerald-800 dark:text-emerald-200'}`}>
+                                  {currentSellerStock} pcs
+                                </span>
+                              </div>
+                            </div>
+
+                            {/* Note / Reason */}
+                            {req.note && (
+                              <div className="text-xs text-gray-600 dark:text-emerald-300/80 bg-white/70 dark:bg-black/20 p-2.5 rounded-xl border border-gray-100 dark:border-emerald-950">
+                                <span className="font-bold text-gray-800 dark:text-emerald-100">📝 সেলার নোট:</span> {req.note}
+                              </div>
+                            )}
+                            {req.rejectReason && (
+                              <div className="text-xs text-rose-700 dark:text-rose-300 bg-rose-50 dark:bg-rose-950/40 p-2.5 rounded-xl border border-rose-200">
+                                <span className="font-bold">❌ বাতিলের কারণ:</span> {req.rejectReason}
+                              </div>
+                            )}
+                            {req.adminNote && req.status === 'approved' && (
+                              <div className="text-xs text-emerald-800 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/40 p-2.5 rounded-xl border border-emerald-200">
+                                <span className="font-bold">✅ এডমিন নোট:</span> {req.adminNote}
+                              </div>
+                            )}
+
+                            <div className="text-[11px] text-gray-400 font-semibold flex items-center justify-between">
+                              <span>তারিখ: {new Date(req.createdAt || Date.now()).toLocaleString('en-GB')}</span>
+                              {req.approvedAt && <span>অনুমোদন: {new Date(req.approvedAt).toLocaleDateString('en-GB')}</span>}
+                            </div>
+                          </div>
+
+                          {/* Action Buttons for Pending Requests */}
+                          {req.status === 'pending' && (
+                            <div className="flex items-center gap-2 pt-2 border-t border-gray-100 dark:border-emerald-900/60">
+                              <button
+                                type="button"
+                                onClick={() => handleOpenApprovalModal(req)}
+                                className="flex-1 py-2.5 px-3 bg-gradient-to-r from-emerald-600 via-brand-800 to-emerald-900 hover:from-emerald-700 hover:to-brand-950 text-white font-black text-xs rounded-xl shadow-md flex items-center justify-center gap-1.5 transition-all"
+                              >
+                                <CheckCircle2 className="w-4 h-4" />
+                                <span>{isBangla ? 'অনুমোদন ও স্টক হস্তান্তর' : 'Approve & Transfer'}</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setRequestRejectModal({ isOpen: true, request: req, reason: '' })}
+                                className="py-2.5 px-3.5 bg-red-50 hover:bg-red-100 dark:bg-red-950/50 text-red-600 dark:text-red-300 text-xs font-bold rounded-xl border border-red-200 dark:border-red-900 transition-colors"
+                              >
+                                {isBangla ? 'বাতিল' : 'Reject'}
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                </div>
+              )}
             </div>
           )}
 
@@ -2165,7 +2611,7 @@ export default function AdminDashboardPage() {
                   {/* Photo / ImgBB Upload */}
                   <div>
                     <label className="block text-xs font-bold mb-1 text-gray-700 dark:text-emerald-300">
-                      {isBangla ? 'প্রোফাইল ছবি (ImgBB Upload / URL)' : 'Avatar Photo'}
+                      {isBangla ? 'প্রোফাইল ছবি (ImgBB Upload / URL)' : 'Avatar Photo (ImgBB Upload / URL)'}
                     </label>
                     <div className="flex items-center gap-2">
                       <input
@@ -2185,15 +2631,17 @@ export default function AdminDashboardPage() {
                           onChange={async (e) => {
                             const file = e.target.files?.[0];
                             if (!file) return;
-                            setIsUploadingUserImg(true);
                             try {
-                              const uploadedUrl = await uploadToImgBB(file);
-                              if (uploadedUrl) {
-                                setNewUserData(prev => ({ ...prev, avatar: uploadedUrl }));
-                                showToast(isBangla ? 'ছবি ImgBB তে আপলোড সফল!' : 'Uploaded to ImgBB!');
+                              setIsUploadingUserImg(true);
+                              const res = await uploadToImgBB(file);
+                              if (res?.success && res.url) {
+                                setNewUserData(prev => ({ ...prev, avatar: res.url }));
+                                showToast(isBangla ? 'ছবি আপলোড হয়েছে!' : 'Image uploaded!');
+                              } else {
+                                showToast(isBangla ? 'আপলোড ব্যর্থ হয়েছে' : 'Upload failed', 'error');
                               }
                             } catch (err) {
-                              showToast(isBangla ? 'ছবি আপলোড ব্যর্থ' : 'Upload failed', 'error');
+                              showToast('Upload error', 'error');
                             } finally {
                               setIsUploadingUserImg(false);
                             }
@@ -2203,20 +2651,21 @@ export default function AdminDashboardPage() {
                     </div>
                   </div>
 
-                  {/* Action Buttons */}
-                  <div className="flex gap-2 pt-2">
+                  {/* Actions */}
+                  <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-gray-100 dark:border-emerald-950">
                     <button
                       type="button"
                       onClick={() => setIsAddUserModalOpen(false)}
-                      className="flex-1 py-2.5 bg-gray-100 dark:bg-black/40 hover:bg-gray-200 text-gray-700 dark:text-gray-300 font-bold text-xs rounded-2xl transition-all"
+                      className="px-4 py-2 text-xs font-bold text-gray-500 hover:bg-gray-100 dark:hover:bg-emerald-950 rounded-2xl transition-colors"
                     >
                       {isBangla ? 'বাতিল' : 'Cancel'}
                     </button>
                     <button
                       type="submit"
-                      className="flex-1 py-2.5 bg-gradient-to-r from-brand-900 to-emerald-700 hover:from-brand-800 hover:to-emerald-600 text-white font-bold text-xs rounded-2xl shadow-md transition-all"
+                      className="px-5 py-2.5 text-xs font-extrabold bg-brand-900 hover:bg-brand-800 text-white rounded-2xl shadow-md transition-all flex items-center gap-1.5"
                     >
-                      {isBangla ? '💾 MongoDB তে সেভ করুন' : 'Save to MongoDB'}
+                      <UserPlus className="w-3.5 h-3.5" />
+                      <span>{isBangla ? 'ইউজার তৈরি করুন' : 'Create User'}</span>
                     </button>
                   </div>
                 </form>
@@ -2225,55 +2674,34 @@ export default function AdminDashboardPage() {
           )}
 
           {/* ======================================================== */}
-          {/* 3. 🏪 SELLER MANAGEMENT                                  */}
+          {/* 3. 🏪 SELLERS & VENDORS MANAGEMENT                      */}
           {/* ======================================================== */}
           {activeMenu === 'sellers' && (
             <div className="bg-white dark:bg-[#112318] rounded-3xl p-6 border border-[#e0ebe2] dark:border-[#1d3b28] shadow-sm space-y-6">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[#e0ebe2] dark:border-[#1d3b28] pb-4">
                 <div>
                   <h3 className="text-lg font-black text-gray-900 dark:text-emerald-100 flex items-center gap-2">
-                    <span>🏪 {isBangla ? 'ভেন্ডর ও সেলার ম্যানেজমেন্ট' : 'Seller & Vendor Management'}</span>
-                    <span className="text-xs px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 font-bold">
-                      {sellersList.length} {isBangla ? 'সেলার' : 'Sellers'}
-                    </span>
+                    <Store className="w-5 h-5 text-brand-900 dark:text-emerald-400" />
+                    <span>{isBangla ? 'সেলার ও ভেন্ডর ব্যবস্থাপনা' : 'Sellers & Vendors Management'}</span>
                   </h3>
                   <p className="text-xs text-gray-500 dark:text-emerald-400">
-                    {isBangla ? 'User Management থেকে সেলার হিসেবে নির্ধারিত সকল ইউজার এবং ভেন্ডরদের তালিকা ও স্টোর সেটিংস' : 'All users assigned as seller in User Management automatically appear here'}
+                    {isBangla ? 'সকল নিবন্ধিত সেলারের শপ, কমিশন রেট ও অনুমোদন' : 'Manage sellers, commission rates, and shop approvals'}
                   </p>
                 </div>
-                <div className="flex flex-wrap gap-1.5 sm:gap-2">
-                  <button
-                    onClick={() => setActiveSubTab('all')}
-                    className={`px-3 py-1.5 text-xs font-bold rounded-xl transition-all ${
-                      activeSubTab === 'all' ? 'bg-brand-900 text-white shadow-sm dark:bg-emerald-600' : 'bg-gray-100 dark:bg-black/30 text-gray-600 dark:text-emerald-300'
-                    }`}
-                  >
-                    All ({sellersList.length})
-                  </button>
-                  <button
-                    onClick={() => setActiveSubTab('approved')}
-                    className={`px-3 py-1.5 text-xs font-bold rounded-xl transition-all ${
-                      activeSubTab === 'approved' ? 'bg-emerald-600 text-white shadow-sm' : 'bg-gray-100 dark:bg-black/30 text-gray-600 dark:text-emerald-300'
-                    }`}
-                  >
-                    Approved ({sellersList.filter(s => (s.status || 'approved') === 'approved').length})
-                  </button>
-                  <button
-                    onClick={() => setActiveSubTab('pending')}
-                    className={`px-3 py-1.5 text-xs font-bold rounded-xl transition-all ${
-                      activeSubTab === 'pending' ? 'bg-amber-500 text-brand-950 shadow-sm' : 'bg-gray-100 dark:bg-black/30 text-gray-600 dark:text-emerald-300'
-                    }`}
-                  >
-                    Pending ({sellersList.filter(s => s.status === 'pending').length})
-                  </button>
-                  <button
-                    onClick={() => setActiveSubTab('suspended')}
-                    className={`px-3 py-1.5 text-xs font-bold rounded-xl transition-all ${
-                      activeSubTab === 'suspended' ? 'bg-red-600 text-white shadow-sm' : 'bg-gray-100 dark:bg-black/30 text-gray-600 dark:text-emerald-300'
-                    }`}
-                  >
-                    Suspended ({sellersList.filter(s => s.status === 'suspended').length})
-                  </button>
+                <div className="flex items-center gap-1 bg-gray-100 dark:bg-black/30 p-1 rounded-2xl border border-gray-200 dark:border-emerald-900/60">
+                  {['all', 'approved', 'pending', 'suspended'].map((subTab) => (
+                    <button
+                      key={subTab}
+                      onClick={() => setActiveSubTab(subTab)}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all capitalize ${
+                        activeSubTab === subTab
+                          ? 'bg-brand-900 text-white shadow-sm'
+                          : 'text-gray-600 dark:text-emerald-300 hover:text-brand-900'
+                      }`}
+                    >
+                      {subTab} ({sellersList.filter(s => subTab === 'all' ? true : (s.status || 'approved') === subTab).length})
+                    </button>
+                  ))}
                 </div>
               </div>
 
@@ -2312,31 +2740,31 @@ export default function AdminDashboardPage() {
                                   alt={shopName}
                                   className="w-12 h-12 rounded-2xl object-cover border border-emerald-500/30 flex-shrink-0 bg-white"
                                 />
-                                <div>
-                                  <h4 className="font-black text-sm sm:text-base leading-snug text-gray-900 dark:text-emerald-100">
-                                    {shopName}
-                                  </h4>
-                                  <p className="text-xs font-bold text-amber-600 dark:text-amber-400 flex items-center gap-1">
-                                    <span>👤 {sellerName}</span>
-                                  </p>
+                                  <div>
+                                    <h4 className="font-black text-sm sm:text-base leading-snug text-gray-900 dark:text-emerald-100">
+                                      {shopName}
+                                    </h4>
+                                    <p className="text-xs font-bold text-amber-600 dark:text-amber-400 flex items-center gap-1">
+                                      <span>👤 {sellerName}</span>
+                                    </p>
+                                  </div>
                                 </div>
+                                <span className={`px-2.5 py-1 rounded-xl text-[10px] font-black uppercase flex-shrink-0 ${
+                                  sellerStatus === 'approved' ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300' :
+                                  sellerStatus === 'pending' ? 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300' : 'bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-300'
+                                }`}>
+                                  {sellerStatus}
+                                </span>
                               </div>
-                              <span className={`px-2.5 py-1 rounded-xl text-[10px] font-black uppercase flex-shrink-0 ${
-                                sellerStatus === 'approved' ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300' :
-                                sellerStatus === 'pending' ? 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300' : 'bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-300'
-                              }`}>
-                                {sellerStatus}
-                              </span>
-                            </div>
 
-                            <div className="mt-2 text-xs text-gray-500 dark:text-gray-400 space-y-0.5">
-                              <p className="truncate">📞 {seller.phone || 'No phone'}</p>
-                              <p className="truncate">✉️ {seller.email || 'No email'}</p>
-                              {seller.shop_description && (
-                                <p className="text-[11px] text-gray-400 line-clamp-2 pt-1">{seller.shop_description}</p>
-                              )}
+                              <div className="mt-2 text-xs text-gray-500 dark:text-gray-400 space-y-0.5">
+                                <p className="truncate">📞 {seller.phone || 'No phone'}</p>
+                                <p className="truncate">✉️ {seller.email || 'No email'}</p>
+                                {seller.shop_description && (
+                                  <p className="text-[11px] text-gray-400 line-clamp-2 pt-1">{seller.shop_description}</p>
+                                )}
+                              </div>
                             </div>
-                          </div>
 
                           <div className="pt-2 border-t border-gray-200 dark:border-emerald-900/40 text-xs space-y-1.5 text-gray-600 dark:text-emerald-300">
                             <div className="flex justify-between">
@@ -2383,17 +2811,18 @@ export default function AdminDashboardPage() {
           )}
 
           {/* ======================================================== */}
-          {/* 4. 📦 PRODUCT MANAGEMENT                                 */}
+          {/* 4. 📦 PRODUCT MANAGEMENT & INVENTORY ALLOCATION          */}
           {/* ======================================================== */}
           {activeMenu === 'products' && (
             <div className="bg-white dark:bg-[#112318] rounded-3xl p-6 border border-[#e0ebe2] dark:border-[#1d3b28] shadow-sm space-y-6">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[#e0ebe2] dark:border-[#1d3b28] pb-4">
                 <div>
-                  <h3 className="text-lg font-black text-gray-900 dark:text-emerald-100">
-                    {isBangla ? 'পণ্য ব্যবস্থাপনা' : 'Product Management'}
+                  <h3 className="text-lg font-black text-gray-900 dark:text-emerald-100 flex items-center gap-2">
+                    <Package className="w-5 h-5 text-brand-900 dark:text-emerald-400" />
+                    <span>{isBangla ? 'পণ্য ও স্টক ব্যবস্থাপনা' : 'Product & Stock Management'}</span>
                   </h3>
                   <p className="text-xs text-gray-500 dark:text-emerald-400">
-                    {isBangla ? 'ক্যাটালগ, ক্যাটাগরি, ব্র্যান্ড ও নতুন পণ্য সংযোজন' : 'Products catalog, categories and brands management'}
+                    {isBangla ? 'অ্যাডমিন মাস্টার স্টক, সেলারকে স্টক স্থানান্তর ও ক্যাটালগ' : 'Admin Master Stock, Seller Allocation & Catalog Management'}
                   </p>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
@@ -2454,6 +2883,22 @@ export default function AdminDashboardPage() {
                   </button>
 
                   <button
+                    onClick={() => setActiveSubTab('requests')}
+                    className={`px-3.5 py-1.5 text-xs font-bold rounded-xl flex items-center gap-1.5 transition-all ${
+                      activeSubTab === 'requests' 
+                        ? 'bg-amber-600 text-white shadow-md' 
+                        : 'bg-amber-100 dark:bg-amber-950/70 text-amber-900 dark:text-amber-300 hover:bg-amber-200'
+                    }`}
+                  >
+                    <span>📢 {isBangla ? 'সেলার স্টক রিকোয়েস্ট' : 'Stock Requests'}</span>
+                    {stockRequestsList.filter(r => r.status === 'pending').length > 0 && (
+                      <span className="px-1.5 py-0.2 rounded-full bg-red-600 text-white text-[10px] font-black animate-pulse">
+                        {stockRequestsList.filter(r => r.status === 'pending').length}
+                      </span>
+                    )}
+                  </button>
+
+                  <button
                     onClick={() => setActiveSubTab('add')}
                     className={`px-3.5 py-1.5 text-xs font-bold rounded-xl flex items-center gap-1.5 transition-all ${
                       activeSubTab === 'add' ? 'bg-brand-900 text-white shadow' : 'bg-emerald-100 dark:bg-emerald-950 text-brand-900 dark:text-emerald-300'
@@ -2481,12 +2926,14 @@ export default function AdminDashboardPage() {
                     })
                     .map((prod) => {
                       const prodSeller = prod.seller_name || prod.sellerName || prod.shop_name || 'সুন্দরবন অর্গানিক ফার্মস';
-                      const stockCount = prod.stock_quantity !== undefined ? Number(prod.stock_quantity) : (prod.stock !== undefined ? Number(prod.stock) : 50);
+                      const sellerStock = prod.stock_quantity !== undefined ? Number(prod.stock_quantity) : (prod.stock !== undefined ? Number(prod.stock) : 0);
+                      const adminStock = Number(prod.admin_stock !== undefined ? prod.admin_stock : (prod.adminStock !== undefined ? prod.adminStock : 70));
+                      const isSellerOutOfStock = sellerStock <= 0;
 
                       return (
                         <div
                           key={prod._id || prod.id || prod.slug}
-                          className="bg-gray-50 dark:bg-black/20 p-4 rounded-3xl border border-gray-200 dark:border-emerald-900/60 flex flex-col justify-between hover:border-emerald-500/40 transition-all shadow-sm"
+                          className={`bg-gray-50 dark:bg-black/20 p-4 rounded-3xl border ${isSellerOutOfStock ? 'border-red-400 dark:border-red-800/80 bg-red-50/20' : 'border-gray-200 dark:border-emerald-900/60'} flex flex-col justify-between hover:border-emerald-500/40 transition-all shadow-sm`}
                         >
                           <div>
                             <div className="flex gap-3">
@@ -2506,20 +2953,67 @@ export default function AdminDashboardPage() {
                             </div>
 
                             {/* 🏪 Seller / Vendor Display under product */}
-                            <div className="mt-2.5 flex items-center gap-1.5 text-[11px] font-bold text-amber-800 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 px-2.5 py-1 rounded-xl border border-amber-200/70 dark:border-amber-900/40 w-fit">
-                              <Store className="w-3.5 h-3.5 text-amber-600 flex-shrink-0" />
-                              <span className="truncate max-w-[200px]">{prodSeller}</span>
+                            <div className="mt-2.5 flex items-center justify-between gap-1.5">
+                              <div className="flex items-center gap-1.5 text-[11px] font-bold text-amber-800 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 px-2.5 py-1 rounded-xl border border-amber-200/70 dark:border-amber-900/40 truncate max-w-[200px]">
+                                <Store className="w-3.5 h-3.5 text-amber-600 flex-shrink-0" />
+                                <span className="truncate">{prodSeller}</span>
+                              </div>
+                              <span className="text-[10px] font-mono text-gray-400 dark:text-gray-500">ID: #{prod.id || prod._id?.slice(-4)}</span>
+                            </div>
+
+                            {/* 📦 Multi-Tier Stock Levels Display (Admin vs Seller) */}
+                            <div className="mt-3 grid grid-cols-2 gap-2 bg-white dark:bg-[#0d1f14] p-2 rounded-2xl border border-gray-200/80 dark:border-emerald-950/80 shadow-xs">
+                              {/* Admin Master Stock */}
+                              <div className="flex flex-col p-1.5 bg-blue-50/60 dark:bg-blue-950/30 rounded-xl border border-blue-200/60 dark:border-blue-900/40">
+                                <span className="text-[9px] font-bold text-blue-700 dark:text-blue-300">
+                                  👑 {isBangla ? 'অ্যাডমিন স্টক' : 'Admin Stock'}
+                                </span>
+                                <span className="text-xs font-black text-blue-900 dark:text-blue-200">
+                                  {adminStock} pcs
+                                </span>
+                              </div>
+
+                              {/* Seller Stock */}
+                              <div className={`flex flex-col p-1.5 rounded-xl border ${isSellerOutOfStock ? 'bg-red-50 dark:bg-red-950/40 border-red-200 dark:border-red-900/60' : 'bg-emerald-50/60 dark:bg-emerald-950/30 border-emerald-200/60 dark:border-emerald-900/40'}`}>
+                                <span className={`text-[9px] font-bold ${isSellerOutOfStock ? 'text-red-700 dark:text-red-300' : 'text-emerald-700 dark:text-emerald-300'}`}>
+                                  🏪 {isBangla ? 'সেলার স্টক' : 'Seller Stock'}
+                                </span>
+                                <span className={`text-xs font-black ${isSellerOutOfStock ? 'text-red-600 dark:text-red-400' : 'text-emerald-900 dark:text-emerald-200'}`}>
+                                  {isSellerOutOfStock ? (isBangla ? 'স্টক আউট (০)' : 'Out of Stock (0)') : `${sellerStock} pcs`}
+                                </span>
+                              </div>
                             </div>
                           </div>
 
-                          <div className="mt-3 pt-3 border-t border-gray-200 dark:border-emerald-900/40 flex items-center justify-between text-xs">
-                            <span className={`font-bold ${stockCount <= 0 ? 'text-red-600' : 'text-gray-600 dark:text-emerald-300'}`}>
-                              Stock: <strong>{stockCount <= 0 ? (isBangla ? 'স্টক আউট (0)' : 'Out of Stock (0)') : stockCount}</strong>
-                            </span>
-                            <div className="flex items-center gap-1.5">
+                          {/* Action Buttons: Stock Transfer, Edit, Delete */}
+                          <div className="mt-3 pt-3 border-t border-gray-200 dark:border-emerald-900/40 flex items-center justify-between gap-2 text-xs">
+                            <button
+                              onClick={() => {
+                                setStockTransferModal({
+                                  isOpen: true,
+                                  product: prod,
+                                  quantity: Math.min(30, adminStock > 0 ? adminStock : 10),
+                                  sellerId: prod.seller_id || prod.sellerId || null,
+                                  sellerName: prodSeller,
+                                  note: `অ্যাডমিন স্টক থেকে ${prodSeller}-কে স্টক স্থানান্তর`
+                                });
+                              }}
+                              className={`flex-1 py-1.5 px-2 rounded-xl text-[11px] font-bold flex items-center justify-center gap-1.5 transition-all shadow-xs ${
+                                adminStock > 0 
+                                  ? 'bg-gradient-to-r from-emerald-600 to-brand-800 text-white hover:from-emerald-700 hover:to-brand-900 shadow-emerald-900/20'
+                                  : 'bg-gray-200 dark:bg-gray-800 text-gray-400 cursor-not-allowed'
+                              }`}
+                              title={isBangla ? 'সেলারকে স্টক হস্তান্তর করুন' : 'Transfer Stock to Seller'}
+                              disabled={adminStock <= 0}
+                            >
+                              <ArrowLeftRight className="w-3.5 h-3.5" />
+                              <span>{isBangla ? 'স্টক ট্রান্সফার' : 'Transfer Stock'}</span>
+                            </button>
+
+                            <div className="flex items-center gap-1">
                               <button
                                 onClick={() => setEditingProd(prod)}
-                                className="p-1.5 text-brand-800 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 rounded-lg transition-colors"
+                                className="p-1.5 text-brand-800 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 rounded-lg transition-colors border border-transparent hover:border-emerald-200 dark:hover:border-emerald-900"
                                 title={isBangla ? 'এডিট করুন' : 'Edit Product'}
                               >
                                 <Edit className="w-4 h-4" />
@@ -2532,7 +3026,7 @@ export default function AdminDashboardPage() {
                                     loadAllData();
                                   }
                                 }}
-                                className="p-1.5 text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 rounded-lg transition-colors"
+                                className="p-1.5 text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 rounded-lg transition-colors border border-transparent hover:border-red-200 dark:hover:border-red-900"
                                 title={isBangla ? 'মুছে ফেলুন' : 'Delete'}
                               >
                                 <Trash2 className="w-4 h-4" />
@@ -2561,7 +3055,7 @@ export default function AdminDashboardPage() {
                       <label className="block text-xs font-bold mb-1">Product Name (English)</label>
                       <input
                         type="text"
-                        placeholder="e.g. Sundarban Pure Honey"
+                        placeholder="e.g. Sundarban Pure Organic Honey"
                         value={newProd.name_en}
                         onChange={(e) => setNewProd({ ...newProd, name_en: e.target.value })}
                         className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-black/30 border border-gray-300 dark:border-emerald-900 rounded-xl text-xs sm:text-sm"
@@ -2590,7 +3084,7 @@ export default function AdminDashboardPage() {
                         placeholder="950"
                         value={newProd.price}
                         onChange={(e) => setNewProd({ ...newProd, price: e.target.value })}
-                        className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-black/30 border border-gray-300 dark:border-emerald-900 rounded-xl text-xs sm:text-sm"
+                        className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-black/30 border border-gray-300 dark:border-emerald-900 rounded-xl text-xs sm:text-sm font-bold"
                       />
                     </div>
                     <div>
@@ -2602,6 +3096,52 @@ export default function AdminDashboardPage() {
                         onChange={(e) => setNewProd({ ...newProd, regularPrice: e.target.value })}
                         className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-black/30 border border-gray-300 dark:border-emerald-900 rounded-xl text-xs sm:text-sm"
                       />
+                    </div>
+                  </div>
+
+                  {/* Multi-Tier Stock Setup: Admin Master Stock & Initial Seller Stock */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 p-4 rounded-2xl bg-emerald-50/50 dark:bg-emerald-950/20 border border-emerald-200/60 dark:border-emerald-900/60">
+                    <div>
+                      <label className="block text-xs font-black text-blue-900 dark:text-blue-300 mb-1">
+                        👑 {isBangla ? 'অ্যাডমিন মাস্টার স্টক (pcs)' : 'Admin Master Stock'} *
+                      </label>
+                      <input
+                        type="number"
+                        required
+                        min="0"
+                        placeholder="100"
+                        value={newProd.admin_stock}
+                        onChange={(e) => setNewProd({ ...newProd, admin_stock: Number(e.target.value) })}
+                        className="w-full px-3.5 py-2.5 bg-white dark:bg-black/40 border border-blue-300 dark:border-blue-900 rounded-xl text-xs sm:text-sm font-black text-blue-800 dark:text-blue-200"
+                      />
+                      <span className="text-[10px] text-gray-500 mt-1 block">যেমন: ১০০ পিছ</span>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-black text-emerald-900 dark:text-emerald-300 mb-1">
+                        🏪 {isBangla ? 'সেলার প্রাথমিক স্টক (pcs)' : 'Initial Seller Stock'}
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        placeholder="0"
+                        value={newProd.stock_quantity}
+                        onChange={(e) => setNewProd({ ...newProd, stock_quantity: Number(e.target.value) })}
+                        className="w-full px-3.5 py-2.5 bg-white dark:bg-black/40 border border-emerald-300 dark:border-emerald-900 rounded-xl text-xs sm:text-sm font-black text-emerald-800 dark:text-emerald-200"
+                      />
+                      <span className="text-[10px] text-gray-500 mt-1 block">স্থানান্তরের আগে (যেমন: ০)</span>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold mb-1">SKU Code</label>
+                      <input
+                        type="text"
+                        placeholder="GB-HONEY-01"
+                        value={newProd.sku}
+                        onChange={(e) => setNewProd({ ...newProd, sku: e.target.value })}
+                        className="w-full px-3.5 py-2.5 bg-white dark:bg-black/40 border border-gray-300 dark:border-emerald-900 rounded-xl text-xs sm:text-sm"
+                      />
+                      <span className="text-[10px] text-gray-500 mt-1 block">ইউনিক বারকোড/SKU</span>
                     </div>
                   </div>
 
@@ -2626,11 +3166,454 @@ export default function AdminDashboardPage() {
 
                   <button
                     type="submit"
-                    className="w-full bg-brand-900 hover:bg-brand-800 text-white font-black py-3 rounded-2xl shadow-lg"
+                    className="w-full bg-brand-900 hover:bg-brand-800 text-white font-black py-3 rounded-2xl shadow-lg transition-all"
                   >
-                    Save Product
+                    {isBangla ? 'পণ্য সংরক্ষণ করুন' : 'Save Product'}
                   </button>
                 </form>
+              )}
+
+              {/* 📢 SUB-TAB: SELLER STOCK RESTOCK REQUESTS */}
+              {activeSubTab === 'requests' && (
+                <div className="space-y-5">
+                  {/* Sub-Header & Status Filter */}
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-2xl bg-amber-50/70 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/50">
+                    <div>
+                      <h4 className="text-base font-black text-amber-950 dark:text-amber-200 flex items-center gap-2">
+                        <span>📢 {isBangla ? 'সেলারদের স্টক রিকোয়েস্ট তালিকা' : 'Seller Stock Restock Requests'}</span>
+                        <span className="px-2.5 py-0.5 rounded-full bg-amber-200 dark:bg-amber-900 text-amber-950 dark:text-amber-100 text-xs font-black">
+                          {stockRequestsList.filter(r => r.status === 'pending').length} {isBangla ? 'টি অপেক্ষমান' : 'Pending'}
+                        </span>
+                      </h4>
+                      <p className="text-xs text-amber-800/80 dark:text-amber-300/70 mt-0.5">
+                        {isBangla 
+                          ? 'সেলারদের স্টক শেষ হলে তারা এডমিন থেকে যে স্টক রিকোয়েস্ট পাঠায় তা এখানে দৃশ্যমান হবে এবং অনুমোদন দিয়ে স্টক হস্তান্তর করা যাবে।' 
+                          : 'Review restock requests submitted by sellers and transfer stock directly from Admin warehouse.'}
+                      </p>
+                    </div>
+
+                    {/* Filter Pills */}
+                    <div className="flex items-center gap-1.5 bg-white dark:bg-black/40 p-1.5 rounded-xl border border-amber-300 dark:border-amber-900">
+                      {[
+                        { id: 'all', label: isBangla ? 'সকল' : 'All', count: stockRequestsList.length },
+                        { id: 'pending', label: isBangla ? 'অপেক্ষমান' : 'Pending', count: stockRequestsList.filter(r => r.status === 'pending').length, badgeColor: 'bg-amber-500 text-slate-950' },
+                        { id: 'approved', label: isBangla ? 'অনুমোদিত' : 'Approved', count: stockRequestsList.filter(r => r.status === 'approved').length, badgeColor: 'bg-emerald-600 text-white' },
+                        { id: 'rejected', label: isBangla ? 'বাতিল' : 'Rejected', count: stockRequestsList.filter(r => r.status === 'rejected').length, badgeColor: 'bg-red-600 text-white' },
+                      ].map((tab) => (
+                        <button
+                          key={tab.id}
+                          type="button"
+                          onClick={() => setStockRequestFilter(tab.id)}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all flex items-center gap-1.5 ${
+                            stockRequestFilter === tab.id
+                              ? 'bg-amber-600 text-white shadow-sm'
+                              : 'text-gray-700 dark:text-emerald-200 hover:bg-amber-50 dark:hover:bg-amber-950/40'
+                          }`}
+                        >
+                          <span>{tab.label}</span>
+                          <span className={`px-1.5 py-0.2 text-[10px] rounded-full ${tab.badgeColor || (stockRequestFilter === tab.id ? 'bg-white/30 text-white' : 'bg-gray-200 dark:bg-emerald-950 text-gray-700 dark:text-emerald-300')}`}>
+                            {tab.count}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Requests Grid / Table */}
+                  {stockRequestsList.filter(r => stockRequestFilter === 'all' || r.status === stockRequestFilter).length === 0 ? (
+                    <div className="text-center py-16 bg-gray-50/50 dark:bg-black/20 rounded-3xl border border-dashed border-gray-300 dark:border-emerald-900/60 p-8">
+                      <span className="text-4xl mb-2 block">📦</span>
+                      <h4 className="text-base font-bold text-gray-700 dark:text-emerald-200">
+                        {isBangla ? 'কোনো স্টক রিকোয়েস্ট পাওয়া যায়নি' : 'No stock restock requests found'}
+                      </h4>
+                      <p className="text-xs text-gray-500 mt-1">
+                        {stockRequestFilter === 'pending'
+                          ? (isBangla ? 'বর্তমানে কোনো পেন্ডিং স্টক রিকোয়েস্ট নেই।' : 'No pending requests at the moment.')
+                          : (isBangla ? 'সেলার স্টক রিকোয়েস্ট পাঠালে তা এখানে প্রদর্শিত হবে।' : 'When sellers submit restock requests, they will appear here.')}
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {stockRequestsList
+                        .filter(r => stockRequestFilter === 'all' || r.status === stockRequestFilter)
+                        .map((req) => {
+                          const matchingProd = productsList.find(p => String(p.id || p._id) === String(req.productId || req.product_id));
+                          const currentAdminStock = matchingProd 
+                            ? Number(matchingProd.admin_stock !== undefined ? matchingProd.admin_stock : (matchingProd.adminStock !== undefined ? matchingProd.adminStock : 70))
+                            : (req.adminStockAtRequest || 70);
+                          const currentSellerStock = matchingProd
+                            ? Number(matchingProd.stock_quantity !== undefined ? matchingProd.stock_quantity : (matchingProd.stock || 0))
+                            : (req.sellerStockAtRequest || 0);
+
+                          return (
+                            <div
+                              key={req.id || req._id}
+                              className={`p-5 rounded-3xl border shadow-sm transition-all relative overflow-hidden flex flex-col justify-between gap-4 ${
+                                req.status === 'pending'
+                                  ? 'bg-white dark:bg-[#112318] border-amber-300 dark:border-amber-800/80 ring-1 ring-amber-400/30'
+                                  : req.status === 'approved'
+                                  ? 'bg-emerald-50/40 dark:bg-emerald-950/20 border-emerald-300 dark:border-emerald-900/60'
+                                  : 'bg-rose-50/30 dark:bg-rose-950/20 border-rose-200 dark:border-rose-900/50'
+                              }`}
+                            >
+                              {/* Top Bar: Product & Seller Info */}
+                              <div className="space-y-3">
+                                <div className="flex items-start justify-between gap-3">
+                                  <div className="flex items-center gap-3">
+                                    <img
+                                      src={req.productImage || matchingProd?.thumbnail || 'https://images.unsplash.com/photo-1587049352846-4a222e784d38?auto=format&fit=crop&w=150&q=80'}
+                                      alt={req.productName}
+                                      className="w-14 h-14 rounded-2xl object-cover border border-emerald-900/20 flex-shrink-0 shadow-sm"
+                                    />
+                                    <div>
+                                      <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">
+                                        ID: #{req.id || req._id?.slice?.(-6)}
+                                      </span>
+                                      <h4 className="text-sm font-black text-gray-900 dark:text-emerald-100 line-clamp-1">
+                                        {req.productName}
+                                      </h4>
+                                      <p className="text-xs text-amber-700 dark:text-amber-400 font-bold flex items-center gap-1 mt-0.5">
+                                        <span>🏪 সেলার:</span>
+                                        <strong className="text-gray-900 dark:text-emerald-200">{req.sellerName || 'সেলার'}</strong>
+                                      </p>
+                                    </div>
+                                  </div>
+
+                                  {/* Status Badge */}
+                                  <div>
+                                    {req.status === 'pending' && (
+                                      <span className="px-3 py-1 rounded-full bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-300 border border-amber-300 dark:border-amber-800 text-xs font-black flex items-center gap-1 shadow-sm">
+                                        <span className="w-2 h-2 rounded-full bg-amber-500 animate-ping" />
+                                        <span>অপেক্ষমান</span>
+                                      </span>
+                                    )}
+                                    {req.status === 'approved' && (
+                                      <span className="px-3 py-1 rounded-full bg-emerald-100 text-emerald-900 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-300 text-xs font-black flex items-center gap-1">
+                                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                                        <span>অনুমোদিত ({req.transferredQty || req.requestedQty} pcs)</span>
+                                      </span>
+                                    )}
+                                    {req.status === 'rejected' && (
+                                      <span className="px-3 py-1 rounded-full bg-rose-100 text-rose-900 dark:bg-rose-950 dark:text-rose-300 border border-rose-300 text-xs font-black flex items-center gap-1">
+                                        <XCircle className="w-3.5 h-3.5 text-rose-600" />
+                                        <span>বাতিলকৃত</span>
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+
+                                {/* Stock Details Box */}
+                                <div className="grid grid-cols-3 gap-2 p-3 rounded-2xl bg-gray-50 dark:bg-black/30 border border-gray-200/70 dark:border-emerald-950 text-center">
+                                  <div>
+                                    <span className="text-[10px] text-gray-500 dark:text-gray-400 font-bold block">অনুরোধকৃত স্টক</span>
+                                    <span className="text-base font-black text-amber-700 dark:text-amber-300">
+                                      {req.requestedQty} pcs
+                                    </span>
+                                  </div>
+                                  <div className="border-x border-gray-200 dark:border-emerald-900/60 px-1">
+                                    <span className="text-[10px] text-blue-700 dark:text-blue-300 font-bold block">👑 এডমিন স্টক</span>
+                                    <span className="text-base font-black text-blue-900 dark:text-blue-200">
+                                      {currentAdminStock} pcs
+                                    </span>
+                                  </div>
+                                  <div>
+                                    <span className="text-[10px] text-emerald-700 dark:text-emerald-300 font-bold block">🏪 সেলার স্টক</span>
+                                    <span className={`text-base font-black ${currentSellerStock <= 0 ? 'text-red-600' : 'text-emerald-800 dark:text-emerald-200'}`}>
+                                      {currentSellerStock} pcs
+                                    </span>
+                                  </div>
+                                </div>
+
+                                {/* Note / Reason */}
+                                {req.note && (
+                                  <div className="text-xs text-gray-600 dark:text-emerald-300/80 bg-white/70 dark:bg-black/20 p-2.5 rounded-xl border border-gray-100 dark:border-emerald-950">
+                                    <span className="font-bold text-gray-800 dark:text-emerald-100">📝 সেলার নোট:</span> {req.note}
+                                  </div>
+                                )}
+                                {req.rejectReason && (
+                                  <div className="text-xs text-rose-700 dark:text-rose-300 bg-rose-50 dark:bg-rose-950/40 p-2.5 rounded-xl border border-rose-200">
+                                    <span className="font-bold">❌ বাতিলের কারণ:</span> {req.rejectReason}
+                                  </div>
+                                )}
+                                {req.adminNote && req.status === 'approved' && (
+                                  <div className="text-xs text-emerald-800 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/40 p-2.5 rounded-xl border border-emerald-200">
+                                    <span className="font-bold">✅ এডমিন নোট:</span> {req.adminNote}
+                                  </div>
+                                )}
+
+                                <div className="text-[11px] text-gray-400 font-semibold flex items-center justify-between">
+                                  <span>তারিখ: {new Date(req.createdAt || Date.now()).toLocaleString('en-GB')}</span>
+                                  {req.approvedAt && <span>অনুমোদন: {new Date(req.approvedAt).toLocaleDateString('en-GB')}</span>}
+                                </div>
+                              </div>
+
+                              {/* Action Buttons for Pending Requests */}
+                              {req.status === 'pending' && (
+                                <div className="flex items-center gap-2 pt-2 border-t border-gray-100 dark:border-emerald-900/60">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleOpenApprovalModal(req)}
+                                    className="flex-1 py-2.5 px-3 bg-gradient-to-r from-emerald-600 via-brand-800 to-emerald-900 hover:from-emerald-700 hover:to-brand-950 text-white font-black text-xs rounded-xl shadow-md flex items-center justify-center gap-1.5 transition-all"
+                                  >
+                                    <CheckCircle2 className="w-4 h-4" />
+                                    <span>{isBangla ? 'অনুমোদন ও স্টক হস্তান্তর' : 'Approve & Transfer'}</span>
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => setRequestRejectModal({ isOpen: true, request: req, reason: '' })}
+                                    className="py-2.5 px-3.5 bg-red-50 hover:bg-red-100 dark:bg-red-950/50 text-red-600 dark:text-red-300 text-xs font-bold rounded-xl border border-red-200 dark:border-red-900 transition-colors"
+                                  >
+                                    {isBangla ? 'বাতিল' : 'Reject'}
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* 📢 SELLER STOCK REQUEST APPROVAL & TRANSFER MODAL */}
+              {selectedStockRequestForApproval && (() => {
+                const req = selectedStockRequestForApproval;
+                const matchingProd = productsList.find(p => String(p.id || p._id) === String(req.productId || req.product_id));
+                const currentAdminStock = matchingProd 
+                  ? Number(matchingProd.admin_stock !== undefined ? matchingProd.admin_stock : (matchingProd.adminStock !== undefined ? matchingProd.adminStock : 70))
+                  : (req.adminStockAtRequest || 70);
+                const currentSellerStock = matchingProd 
+                  ? Number(matchingProd.stock_quantity !== undefined ? matchingProd.stock_quantity : (matchingProd.stock || 0))
+                  : (req.sellerStockAtRequest || 0);
+                const transferQty = Number(approvalTransferQty) || 0;
+                const remainingAdmin = Math.max(0, currentAdminStock - transferQty);
+                const resultingSeller = currentSellerStock + transferQty;
+                const isOverStock = transferQty > currentAdminStock;
+
+                return (
+                  <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200">
+                    <div className="bg-white dark:bg-[#0e2115] rounded-3xl p-6 sm:p-8 max-w-lg w-full border border-emerald-500/40 shadow-2xl space-y-5">
+                      {/* Modal Header */}
+                      <div className="flex items-center justify-between border-b border-gray-200 dark:border-emerald-900/60 pb-3">
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-emerald-600 to-brand-900 flex items-center justify-center text-white shadow-md">
+                            <CheckCircle2 className="w-5 h-5" />
+                          </div>
+                          <div>
+                            <h3 className="text-base sm:text-lg font-black text-gray-900 dark:text-emerald-100">
+                              {isBangla ? 'সেলার স্টক রিকোয়েস্ট অনুমোদন ও হস্তান্তর' : 'Approve & Transfer Stock'}
+                            </h3>
+                            <p className="text-[11px] text-emerald-700 dark:text-emerald-400 font-semibold">
+                              {isBangla ? 'এডমিন মাস্টার স্টক থেকে সেলারকে স্টক স্থানান্তর' : 'Direct Stock Allocation from Admin Master Stock'}
+                            </p>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedStockRequestForApproval(null)}
+                          className="p-1.5 rounded-xl hover:bg-gray-100 dark:hover:bg-emerald-950 text-gray-500"
+                        >
+                          <X className="w-5 h-5" />
+                        </button>
+                      </div>
+
+                      {/* Product Preview Card */}
+                      <div className="flex items-center gap-3.5 p-3 rounded-2xl bg-gray-50 dark:bg-black/40 border border-gray-200/80 dark:border-emerald-950">
+                        <img
+                          src={req.productImage || matchingProd?.thumbnail || 'https://images.unsplash.com/photo-1587049352846-4a222e784d38?auto=format&fit=crop&w=150&q=80'}
+                          alt={req.productName}
+                          className="w-14 h-14 rounded-xl object-cover border border-emerald-900/20"
+                        />
+                        <div className="flex-1 min-w-0">
+                          <h4 className="text-xs sm:text-sm font-black text-gray-900 dark:text-emerald-100 truncate">
+                            {req.productName}
+                          </h4>
+                          <div className="flex items-center gap-2 mt-1 text-[11px] text-gray-500 dark:text-emerald-400">
+                            <span>সেলার: <strong className="text-gray-800 dark:text-emerald-200">{req.sellerName}</strong></span>
+                            <span>•</span>
+                            <span>অনুরোধ: <strong className="text-amber-600">{req.requestedQty} pcs</strong></span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Live Before & After Transfer Visualizer */}
+                      <div className="grid grid-cols-2 gap-3 p-3.5 rounded-2xl bg-gradient-to-br from-emerald-50/70 to-blue-50/70 dark:from-[#09170e] dark:to-[#0a1824] border border-emerald-200/70 dark:border-emerald-800/40">
+                        {/* Admin Stock Column */}
+                        <div className="space-y-1 text-center">
+                          <span className="text-[10px] font-black uppercase text-blue-800 dark:text-blue-300">
+                            👑 এডমিন মাস্টার স্টক
+                          </span>
+                          <div className="text-xl font-black text-blue-900 dark:text-blue-100">
+                            {currentAdminStock} pcs
+                          </div>
+                          <span className="text-[10px] text-blue-600 dark:text-blue-400 font-bold block">
+                            স্থানান্তরের পর: <strong className={isOverStock ? 'text-red-500' : 'text-blue-900 dark:text-blue-100'}>{remainingAdmin} pcs</strong>
+                          </span>
+                        </div>
+
+                        {/* Seller Stock Column */}
+                        <div className="space-y-1 text-center border-l border-emerald-200 dark:border-emerald-900/60 pl-3">
+                          <span className="text-[10px] font-black uppercase text-emerald-800 dark:text-emerald-300">
+                            🏪 সেলার স্টক
+                          </span>
+                          <div className={`text-xl font-black ${currentSellerStock <= 0 ? 'text-red-600' : 'text-emerald-900 dark:text-emerald-100'}`}>
+                            {currentSellerStock} pcs
+                          </div>
+                          <span className="text-[10px] text-emerald-700 dark:text-emerald-400 font-bold block">
+                            স্থানান্তরের পর: <strong className="text-emerald-900 dark:text-emerald-100">{resultingSeller} pcs</strong>
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Form */}
+                      <form onSubmit={handleExecuteApproval} className="space-y-4">
+                        <div>
+                          <label className="block text-xs font-black text-gray-800 dark:text-emerald-200 mb-1.5">
+                            {isBangla ? 'অনুমোদিত স্থানান্তরের পরিমাণ (pcs) *' : 'Approved Transfer Quantity (pcs) *'}
+                          </label>
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="number"
+                              required
+                              min="1"
+                              max={currentAdminStock}
+                              value={approvalTransferQty}
+                              onChange={(e) => setApprovalTransferQty(Number(e.target.value))}
+                              className={`w-full px-4 py-3 rounded-2xl bg-white dark:bg-black/50 border text-base font-black focus:outline-none focus:ring-2 ${
+                                isOverStock
+                                  ? 'border-red-500 focus:ring-red-400 text-red-600'
+                                  : 'border-emerald-300 dark:border-emerald-800 focus:ring-emerald-500 text-emerald-950 dark:text-emerald-100'
+                              }`}
+                            />
+                            <div className="flex gap-1">
+                              {[10, 20, 30, 50].map((presetQty) => (
+                                <button
+                                  type="button"
+                                  key={presetQty}
+                                  onClick={() => setApprovalTransferQty(presetQty)}
+                                  disabled={presetQty > currentAdminStock}
+                                  className={`px-2.5 py-3 rounded-xl text-xs font-black transition-all ${
+                                    approvalTransferQty === presetQty
+                                      ? 'bg-brand-900 text-white shadow-sm'
+                                      : 'bg-gray-100 dark:bg-emerald-950 hover:bg-gray-200 text-gray-700 dark:text-emerald-300'
+                                  } ${presetQty > currentAdminStock ? 'opacity-40 cursor-not-allowed' : ''}`}
+                                >
+                                  +{presetQty}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                          {isOverStock && (
+                            <p className="text-xs text-red-600 font-bold mt-1">
+                              ⚠️ এডমিনের কাছে মাত্র {currentAdminStock} টি স্টক আছে! {transferQty} টি দেওয়া সম্ভব নয়।
+                            </p>
+                          )}
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-bold text-gray-700 dark:text-emerald-300 mb-1">
+                            {isBangla ? 'এডমিন নোট (সেলার দেখতে পাবে)' : 'Admin Note for Seller'}
+                          </label>
+                          <input
+                            type="text"
+                            value={approvalAdminNote}
+                            onChange={(e) => setApprovalAdminNote(e.target.value)}
+                            className="w-full px-3.5 py-2.5 rounded-xl bg-gray-50 dark:bg-black/40 border border-gray-300 dark:border-emerald-900 text-xs text-gray-800 dark:text-emerald-100"
+                          />
+                        </div>
+
+                        <div className="flex items-center gap-3 pt-2">
+                          <button
+                            type="button"
+                            onClick={() => setSelectedStockRequestForApproval(null)}
+                            className="flex-1 py-3 px-4 rounded-2xl bg-gray-100 dark:bg-emerald-950 hover:bg-gray-200 text-gray-700 dark:text-emerald-300 font-bold text-xs"
+                          >
+                            {isBangla ? 'বাতিল' : 'Cancel'}
+                          </button>
+                          <button
+                            type="submit"
+                            disabled={isApprovingRequest || isOverStock || transferQty <= 0}
+                            className={`flex-1 py-3 px-4 rounded-2xl font-black text-xs text-white shadow-lg flex items-center justify-center gap-2 transition-all ${
+                              isApprovingRequest || isOverStock || transferQty <= 0
+                                ? 'bg-gray-400 cursor-not-allowed'
+                                : 'bg-gradient-to-r from-emerald-600 via-brand-800 to-emerald-900 hover:from-emerald-700 hover:to-brand-950'
+                            }`}
+                          >
+                            {isApprovingRequest ? (
+                              <>
+                                <RefreshCw className="w-4 h-4 animate-spin" />
+                                <span>{isBangla ? 'অনুমোদন হচ্ছে...' : 'Approving...'}</span>
+                              </>
+                            ) : (
+                              <>
+                                <CheckCircle2 className="w-4 h-4" />
+                                <span>{isBangla ? 'অনুমোদন ও স্টক হস্তান্তর করুন' : 'Confirm & Transfer'}</span>
+                              </>
+                            )}
+                          </button>
+                        </div>
+                      </form>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* ❌ REJECT REQUEST MODAL */}
+              {requestRejectModal.isOpen && requestRejectModal.request && (
+                <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
+                  <div className="bg-white dark:bg-[#112318] rounded-3xl p-6 max-w-md w-full border border-rose-300 dark:border-rose-900 shadow-2xl space-y-4">
+                    <div className="flex items-center justify-between border-b border-gray-200 dark:border-emerald-900/60 pb-3">
+                      <h4 className="text-base font-black text-rose-600 dark:text-rose-400 flex items-center gap-2">
+                        <XCircle className="w-5 h-5" />
+                        <span>{isBangla ? 'স্টক রিকোয়েস্ট বাতিলকরণ' : 'Reject Stock Request'}</span>
+                      </h4>
+                      <button
+                        type="button"
+                        onClick={() => setRequestRejectModal({ isOpen: false, request: null, reason: '' })}
+                        className="p-1.5 rounded-xl hover:bg-gray-100 dark:hover:bg-emerald-950 text-gray-500"
+                      >
+                        <X className="w-5 h-5" />
+                      </button>
+                    </div>
+
+                    <p className="text-xs text-gray-600 dark:text-emerald-300">
+                      আপনি কি নিশ্চিত যে <strong>"{requestRejectModal.request.productName}"</strong> পণ্যের স্টক রিকোয়েস্টটি বাতিল করতে চান?
+                    </p>
+
+                    <form onSubmit={handleExecuteRejection} className="space-y-4">
+                      <div>
+                        <label className="block text-xs font-bold text-gray-700 dark:text-emerald-300 mb-1">
+                          {isBangla ? 'বাতিলের কারণ (সেলার দেখতে পাবে) *' : 'Rejection Reason *'}
+                        </label>
+                        <textarea
+                          rows={3}
+                          required
+                          placeholder="যেমন: অ্যাডমিন মাস্টার স্টকে এই মুহূর্তে পর্যাপ্ত পণ্য মজুদ নেই / সাপ্লাই আসার অপেক্ষায় রয়েছে।"
+                          value={requestRejectModal.reason}
+                          onChange={(e) => setRequestRejectModal({ ...requestRejectModal, reason: e.target.value })}
+                          className="w-full px-3.5 py-2.5 rounded-xl bg-gray-50 dark:bg-black/40 border border-gray-300 dark:border-emerald-900 text-xs text-gray-800 dark:text-emerald-100"
+                        />
+                      </div>
+
+                      <div className="flex items-center gap-3">
+                        <button
+                          type="button"
+                          onClick={() => setRequestRejectModal({ isOpen: false, request: null, reason: '' })}
+                          className="flex-1 py-2.5 rounded-xl bg-gray-100 dark:bg-emerald-950 text-xs font-bold text-gray-700 dark:text-emerald-300"
+                        >
+                          {isBangla ? 'বাতিল' : 'Cancel'}
+                        </button>
+                        <button
+                          type="submit"
+                          disabled={isRejectingRequest}
+                          className="flex-1 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-black shadow-md flex items-center justify-center gap-1.5"
+                        >
+                          {isRejectingRequest ? 'বাতিল হচ্ছে...' : 'বাতিল নিশ্চিত করুন'}
+                        </button>
+                      </div>
+                    </form>
+                  </div>
+                </div>
               )}
 
               {/* ✏️ Edit Product Modal */}
@@ -2643,7 +3626,7 @@ export default function AdminDashboardPage() {
                           <Edit className="w-5 h-5 text-brand-900 dark:text-emerald-400" />
                           <span>{isBangla ? 'পণ্য সম্পাদনা করুন' : 'Edit Product'}</span>
                         </h3>
-                        <p className="text-xs text-gray-500">ID: #{editingProd.id}</p>
+                        <p className="text-xs text-gray-500">ID: #{editingProd.id || editingProd._id?.slice(-6)}</p>
                       </div>
                       <button
                         onClick={() => setEditingProd(null)}
@@ -2710,23 +3693,41 @@ export default function AdminDashboardPage() {
                         </div>
                       </div>
 
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      {/* Stock Inputs: Admin Master Stock vs Seller Stock */}
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 p-4 rounded-2xl bg-blue-50/40 dark:bg-blue-950/20 border border-blue-200/50 dark:border-blue-900/40">
                         <div>
-                          <label className="block text-xs font-bold mb-1">Stock Quantity</label>
+                          <label className="block text-xs font-black text-blue-900 dark:text-blue-300 mb-1">
+                            👑 {isBangla ? 'অ্যাডমিন মাস্টার স্টক' : 'Admin Master Stock'}
+                          </label>
                           <input
                             type="number"
-                            value={editingProd.stock_quantity || 0}
-                            onChange={(e) => setEditingProd({ ...editingProd, stock_quantity: Number(e.target.value) })}
-                            className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-black/30 border border-gray-300 dark:border-emerald-900 rounded-xl text-xs sm:text-sm"
+                            min="0"
+                            value={editingProd.admin_stock !== undefined ? editingProd.admin_stock : (editingProd.adminStock !== undefined ? editingProd.adminStock : 70)}
+                            onChange={(e) => setEditingProd({ ...editingProd, admin_stock: Number(e.target.value) })}
+                            className="w-full px-3.5 py-2.5 bg-white dark:bg-black/40 border border-blue-300 dark:border-blue-900 rounded-xl text-xs sm:text-sm font-black text-blue-900 dark:text-blue-200"
                           />
                         </div>
+
                         <div>
-                          <label className="block text-xs font-bold mb-1">SKU</label>
+                          <label className="block text-xs font-black text-emerald-900 dark:text-emerald-300 mb-1">
+                            🏪 {isBangla ? 'সেলার কারেন্ট স্টক' : 'Seller Current Stock'}
+                          </label>
+                          <input
+                            type="number"
+                            min="0"
+                            value={editingProd.stock_quantity !== undefined ? editingProd.stock_quantity : (editingProd.stock || 0)}
+                            onChange={(e) => setEditingProd({ ...editingProd, stock_quantity: Number(e.target.value) })}
+                            className="w-full px-3.5 py-2.5 bg-white dark:bg-black/40 border border-emerald-300 dark:border-emerald-900 rounded-xl text-xs sm:text-sm font-black text-emerald-900 dark:text-emerald-200"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-bold mb-1">SKU Code</label>
                           <input
                             type="text"
                             value={editingProd.sku || ''}
                             onChange={(e) => setEditingProd({ ...editingProd, sku: e.target.value })}
-                            className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-black/30 border border-gray-300 dark:border-emerald-900 rounded-xl text-xs sm:text-sm"
+                            className="w-full px-3.5 py-2.5 bg-white dark:bg-black/40 border border-gray-300 dark:border-emerald-900 rounded-xl text-xs sm:text-sm"
                           />
                         </div>
                       </div>
@@ -2754,7 +3755,7 @@ export default function AdminDashboardPage() {
                         <button
                           type="button"
                           onClick={() => setEditingProd(null)}
-                          className="px-5 py-2.5 rounded-xl border border-gray-300 dark:border-emerald-900 text-xs font-bold hover:bg-gray-100"
+                          className="px-5 py-2.5 rounded-xl border border-gray-300 dark:border-emerald-900 text-xs font-bold hover:bg-gray-100 dark:hover:bg-black/40"
                         >
                           {isBangla ? 'বাতিল' : 'Cancel'}
                         </button>
@@ -2769,6 +3770,187 @@ export default function AdminDashboardPage() {
                   </div>
                 </div>
               )}
+
+              {/* 🔄 STOCK TRANSFER MODAL (Admin Master Stock -> Seller Stock Transfer) */}
+              {stockTransferModal.isOpen && stockTransferModal.product && (() => {
+                const prod = stockTransferModal.product;
+                const adminStock = Number(prod.admin_stock !== undefined ? prod.admin_stock : (prod.adminStock !== undefined ? prod.adminStock : 70));
+                const sellerStock = Number(prod.stock_quantity !== undefined ? prod.stock_quantity : (prod.stock || 0));
+                const transferQty = Number(stockTransferModal.quantity) || 0;
+                const remainingAdmin = Math.max(0, adminStock - transferQty);
+                const resultingSeller = sellerStock + transferQty;
+                const isOverStock = transferQty > adminStock;
+
+                return (
+                  <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200">
+                    <div className="bg-white dark:bg-[#0e2115] rounded-3xl p-6 sm:p-8 max-w-lg w-full border border-emerald-500/30 dark:border-emerald-500/40 shadow-2xl space-y-5">
+                      
+                      {/* Modal Header */}
+                      <div className="flex items-center justify-between border-b border-gray-200 dark:border-emerald-900/60 pb-3">
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-emerald-600 to-brand-900 flex items-center justify-center text-white shadow-md">
+                            <ArrowLeftRight className="w-5 h-5" />
+                          </div>
+                          <div>
+                            <h3 className="text-base sm:text-lg font-black text-gray-900 dark:text-emerald-100">
+                              {isBangla ? 'স্টক স্থানান্তর উইন্ডো' : 'Stock Transfer Portal'}
+                            </h3>
+                            <p className="text-[11px] text-emerald-700 dark:text-emerald-400 font-semibold">
+                              {isBangla ? 'অ্যাডমিন মাস্টার স্টক থেকে সেলারকে স্টক প্রদান' : 'Admin Master Stock -> Seller Allocated Stock'}
+                            </p>
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => setStockTransferModal({ ...stockTransferModal, isOpen: false, product: null })}
+                          className="p-1.5 rounded-xl hover:bg-gray-100 dark:hover:bg-emerald-950 text-gray-500 dark:text-emerald-400"
+                        >
+                          <X className="w-5 h-5" />
+                        </button>
+                      </div>
+
+                      {/* Product Preview Card */}
+                      <div className="flex items-center gap-3.5 p-3 rounded-2xl bg-gray-50 dark:bg-black/40 border border-gray-200/80 dark:border-emerald-950">
+                        <img
+                          src={prod.thumbnail || prod.images?.[0]}
+                          alt={prod.name}
+                          className="w-14 h-14 rounded-xl object-cover border border-emerald-900/20"
+                        />
+                        <div className="flex-1 min-w-0">
+                          <h4 className="text-xs sm:text-sm font-black text-gray-900 dark:text-emerald-100 truncate">
+                            {prod.name_bn || prod.name}
+                          </h4>
+                          <div className="flex items-center gap-2 mt-1 text-[11px] text-gray-500 dark:text-emerald-400">
+                            <span>মূল্য: ৳{prod.price}</span>
+                            <span>•</span>
+                            <span className="truncate">সেলার: {stockTransferModal.sellerName || 'সুন্দরবন অর্গানিক ফার্মস'}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Live Before & After Transfer Visualizer */}
+                      <div className="grid grid-cols-2 gap-3 p-3.5 rounded-2xl bg-gradient-to-br from-emerald-50/70 to-blue-50/70 dark:from-[#09170e] dark:to-[#0a1824] border border-emerald-200/70 dark:border-emerald-800/40">
+                        {/* Admin Stock Column */}
+                        <div className="space-y-1 text-center">
+                          <span className="text-[10px] font-black uppercase text-blue-800 dark:text-blue-300">
+                            👑 অ্যাডমিন স্টক
+                          </span>
+                          <div className="text-xl font-black text-blue-900 dark:text-blue-100">
+                            {adminStock} pcs
+                          </div>
+                          <span className="text-[10px] text-blue-600 dark:text-blue-400 font-bold block">
+                            স্থানান্তরের পর: <strong className={isOverStock ? 'text-red-500' : 'text-blue-900 dark:text-blue-100'}>{remainingAdmin} pcs</strong>
+                          </span>
+                        </div>
+
+                        {/* Seller Stock Column */}
+                        <div className="space-y-1 text-center border-l border-emerald-200 dark:border-emerald-900/60 pl-3">
+                          <span className="text-[10px] font-black uppercase text-emerald-800 dark:text-emerald-300">
+                            🏪 সেলার স্টক
+                          </span>
+                          <div className={`text-xl font-black ${sellerStock <= 0 ? 'text-red-600' : 'text-emerald-900 dark:text-emerald-100'}`}>
+                            {sellerStock} pcs
+                          </div>
+                          <span className="text-[10px] text-emerald-700 dark:text-emerald-400 font-bold block">
+                            স্থানান্তরের পর: <strong className="text-emerald-900 dark:text-emerald-100">{resultingSeller} pcs</strong>
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Transfer Form */}
+                      <form onSubmit={handleExecuteStockTransfer} className="space-y-4">
+                        <div>
+                          <label className="block text-xs font-black text-gray-800 dark:text-emerald-200 mb-1.5">
+                            {isBangla ? 'কত পিছ স্টক সেলারকে হস্তান্তর করবেন?' : 'Quantity to Transfer to Seller (pcs) *'}
+                          </label>
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="number"
+                              required
+                              min="1"
+                              max={adminStock}
+                              value={stockTransferModal.quantity}
+                              onChange={(e) => setStockTransferModal({ ...stockTransferModal, quantity: Number(e.target.value) })}
+                              className={`w-full px-4 py-3 rounded-2xl bg-white dark:bg-black/50 border text-base font-black focus:outline-none focus:ring-2 ${
+                                isOverStock
+                                  ? 'border-red-500 focus:ring-red-400 text-red-600'
+                                  : 'border-emerald-300 dark:border-emerald-800 focus:ring-emerald-500 text-emerald-950 dark:text-emerald-100'
+                              }`}
+                              placeholder="যেমন: ৩০"
+                            />
+                            {/* Preset Buttons */}
+                            <div className="flex gap-1">
+                              {[10, 20, 30, 50].map((presetQty) => (
+                                <button
+                                  type="button"
+                                  key={presetQty}
+                                  onClick={() => setStockTransferModal({ ...stockTransferModal, quantity: presetQty })}
+                                  disabled={presetQty > adminStock}
+                                  className={`px-2.5 py-3 rounded-xl text-xs font-black transition-all ${
+                                    stockTransferModal.quantity === presetQty
+                                      ? 'bg-brand-900 text-white shadow-sm'
+                                      : 'bg-gray-100 dark:bg-emerald-950 hover:bg-gray-200 text-gray-700 dark:text-emerald-300'
+                                  } ${presetQty > adminStock ? 'opacity-40 cursor-not-allowed' : ''}`}
+                                >
+                                  +{presetQty}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                          {isOverStock && (
+                            <p className="text-xs text-red-600 font-bold mt-1">
+                              ⚠️ অ্যাডমিনের কাছে মাত্র {adminStock} টি স্টক আছে! {transferQty} টি দেওয়া সম্ভব নয়।
+                            </p>
+                          )}
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-bold text-gray-700 dark:text-emerald-300 mb-1">
+                            {isBangla ? 'স্থানান্তর নোট (ঐচ্ছিক)' : 'Transfer Note (Optional)'}
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="যেমন: রেগুলার সাপ্লাই হস্তান্তর / অনুরোধ অনুযায়ী"
+                            value={stockTransferModal.note}
+                            onChange={(e) => setStockTransferModal({ ...stockTransferModal, note: e.target.value })}
+                            className="w-full px-3.5 py-2.5 rounded-xl bg-gray-50 dark:bg-black/40 border border-gray-300 dark:border-emerald-900 text-xs text-gray-800 dark:text-emerald-100"
+                          />
+                        </div>
+
+                        <div className="flex items-center gap-3 pt-2">
+                          <button
+                            type="button"
+                            onClick={() => setStockTransferModal({ ...stockTransferModal, isOpen: false, product: null })}
+                            className="flex-1 py-3 px-4 rounded-2xl bg-gray-100 dark:bg-emerald-950 hover:bg-gray-200 text-gray-700 dark:text-emerald-300 font-bold text-xs transition-colors"
+                          >
+                            {isBangla ? 'বাতিল' : 'Cancel'}
+                          </button>
+                          <button
+                            type="submit"
+                            disabled={isTransferringStock || isOverStock || transferQty <= 0}
+                            className={`flex-1 py-3 px-4 rounded-2xl font-black text-xs text-white shadow-lg flex items-center justify-center gap-2 transition-all ${
+                              isTransferringStock || isOverStock || transferQty <= 0
+                                ? 'bg-gray-400 cursor-not-allowed'
+                                : 'bg-gradient-to-r from-emerald-600 via-brand-800 to-emerald-900 hover:from-emerald-700 hover:to-brand-950 shadow-emerald-900/30 active:scale-98'
+                            }`}
+                          >
+                            {isTransferringStock ? (
+                              <>
+                                <RefreshCw className="w-4 h-4 animate-spin" />
+                                <span>{isBangla ? 'স্থানান্তর হচ্ছে...' : 'Transferring...'}</span>
+                              </>
+                            ) : (
+                              <>
+                                <CheckCircle2 className="w-4 h-4" />
+                                <span>{isBangla ? 'স্থানান্তর সম্পন্ন করুন' : 'Confirm Transfer'}</span>
+                              </>
+                            )}
+                          </button>
+                        </div>
+                        </form>
+                      </div>
+                    </div>
+                  );
+                })()}
             </div>
           )}
 
@@ -6141,6 +7323,239 @@ export default function AdminDashboardPage() {
 
         </main>
       </div>
+
+      {/* 📢 APPROVAL MODAL FOR SELLER STOCK REQUEST */}
+      {selectedStockRequestForApproval && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200 overflow-y-auto">
+          <div className="bg-white dark:bg-[#112318] text-gray-900 dark:text-emerald-50 rounded-3xl max-w-lg w-full p-6 sm:p-8 space-y-5 shadow-2xl border-2 border-emerald-500 my-8">
+            <div className="flex items-center justify-between border-b pb-3 border-gray-200 dark:border-emerald-900">
+              <div>
+                <h4 className="font-black text-base sm:text-lg flex items-center gap-2 text-emerald-950 dark:text-emerald-200">
+                  <span>✅</span>
+                  <span>{isBangla ? 'স্টক রিকোয়েস্ট অনুমোদন ও হস্তান্তর' : 'Approve Restock & Transfer Stock'}</span>
+                </h4>
+                <p className="text-xs text-gray-500 dark:text-emerald-400">
+                  {isBangla ? 'অ্যাডমিন মাস্টার স্টক থেকে কেটে সেলারের দোকানে স্টক যুক্ত করা হবে।' : 'Stock will be deducted from Master Admin and added to Seller inventory in MongoDB.'}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedStockRequestForApproval(null)}
+                className="p-1.5 rounded-xl hover:bg-gray-100 dark:hover:bg-emerald-950 text-gray-500"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Product Summary Box */}
+            <div className="flex items-center gap-3 p-3.5 rounded-2xl bg-emerald-50/70 dark:bg-black/30 border border-emerald-200 dark:border-emerald-900/60">
+              <img
+                src={selectedStockRequestForApproval.productImage || 'https://images.unsplash.com/photo-1587049352846-4a222e784d38?auto=format&fit=crop&w=150&q=80'}
+                alt={selectedStockRequestForApproval.productName}
+                className="w-14 h-14 rounded-xl object-cover border border-emerald-300 flex-shrink-0"
+              />
+              <div className="min-w-0 flex-1">
+                <span className="text-[10px] font-black text-emerald-700 uppercase block">ID: #{selectedStockRequestForApproval.id}</span>
+                <h5 className="font-extrabold text-sm text-gray-900 dark:text-emerald-100 truncate">
+                  {selectedStockRequestForApproval.productName}
+                </h5>
+                <p className="text-xs text-amber-700 dark:text-amber-400 font-bold mt-0.5">
+                  🏪 সেলার: {selectedStockRequestForApproval.sellerName || 'সেলার'}
+                </p>
+              </div>
+            </div>
+
+            {/* Before / After Preview Calculation */}
+            {(() => {
+              const matchingProd = productsList.find(p => String(p.id || p._id) === String(selectedStockRequestForApproval.productId));
+              const curAdminStock = matchingProd 
+                ? Number(matchingProd.admin_stock !== undefined ? matchingProd.admin_stock : (matchingProd.adminStock !== undefined ? matchingProd.adminStock : 70))
+                : (selectedStockRequestForApproval.adminStockAtRequest || 70);
+              const curSellerStock = matchingProd
+                ? Number(matchingProd.stock_quantity !== undefined ? matchingProd.stock_quantity : (matchingProd.stock || 0))
+                : (selectedStockRequestForApproval.sellerStockAtRequest || 0);
+              const qty = Number(approvalTransferQty) || 0;
+              const nextAdminStock = Math.max(0, curAdminStock - qty);
+              const nextSellerStock = curSellerStock + qty;
+
+              return (
+                <div className="space-y-4">
+                  {/* Stock Transfer Math Card */}
+                  <div className="grid grid-cols-2 gap-3 p-3.5 rounded-2xl bg-gray-50 dark:bg-black/40 border border-gray-200 dark:border-emerald-950 text-xs">
+                    <div className="space-y-1">
+                      <span className="text-gray-500 block font-bold">👑 এডমিন স্টক পরিবর্তন:</span>
+                      <div className="flex items-center gap-2 font-black">
+                        <span className="text-blue-600">{curAdminStock} টি</span>
+                        <span>→</span>
+                        <span className="text-blue-800 dark:text-blue-300 font-black">{nextAdminStock} টি</span>
+                        <span className="text-[10px] text-red-500 font-bold">(-{qty})</span>
+                      </div>
+                    </div>
+                    <div className="space-y-1">
+                      <span className="text-gray-500 block font-bold">🏪 সেলার স্টক পরিবর্তন:</span>
+                      <div className="flex items-center gap-2 font-black">
+                        <span className="text-amber-600">{curSellerStock} টি</span>
+                        <span>→</span>
+                        <span className="text-emerald-700 dark:text-emerald-300 font-black">{nextSellerStock} টি</span>
+                        <span className="text-[10px] text-emerald-600 font-bold">(+{qty})</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Quantity Input with Presets */}
+                  <div className="space-y-2">
+                    <label className="block text-xs font-bold text-gray-700 dark:text-emerald-300">
+                      {isBangla ? 'অনুমোদিত স্থানান্তরের পরিমাণ (পিস) *' : 'Approved Transfer Quantity (Pieces) *'}
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      max={curAdminStock}
+                      required
+                      value={approvalTransferQty}
+                      onChange={(e) => setApprovalTransferQty(Math.max(1, parseInt(e.target.value) || 1))}
+                      className="w-full px-4 py-3 bg-white dark:bg-black/40 border border-gray-300 dark:border-emerald-900 rounded-2xl text-base font-black text-gray-900 dark:text-emerald-50 focus:outline-none focus:border-emerald-600"
+                    />
+
+                    {/* Quick Preset Buttons */}
+                    <div className="flex items-center gap-2 pt-1 flex-wrap">
+                      <span className="text-[11px] text-gray-400 font-bold">{isBangla ? 'কুইক সিলেক্ট:' : 'Quick Select:'}</span>
+                      {[10, 20, 30, 50, 100].map((q) => (
+                        <button
+                          key={q}
+                          type="button"
+                          onClick={() => setApprovalTransferQty(q)}
+                          className={`px-3 py-1 rounded-xl text-xs font-black transition-all ${
+                            approvalTransferQty === q
+                              ? 'bg-emerald-600 text-white shadow-sm scale-105'
+                              : 'bg-gray-100 dark:bg-black/40 text-gray-700 dark:text-emerald-300 hover:bg-gray-200'
+                          }`}
+                        >
+                          +{q}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Admin Note */}
+                  <div className="space-y-1.5">
+                    <label className="block text-xs font-bold text-gray-700 dark:text-emerald-300">
+                      {isBangla ? 'এডমিন নোট (সেলার ড্যাশবোর্ডে প্রদর্শিত হবে)' : 'Admin Approval Note'}
+                    </label>
+                    <input
+                      type="text"
+                      placeholder={isBangla ? 'যেমন: স্টক অনুমোদন ও সফলভাবে স্থানান্তর করা হয়েছে।' : 'e.g. Approved and transferred from master stock.'}
+                      value={approvalAdminNote}
+                      onChange={(e) => setApprovalAdminNote(e.target.value)}
+                      className="w-full px-4 py-2.5 bg-white dark:bg-black/40 border border-gray-300 dark:border-emerald-900 rounded-2xl text-xs sm:text-sm font-medium focus:outline-none focus:border-emerald-600"
+                    />
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* Actions */}
+            <div className="flex items-center justify-end gap-3 pt-3 border-t border-gray-100 dark:border-emerald-950">
+              <button
+                type="button"
+                onClick={() => setSelectedStockRequestForApproval(null)}
+                className="px-5 py-2.5 border border-gray-300 dark:border-emerald-900 rounded-2xl text-xs font-bold hover:bg-gray-100 dark:hover:bg-emerald-950 text-gray-700 dark:text-emerald-200"
+              >
+                {isBangla ? 'বাতিল' : 'Cancel'}
+              </button>
+              <button
+                type="button"
+                disabled={isApprovingRequest}
+                onClick={handleExecuteApproval}
+                className="px-6 py-2.5 bg-gradient-to-r from-emerald-600 via-brand-900 to-teal-700 hover:from-emerald-700 hover:to-brand-950 text-white font-black text-xs sm:text-sm rounded-2xl shadow-lg transition-all flex items-center gap-2 active:scale-95 disabled:opacity-50"
+              >
+                {isApprovingRequest ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                    <span>{isBangla ? 'হস্তান্তর হচ্ছে...' : 'Transferring...'}</span>
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle2 className="w-4 h-4" />
+                    <span>{isBangla ? '✅ অনুমোদন ও স্টক হস্তান্তর সম্পন্ন করুন' : 'Confirm & Transfer Stock'}</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ❌ REJECT MODAL FOR SELLER STOCK REQUEST */}
+      {requestRejectModal.isOpen && requestRejectModal.request && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200 overflow-y-auto">
+          <div className="bg-white dark:bg-[#112318] text-gray-900 dark:text-emerald-50 rounded-3xl max-w-md w-full p-6 space-y-4 shadow-2xl border-2 border-rose-400 my-8">
+            <div className="flex items-center justify-between border-b pb-3 border-gray-200 dark:border-emerald-900">
+              <div>
+                <h4 className="font-black text-base text-rose-600 dark:text-rose-400 flex items-center gap-2">
+                  <span>❌</span>
+                  <span>{isBangla ? 'স্টক রিকোয়েস্ট বাতিল ও ডিলিট' : 'Reject & Delete Request'}</span>
+                </h4>
+                <p className="text-[11px] text-gray-400 mt-0.5">
+                  {isBangla ? 'বাতিল করলে এই রিকোয়েস্টটি তালিকা থেকে মুছে যাবে এবং সেলারকে নোটিফিকেশন দেওয়া হবে।' : 'Request will be removed from list and seller will be notified.'}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setRequestRejectModal({ isOpen: false, request: null, reason: '' })}
+                className="p-1.5 rounded-xl hover:bg-gray-100 text-gray-500"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-3 bg-rose-50 dark:bg-rose-950/40 rounded-2xl border border-rose-200 dark:border-rose-900 text-xs space-y-1">
+              <p className="text-gray-700 dark:text-emerald-200">
+                পণ্য: <strong className="text-rose-700 dark:text-rose-300">{requestRejectModal.request.productName}</strong>
+              </p>
+              <p className="text-gray-700 dark:text-emerald-200">
+                সেলার: <strong>{requestRejectModal.request.sellerName || 'সেলার'}</strong> ({requestRejectModal.request.requestedQty} টি স্টক)
+              </p>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="block text-xs font-bold text-gray-700 dark:text-emerald-300">
+                {isBangla ? 'বাতিলের কারণ লিখুন (সেলার দেখতে পাবেন) *' : 'Reason for Rejection *'}
+              </label>
+              <textarea
+                rows={2}
+                required
+                placeholder={isBangla ? 'যেমন: মাস্টার স্টকে বর্তমানে পর্যাপ্ত পণ্য নেই।' : 'e.g. Master stock out of quantity currently.'}
+                value={requestRejectModal.reason}
+                onChange={(e) => setRequestRejectModal({ ...requestRejectModal, reason: e.target.value })}
+                className="w-full px-4 py-2.5 bg-gray-50 dark:bg-black/40 border border-gray-300 dark:border-emerald-900 rounded-2xl text-xs sm:text-sm font-medium focus:outline-none focus:border-rose-500"
+              />
+            </div>
+
+            <div className="flex items-center justify-end gap-3 pt-3 border-t border-gray-100 dark:border-emerald-950">
+              <button
+                type="button"
+                onClick={() => setRequestRejectModal({ isOpen: false, request: null, reason: '' })}
+                className="px-4 py-2 border border-gray-300 rounded-xl text-xs font-bold"
+              >
+                {isBangla ? 'ফিরে যান' : 'Back'}
+              </button>
+              <button
+                type="button"
+                disabled={isRejectingRequest}
+                onClick={handleExecuteRejection}
+                className="px-5 py-2.5 bg-gradient-to-r from-red-600 to-rose-700 hover:from-red-700 hover:to-rose-800 text-white font-black text-xs rounded-xl shadow-md transition-all flex items-center gap-1.5 disabled:opacity-50 active:scale-95"
+              >
+                {isRejectingRequest ? (
+                  <span>{isBangla ? 'বাতিল হচ্ছে...' : 'Rejecting...'}</span>
+                ) : (
+                  <span>{isBangla ? '❌ বাতিল ও লিস্ট থেকে ডিলিট করুন' : 'Confirm Reject & Delete'}</span>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );

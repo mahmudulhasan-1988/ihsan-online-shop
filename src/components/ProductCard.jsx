@@ -15,9 +15,9 @@ export default function ProductCard({ product }) {
     hasVariants ? product.variants[0] : null
   );
 
-  const stockCount = product.stock_quantity !== undefined 
+  const stockCount = product.stock_quantity != null 
     ? Number(product.stock_quantity) 
-    : (product.stock !== undefined ? Number(product.stock) : 50);
+    : (product.stock != null ? Number(product.stock) : 0);
   const isOutOfStock = stockCount <= 0;
 
   const currentPrice = selectedVariant ? selectedVariant.price : product.price;

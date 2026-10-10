@@ -45,7 +45,8 @@ import {
   PieChart,
   TrendingUp,
   Activity,
-  Settings
+  Settings,
+  ArrowLeftRight
 } from 'lucide-react';
 import { 
   getProducts,
@@ -53,6 +54,8 @@ import {
   updateProduct,
   deleteProduct, 
   createProduct, 
+  requestProductRestock,
+  getStockRequests,
   getOrders,
   updateOrderStatus, 
   getSellerWithdrawals, 
@@ -133,6 +136,7 @@ export default function SellerDashboardPage() {
   const [myOrders, setMyOrders] = useState([]);
   const [myWithdrawals, setMyWithdrawals] = useState([]);
   const [myReviews, setMyReviews] = useState([]);
+  const [myStockRequests, setMyStockRequests] = useState([]);
   const [orderSubTab, setOrderSubTab] = useState('all');
   const [selectedOrderForSlip, setSelectedOrderForSlip] = useState(null);
   const [replyTextMap, setReplyTextMap] = useState({});
@@ -176,18 +180,65 @@ export default function SellerDashboardPage() {
     is_bestseller: false,
   });
 
+  // State: Restock Request Modal (Seller -> Admin)
+  const [restockModal, setRestockModal] = useState({
+    isOpen: false,
+    product: null,
+    quantity: 30,
+    note: ''
+  });
+  const [isSendingRestock, setIsSendingRestock] = useState(false);
+
+  // 📢 Handler: Seller requests stock restock from Admin
+  const handleSendRestockRequest = async (e) => {
+    if (e?.preventDefault) e.preventDefault();
+    if (!restockModal.product) return;
+
+    setIsSendingRestock(true);
+    try {
+      const prodId = restockModal.product.id || restockModal.product._id;
+      const res = await requestProductRestock({
+        productId: prodId,
+        sellerId: user?.id || user?._id || restockModal.product.seller_id,
+        sellerName: sellerInfo.shop_name || sellerInfo.seller_name || user?.name || 'সুন্দরবন অর্গানিক ফার্মস',
+        requestedQty: Number(restockModal.quantity) || 30,
+        note: restockModal.note || 'সেলার শপ থেকে স্টক শেষ হওয়ায় অ্যাডমিন থেকে স্টক স্থানান্তরের অনুরোধ'
+      });
+
+      if (res?.success) {
+        showToast(
+          isBangla
+            ? '✅ অ্যাডমিনের কাছে স্টক স্থানান্তরের রিকোয়েস্ট সফলভাবে পাঠানো হয়েছে!'
+            : 'Stock restock request sent to Admin successfully!'
+        );
+        setRestockModal({ isOpen: false, product: null, quantity: 30, note: '' });
+        loadSellerData();
+      } else {
+        showToast(res?.message || (isBangla ? 'অনুরোধ পাঠাতে ব্যর্থ হয়েছে' : 'Failed to send request'), 'error');
+      }
+    } catch (err) {
+      console.error('Restock request error', err);
+      showToast(isBangla ? 'অনুরোধ পাঠাতে ত্রুটি হয়েছে' : 'Error sending request', 'error');
+    } finally {
+      setIsSendingRestock(false);
+    }
+  };
+
   const loadSellerData = async (showLoading = false) => {
     if (showLoading) setLoading(true);
     try {
       const sellerIdentifier = user?.id || user?._id || user?.email || user?.phone || 'seller';
-      const [prodRes, ordRes, withRes, revRes, sellerProfileRes, catRes] = await Promise.all([
+      const [prodRes, ordRes, withRes, revRes, sellerProfileRes, catRes, stockReqRes] = await Promise.all([
         getProducts({ sellerId: sellerIdentifier, limit: 200 }),
         getOrders(),
         getSellerWithdrawals(),
         getReviews(),
         getSellerProfile(sellerIdentifier),
         getCategories(),
+        getStockRequests({ sellerId: sellerIdentifier }),
       ]);
+
+      setMyStockRequests(stockReqRes?.data || []);
 
       const allProds = prodRes?.data || [];
       
@@ -300,12 +351,23 @@ export default function SellerDashboardPage() {
     if (user && (user.role === 'seller' || user.role === 'admin')) {
       loadSellerData(true);
 
-      // Silent Auto Data Refresh every 45 seconds for seller orders & stock live sync without buffering
+      // Auto Data Refresh & Multi-tab sync
+      const handleSync = () => {
+        loadSellerData(false);
+      };
+
+      window.addEventListener('ihsan_stock_request_updated', handleSync);
+      window.addEventListener('storage', handleSync);
+
       const interval = setInterval(() => {
         loadSellerData(false);
-      }, 45000);
+      }, 15000);
 
-      return () => clearInterval(interval);
+      return () => {
+        clearInterval(interval);
+        window.removeEventListener('ihsan_stock_request_updated', handleSync);
+        window.removeEventListener('storage', handleSync);
+      };
     }
   }, [user]);
 
@@ -2183,6 +2245,66 @@ export default function SellerDashboardPage() {
                 </div>
               )}
 
+              {/* 📢 SELLER'S RESTOCK REQUESTS STATUS STRIP */}
+              {myStockRequests.length > 0 && (
+                <div className="bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-950/30 dark:to-[#112318] p-5 rounded-3xl border border-amber-300 dark:border-amber-900/60 shadow-sm space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-sm font-black text-amber-950 dark:text-amber-200 flex items-center gap-2">
+                      <span>📢 {isBangla ? 'এডমিন থেকে আপনার স্টক রিকোয়েস্টের স্ট্যাটাস' : 'Your Restock Requests to Admin'}</span>
+                      <span className="px-2 py-0.5 rounded-full bg-amber-200 dark:bg-amber-900 text-amber-950 dark:text-amber-100 text-[10px] font-black">
+                        {myStockRequests.length} {isBangla ? 'টি অনুরোধ' : 'Requests'}
+                      </span>
+                    </h4>
+                    <button
+                      type="button"
+                      onClick={loadSellerData}
+                      className="text-[11px] text-amber-800 dark:text-amber-300 font-bold hover:underline"
+                    >
+                      🔄 {isBangla ? 'রিফ্রেশ' : 'Refresh'}
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {myStockRequests.slice(0, 6).map((req) => (
+                      <div
+                        key={req.id || req._id}
+                        className="p-3.5 rounded-2xl bg-white dark:bg-black/40 border border-amber-200/80 dark:border-amber-900/40 shadow-xs flex items-center justify-between gap-3"
+                      >
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <img
+                            src={req.productImage || 'https://images.unsplash.com/photo-1587049352846-4a222e784d38?auto=format&fit=crop&w=150&q=80'}
+                            alt={req.productName}
+                            className="w-11 h-11 rounded-xl object-cover border flex-shrink-0"
+                          />
+                          <div className="min-w-0">
+                            <h5 className="font-bold text-xs text-gray-900 dark:text-emerald-100 truncate">{req.productName}</h5>
+                            <span className="text-[10px] text-gray-500 block">রিকোয়েস্ট: {req.requestedQty} pcs</span>
+                          </div>
+                        </div>
+
+                        <div>
+                          {req.status === 'pending' && (
+                            <span className="px-2.5 py-1 rounded-full bg-amber-100 dark:bg-amber-950 text-amber-900 dark:text-amber-300 text-[10px] font-black border border-amber-300">
+                              অপেক্ষমান 🟡
+                            </span>
+                          )}
+                          {req.status === 'approved' && (
+                            <span className="px-2.5 py-1 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-900 dark:text-emerald-300 text-[10px] font-black border border-emerald-300">
+                              অনুমোদিত ✅ (+{req.transferredQty || req.requestedQty} pcs)
+                            </span>
+                          )}
+                          {req.status === 'rejected' && (
+                            <span className="px-2.5 py-1 rounded-full bg-rose-100 dark:bg-rose-950 text-rose-900 dark:text-rose-300 text-[10px] font-black border border-rose-300">
+                              বাতিল ❌
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* 🔍 SEARCH BAR & ALL CATEGORIES DROPDOWN TOOLBAR FOR MY STORE PRODUCTS */}
               <div className="bg-white dark:bg-[#112318] rounded-3xl p-5 border border-[#e0ebe2] dark:border-[#1d3b28] shadow-sm">
                 <div className="flex flex-col md:flex-row gap-3 items-center justify-between">
@@ -2391,6 +2513,28 @@ export default function SellerDashboardPage() {
                                   {p.is_bestseller && <span title="Bestseller">🔥</span>}
                                 </div>
                               </div>
+                            </div>
+
+                            {/* Stock Indicator & Restock Request Button */}
+                            <div className="pt-1">
+                              <button
+                                onClick={() => setRestockModal({
+                                  isOpen: true,
+                                  product: p,
+                                  quantity: 30,
+                                  note: `সেলার "${sellerInfo.shop_name || user?.name || 'সেলার'}" থেকে "${p.name_bn || p.name}" পণ্যের স্টক স্থানান্তরের অনুরোধ`
+                                })}
+                                className={`w-full py-2 px-2.5 rounded-xl font-black text-[11px] flex items-center justify-center gap-1.5 shadow-sm transition-all active:scale-95 ${
+                                  isOutOfStock
+                                    ? 'bg-gradient-to-r from-red-600 to-rose-700 hover:from-red-700 hover:to-rose-800 text-white shadow-red-500/20 animate-pulse'
+                                    : stockVal <= 10
+                                    ? 'bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-slate-950 font-black shadow-amber-500/20'
+                                    : 'bg-emerald-50 dark:bg-emerald-950/60 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 text-emerald-900 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800'
+                                }`}
+                              >
+                                <ArrowLeftRight className="w-3.5 h-3.5" />
+                                <span>{isBangla ? '📢 এডমিন থেকে স্টক রিকোয়েস্ট' : 'Request Stock from Admin'}</span>
+                              </button>
                             </div>
 
                             {/* Actions: Edit and Delete Buttons */}
@@ -2670,6 +2814,122 @@ export default function SellerDashboardPage() {
                           className="px-6 py-2 bg-amber-500 hover:bg-amber-600 text-brand-950 font-black text-xs rounded-xl shadow"
                         >
                           {isSavingProduct ? (isBangla ? 'আপডেট হচ্ছে...' : 'Saving...') : (isBangla ? 'পরিবর্তন সংরক্ষণ করুন' : 'Save Changes')}
+                        </button>
+                      </div>
+                    </form>
+                  </div>
+                </div>
+              )}
+
+              {/* 📢 RESTOCK REQUEST MODAL (Seller -> Admin) */}
+              {restockModal.isOpen && restockModal.product && (
+                <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200">
+                  <div className="bg-white dark:bg-[#0e2115] rounded-3xl p-6 sm:p-8 max-w-md w-full border border-emerald-500/30 dark:border-emerald-500/40 shadow-2xl space-y-4">
+                    <div className="flex items-center justify-between border-b border-gray-200 dark:border-emerald-900/60 pb-3">
+                      <div>
+                        <h3 className="text-base font-black text-gray-900 dark:text-emerald-100 flex items-center gap-2">
+                          <ArrowLeftRight className="w-5 h-5 text-amber-500" />
+                          <span>{isBangla ? 'অ্যাডমিন থেকে স্টক রিকোয়েস্ট' : 'Request Stock from Admin'}</span>
+                        </h3>
+                        <p className="text-[11px] text-gray-500 dark:text-emerald-400">
+                          {isBangla ? 'পণ্যটির স্টক শেষ হয়ে যাওয়ায় অ্যাডমিনকে জানান' : 'Notify admin for stock allocation'}
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => setRestockModal({ isOpen: false, product: null, quantity: 30, note: '' })}
+                        className="p-1.5 rounded-xl hover:bg-gray-100 dark:hover:bg-emerald-950 text-gray-500"
+                      >
+                        <X className="w-5 h-5" />
+                      </button>
+                    </div>
+
+                    <div className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-black/40 rounded-2xl border border-gray-200/80 dark:border-emerald-950">
+                      <img
+                        src={restockModal.product.thumbnail || restockModal.product.images?.[0]}
+                        alt={restockModal.product.name}
+                        className="w-12 h-12 rounded-xl object-cover border"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <h4 className="text-xs font-black text-gray-900 dark:text-emerald-100 truncate">
+                          {restockModal.product.name_bn || restockModal.product.name}
+                        </h4>
+                        <span className="text-[10px] text-red-600 font-bold block mt-0.5">
+                          🚨 {isBangla ? 'বর্তমান সেলার স্টক: 0 pcs (স্টক আউট)' : 'Current Seller Stock: 0 pcs (Out of Stock)'}
+                        </span>
+                      </div>
+                    </div>
+
+                    <form onSubmit={handleSendRestockRequest} className="space-y-3.5">
+                      <div>
+                        <label className="block text-xs font-bold text-gray-800 dark:text-emerald-200 mb-1">
+                          {isBangla ? 'কত পিছ স্টক প্রয়োজন? (pcs) *' : 'Requested Quantity *'}
+                        </label>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="number"
+                            required
+                            min="1"
+                            value={restockModal.quantity}
+                            onChange={(e) => setRestockModal({ ...restockModal, quantity: Number(e.target.value) })}
+                            className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-black/30 border border-gray-300 dark:border-emerald-900 rounded-xl text-xs font-black text-gray-900 dark:text-emerald-100"
+                            placeholder="30"
+                          />
+                          <div className="flex gap-1">
+                            {[10, 20, 30, 50].map((q) => (
+                              <button
+                                type="button"
+                                key={q}
+                                onClick={() => setRestockModal({ ...restockModal, quantity: q })}
+                                className={`px-2.5 py-2 rounded-xl text-xs font-bold ${
+                                  restockModal.quantity === q
+                                    ? 'bg-brand-900 text-white'
+                                    : 'bg-gray-100 dark:bg-emerald-950 text-gray-700 dark:text-emerald-300'
+                                }`}
+                              >
+                                +{q}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-gray-800 dark:text-emerald-200 mb-1">
+                          {isBangla ? 'নোট বা বার্তা (ঐচ্ছিক)' : 'Note (Optional)'}
+                        </label>
+                        <textarea
+                          rows={2}
+                          value={restockModal.note}
+                          onChange={(e) => setRestockModal({ ...restockModal, note: e.target.value })}
+                          placeholder="যেমন: দ্রুত ডেলিভারির জন্য ৩০ পিছ স্টক প্রয়োজন"
+                          className="w-full px-3.5 py-2 bg-gray-50 dark:bg-black/30 border border-gray-300 dark:border-emerald-900 rounded-xl text-xs text-gray-900 dark:text-emerald-100"
+                        />
+                      </div>
+
+                      <div className="flex items-center justify-end gap-2 pt-2 border-t border-gray-200 dark:border-emerald-900/60">
+                        <button
+                          type="button"
+                          onClick={() => setRestockModal({ isOpen: false, product: null, quantity: 30, note: '' })}
+                          className="px-4 py-2.5 border border-gray-200 dark:border-emerald-900 rounded-xl text-xs font-bold text-gray-500"
+                        >
+                          {isBangla ? 'বাতিল' : 'Cancel'}
+                        </button>
+                        <button
+                          type="submit"
+                          disabled={isSendingRestock}
+                          className="px-5 py-2.5 bg-brand-900 hover:bg-brand-800 text-white font-black text-xs rounded-xl shadow-lg flex items-center gap-1.5 transition-all"
+                        >
+                          {isSendingRestock ? (
+                            <>
+                              <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                              <span>{isBangla ? 'পাঠানো হচ্ছে...' : 'Sending...'}</span>
+                            </>
+                          ) : (
+                            <>
+                              <Send className="w-3.5 h-3.5" />
+                              <span>{isBangla ? 'অনুরোধ পাঠান' : 'Send Request'}</span>
+                            </>
+                          )}
                         </button>
                       </div>
                     </form>
@@ -3236,6 +3496,131 @@ export default function SellerDashboardPage() {
 
         </main>
       </div>
+
+      {/* 📢 RESTOCK REQUEST MODAL (Seller -> Admin) */}
+      {restockModal.isOpen && restockModal.product && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200 overflow-y-auto">
+          <div className="bg-white dark:bg-[#112318] text-gray-900 dark:text-emerald-50 rounded-3xl max-w-lg w-full p-6 sm:p-8 space-y-5 shadow-2xl border-2 border-amber-400 my-8">
+            <div className="flex items-center justify-between border-b pb-3 border-gray-200 dark:border-emerald-900">
+              <div>
+                <h4 className="font-black text-base sm:text-lg flex items-center gap-2 text-amber-950 dark:text-amber-200">
+                  <span>📢</span>
+                  <span>{isBangla ? 'এডমিন থেকে স্টক রিকোয়েস্ট পাঠান' : 'Request Stock from Admin'}</span>
+                </h4>
+                <p className="text-xs text-gray-500 dark:text-emerald-400">
+                  {isBangla ? 'আপনার অনুরোধ সরাসরি এডমিন ড্যাশবোর্ডে ও MongoDB ডাটাবেসে যাবে।' : 'Your request will be sent directly to Admin Dashboard and MongoDB.'}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setRestockModal({ isOpen: false, product: null, quantity: 30, note: '' })}
+                className="p-1.5 rounded-xl hover:bg-gray-100 dark:hover:bg-emerald-950 text-gray-500"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Product Summary Banner */}
+            <div className="flex items-center gap-3 p-3.5 rounded-2xl bg-amber-50/80 dark:bg-black/30 border border-amber-200 dark:border-amber-900/60">
+              <img
+                src={restockModal.product.thumbnail || restockModal.product.images?.[0] || 'https://images.unsplash.com/photo-1587049352846-4a222e784d38?auto=format&fit=crop&w=150&q=80'}
+                alt={restockModal.product.name}
+                className="w-14 h-14 rounded-xl object-cover border border-amber-300 flex-shrink-0"
+              />
+              <div className="min-w-0 flex-1">
+                <h5 className="font-extrabold text-sm text-gray-900 dark:text-emerald-100 truncate">
+                  {restockModal.product.name_bn || restockModal.product.name}
+                </h5>
+                <div className="flex items-center gap-3 text-[11px] font-bold mt-1">
+                  <span className="text-purple-700 dark:text-purple-300">
+                    এডমিন মাস্টার স্টক: {restockModal.product.admin_stock !== undefined ? restockModal.product.admin_stock : (restockModal.product.adminStock !== undefined ? restockModal.product.adminStock : 70)} টি
+                  </span>
+                  <span className="text-amber-700 dark:text-amber-300">
+                    আপনার স্টক: {restockModal.product.stock_quantity !== undefined ? restockModal.product.stock_quantity : (restockModal.product.stock || 0)} টি
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Quantity Input with Presets */}
+            <div className="space-y-2">
+              <label className="block text-xs font-bold text-gray-700 dark:text-emerald-300">
+                {isBangla ? 'প্রয়োজনীয় স্টক সংখ্যা (পিস) *' : 'Requested Stock Quantity (Pieces) *'}
+              </label>
+              <input
+                type="number"
+                min="1"
+                required
+                value={restockModal.quantity}
+                onChange={(e) => setRestockModal({ ...restockModal, quantity: Math.max(1, parseInt(e.target.value) || 1) })}
+                className="w-full px-4 py-3 bg-gray-50 dark:bg-black/40 border border-gray-300 dark:border-emerald-900 rounded-2xl text-base font-black text-gray-900 dark:text-emerald-50 focus:outline-none focus:border-amber-500"
+              />
+
+              {/* Quick Preset Buttons */}
+              <div className="flex items-center gap-2 pt-1 flex-wrap">
+                <span className="text-[11px] text-gray-400 font-bold">{isBangla ? 'কুইক সিলেক্ট:' : 'Quick Select:'}</span>
+                {[10, 20, 30, 50, 100].map((qty) => (
+                  <button
+                    key={qty}
+                    type="button"
+                    onClick={() => setRestockModal({ ...restockModal, quantity: qty })}
+                    className={`px-3 py-1 rounded-xl text-xs font-black transition-all ${
+                      restockModal.quantity === qty
+                        ? 'bg-amber-500 text-slate-950 shadow-sm scale-105'
+                        : 'bg-gray-100 dark:bg-black/40 text-gray-700 dark:text-emerald-300 hover:bg-gray-200'
+                    }`}
+                  >
+                    +{qty}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Note Textarea */}
+            <div className="space-y-1.5">
+              <label className="block text-xs font-bold text-gray-700 dark:text-emerald-300">
+                {isBangla ? 'অ্যাডমিনের জন্য বার্তা / নোট (ঐচ্ছিক)' : 'Note for Admin (Optional)'}
+              </label>
+              <textarea
+                rows={2}
+                placeholder={isBangla ? 'যেমন: পণ্যটি দ্রুত বিক্রি হচ্ছে, দ্রুত স্টক স্থানান্তর করলে সুবিধা হয়।' : 'e.g. High demand product, please transfer stock soon.'}
+                value={restockModal.note}
+                onChange={(e) => setRestockModal({ ...restockModal, note: e.target.value })}
+                className="w-full px-4 py-2.5 bg-gray-50 dark:bg-black/40 border border-gray-300 dark:border-emerald-900 rounded-2xl text-xs sm:text-sm font-medium focus:outline-none focus:border-amber-500"
+              />
+            </div>
+
+            {/* Actions */}
+            <div className="flex items-center justify-end gap-3 pt-3 border-t border-gray-100 dark:border-emerald-950">
+              <button
+                type="button"
+                onClick={() => setRestockModal({ isOpen: false, product: null, quantity: 30, note: '' })}
+                className="px-5 py-2.5 border border-gray-300 dark:border-emerald-900 rounded-2xl text-xs font-bold hover:bg-gray-100 dark:hover:bg-emerald-950 text-gray-700 dark:text-emerald-200"
+              >
+                {isBangla ? 'বাতিল' : 'Cancel'}
+              </button>
+              <button
+                type="button"
+                disabled={isSendingRestock}
+                onClick={handleSendRestockRequest}
+                className="px-6 py-2.5 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-brand-950 font-black text-xs sm:text-sm rounded-2xl shadow-lg transition-all flex items-center gap-2 active:scale-95 disabled:opacity-50"
+              >
+                {isSendingRestock ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                    <span>{isBangla ? 'পাঠানো হচ্ছে...' : 'Sending...'}</span>
+                  </>
+                ) : (
+                  <>
+                    <Send className="w-4 h-4" />
+                    <span>{isBangla ? 'রিকোয়েস্ট পাঠান (Send to Admin)' : 'Send Request to Admin'}</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );
