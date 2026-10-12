@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { 
@@ -26,7 +26,12 @@ import {
   Store,
   AlertCircle,
   Lock,
-  BadgeCheck
+  BadgeCheck,
+  ChevronLeft,
+  ChevronRight,
+  Maximize2,
+  X,
+  Image as ImageIcon
 } from 'lucide-react';
 
 export default function ProductDetailPage() {
@@ -40,8 +45,25 @@ export default function ProductDetailPage() {
   const [reviews, setReviews] = useState([]);
   const [selectedVariant, setSelectedVariant] = useState(null);
   const [selectedImage, setSelectedImage] = useState('');
+  const [isLightboxOpen, setIsLightboxOpen] = useState(false);
   const [quantity, setQuantity] = useState(1);
   const [loading, setLoading] = useState(true);
+
+  const productImages = useMemo(() => {
+    if (!product) return [];
+    const list = [];
+    if (product.thumbnail && typeof product.thumbnail === 'string' && product.thumbnail.trim()) {
+      list.push(product.thumbnail.trim());
+    }
+    if (Array.isArray(product.images)) {
+      product.images.forEach(img => {
+        if (img && typeof img === 'string' && img.trim() && !list.includes(img.trim())) {
+          list.push(img.trim());
+        }
+      });
+    }
+    return list.length > 0 ? list : (product.thumbnail ? [product.thumbnail] : []);
+  }, [product]);
 
   // Verified Review System states
   const [reviewEligibility, setReviewEligibility] = useState({
@@ -160,6 +182,21 @@ export default function ProductDetailPage() {
     ? (product.seller_name_bn || product.seller_name || product.shop_name || product.seller?.shop_name || 'সুন্দরবন অর্গানিক ফার্মস')
     : (product.seller_name_en || product.sellerName || product.shop_name_en || product.seller_name || 'Sundarban Organic Farms');
 
+  const activeImage = selectedImage || productImages[0] || product?.thumbnail;
+  const currentImageIdx = Math.max(0, productImages.indexOf(activeImage));
+
+  const handlePrevImage = () => {
+    if (productImages.length <= 1) return;
+    const prevIdx = (currentImageIdx - 1 + productImages.length) % productImages.length;
+    setSelectedImage(productImages[prevIdx]);
+  };
+
+  const handleNextImage = () => {
+    if (productImages.length <= 1) return;
+    const nextIdx = (currentImageIdx + 1) % productImages.length;
+    setSelectedImage(productImages[nextIdx]);
+  };
+
   const handleIncreaseQty = () => {
     if (quantity + 1 > stockCount) {
       showToast(isBangla ? `দুঃখিত, এই পণ্যের সর্বোচ্চ ${stockCount} টি স্টক অবশিষ্ট আছে!` : `Sorry, only ${stockCount} pcs available in stock!`, 'error');
@@ -218,42 +255,131 @@ export default function ProductDetailPage() {
       {/* Product Top Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
         
-        {/* Left: Image Gallery */}
-        <div className="space-y-4">
-          <div className="bg-white dark:bg-[#112318] rounded-3xl border border-gray-100 dark:border-[#1d3b28] p-4 shadow-sm overflow-hidden aspect-square flex items-center justify-center relative">
-            <img
-              src={selectedImage || product.images?.[0] || product.thumbnail}
-              alt={product.name}
-              className={`w-full h-full object-cover rounded-2xl ${isOutOfStock ? 'opacity-60 grayscale-[30%]' : ''}`}
-            />
-            {isOutOfStock ? (
-              <span className="absolute top-6 left-6 bg-red-600 text-white text-xs font-black px-3 py-1.5 rounded-full shadow-lg animate-pulse flex items-center gap-1">
-                <AlertCircle className="w-4 h-4" />
-                <span>{isBangla ? 'স্টক আউট (Out Of Stock)' : 'Out Of Stock'}</span>
-              </span>
-            ) : discountPercent > 0 && (
-              <span className="absolute top-6 left-6 bg-red-500 text-white text-xs font-extrabold px-3 py-1 rounded-full shadow">
-                -{discountPercent}% {isBangla ? 'ছাড়' : 'OFF'}
-              </span>
-            )}
-          </div>
-
-          {/* Thumbnails */}
-          {product.images && product.images.length > 1 && (
-            <div className="flex gap-3 overflow-x-auto pb-1">
-              {product.images.map((img, i) => (
-                <button
-                  key={i}
-                  onClick={() => setSelectedImage(img)}
-                  className={`w-20 h-20 rounded-2xl overflow-hidden border-2 transition-all flex-shrink-0 ${
-                    selectedImage === img ? 'border-brand-900 dark:border-emerald-500 shadow-md scale-105' : 'border-gray-200 dark:border-gray-700 hover:border-gray-400'
-                  }`}
-                >
-                  <img src={img} alt="thumb" className="w-full h-full object-cover" />
-                </button>
-              ))}
+        {/* Left: Enhanced Side-by-Side Multi-Image Gallery */}
+        <div className="flex flex-col-reverse md:flex-row gap-4 items-start">
+          
+          {/* Vertical Thumbnail Strip on the Side (Left on desktop, horizontal on mobile) */}
+          {productImages.length > 1 && (
+            <div className="flex md:flex-col gap-2.5 overflow-x-auto md:overflow-y-auto max-h-[520px] w-full md:w-24 flex-shrink-0 py-1 px-1 scrollbar-thin scrollbar-thumb-emerald-500/20">
+              {productImages.map((img, i) => {
+                const isSelected = (activeImage === img) || (!activeImage && i === 0);
+                return (
+                  <button
+                    key={i}
+                    type="button"
+                    onClick={() => setSelectedImage(img)}
+                    onMouseEnter={() => setSelectedImage(img)}
+                    aria-label={`View image ${i + 1}`}
+                    className={`relative group rounded-2xl overflow-hidden border-2 transition-all duration-200 flex-shrink-0 aspect-square w-16 md:w-20 ${
+                      isSelected
+                        ? 'border-emerald-600 dark:border-emerald-400 ring-2 ring-emerald-500/30 shadow-md scale-105 bg-emerald-50/20'
+                        : 'border-gray-200 dark:border-gray-800 opacity-75 hover:opacity-100 hover:border-emerald-300 dark:hover:border-emerald-700'
+                    }`}
+                  >
+                    <img
+                      src={img}
+                      alt={`Thumbnail ${i + 1}`}
+                      className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110"
+                    />
+                    {isSelected && (
+                      <span className="absolute bottom-1 right-1 w-2.5 h-2.5 rounded-full bg-emerald-600 border border-white dark:border-black shadow-sm" />
+                    )}
+                  </button>
+                );
+              })}
             </div>
           )}
+
+          {/* Main Large Showcase Image */}
+          <div className="relative flex-1 w-full bg-white dark:bg-[#112318] rounded-3xl border border-gray-100 dark:border-[#1d3b28] p-3 sm:p-4 shadow-sm overflow-hidden group">
+            <div 
+              className="relative aspect-square w-full rounded-2xl overflow-hidden bg-gray-50 dark:bg-black/20 flex items-center justify-center cursor-zoom-in"
+              onClick={() => setIsLightboxOpen(true)}
+            >
+              <img
+                src={activeImage}
+                alt={product.name}
+                className={`w-full h-full object-cover transition-all duration-300 group-hover:scale-105 ${
+                  isOutOfStock ? 'opacity-60 grayscale-[30%]' : ''
+                }`}
+              />
+
+              {/* Status Badges */}
+              <div className="absolute top-3 left-3 flex flex-col gap-2 z-10">
+                {isOutOfStock ? (
+                  <span className="bg-red-600 text-white text-xs font-black px-3 py-1.5 rounded-full shadow-lg animate-pulse flex items-center gap-1">
+                    <AlertCircle className="w-4 h-4" />
+                    <span>{isBangla ? 'স্টক আউট (Out Of Stock)' : 'Out Of Stock'}</span>
+                  </span>
+                ) : discountPercent > 0 && (
+                  <span className="bg-red-500 text-white text-xs font-extrabold px-3 py-1 rounded-full shadow-md">
+                    -{discountPercent}% {isBangla ? 'ছাড়' : 'OFF'}
+                  </span>
+                )}
+                {product.isFeatured && (
+                  <span className="bg-amber-500 text-brand-950 text-[11px] font-black px-2.5 py-0.5 rounded-full shadow-sm w-fit">
+                    ⭐ {isBangla ? 'ফিচার্ড পণ্য' : 'Featured'}
+                  </span>
+                )}
+              </div>
+
+              {/* Image Counter Badge */}
+              {productImages.length > 1 && (
+                <div className="absolute bottom-3 left-3 bg-black/60 backdrop-blur-md text-white text-[11px] font-bold px-2.5 py-1 rounded-full flex items-center gap-1.5 shadow-md z-10">
+                  <ImageIcon className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>
+                    {isBangla ? `${currentImageIdx + 1} / ${productImages.length}` : `${currentImageIdx + 1} of ${productImages.length}`}
+                  </span>
+                </div>
+              )}
+
+              {/* Zoom Button */}
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIsLightboxOpen(true);
+                }}
+                className="absolute top-3 right-3 p-2 rounded-2xl bg-white/80 dark:bg-black/60 backdrop-blur-md text-gray-700 dark:text-emerald-300 opacity-0 group-hover:opacity-100 hover:bg-white dark:hover:bg-black transition-all shadow-md z-10"
+                title={isBangla ? 'বড় করে দেখুন' : 'Full Preview'}
+              >
+                <Maximize2 className="w-4 h-4" />
+              </button>
+
+              {/* Navigation Arrows on Showcase Image */}
+              {productImages.length > 1 && (
+                <>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handlePrevImage();
+                    }}
+                    className="absolute left-2.5 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-white/90 dark:bg-black/70 backdrop-blur-md border border-gray-200 dark:border-gray-700 text-gray-800 dark:text-white flex items-center justify-center opacity-0 group-hover:opacity-100 hover:scale-110 hover:bg-white dark:hover:bg-black shadow-md transition-all z-10"
+                    aria-label="Previous image"
+                  >
+                    <ChevronLeft className="w-5 h-5" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleNextImage();
+                    }}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-white/90 dark:bg-black/70 backdrop-blur-md border border-gray-200 dark:border-gray-700 text-gray-800 dark:text-white flex items-center justify-center opacity-0 group-hover:opacity-100 hover:scale-110 hover:bg-white dark:hover:bg-black shadow-md transition-all z-10"
+                    aria-label="Next image"
+                  >
+                    <ChevronRight className="w-5 h-5" />
+                  </button>
+                </>
+              )}
+            </div>
+
+            {/* Helper text below main image */}
+            <p className="text-center text-[11px] text-gray-400 dark:text-emerald-500/60 mt-2 flex items-center justify-center gap-1">
+              <span>🔍 {isBangla ? 'ছবিতে ক্লিক করে বড় করে দেখুন' : 'Click image to view fullscreen'}</span>
+            </p>
+          </div>
         </div>
 
         {/* Right: Product Purchase Details */}
@@ -686,6 +812,83 @@ export default function ProductDetailPage() {
               <ProductCard key={p.id || p._id} product={p} />
             ))}
           </div>
+        </div>
+      )}
+
+      {/* 🖼️ Fullscreen Image Lightbox Modal */}
+      {isLightboxOpen && (
+        <div 
+          className="fixed inset-0 z-50 bg-black/95 backdrop-blur-md flex flex-col items-center justify-center p-4 animate-in fade-in duration-200"
+          onClick={() => setIsLightboxOpen(false)}
+        >
+          {/* Top Bar with counter & close */}
+          <div className="absolute top-4 right-4 flex items-center gap-3 z-50">
+            <span className="text-xs text-white/80 font-bold px-3 py-1.5 rounded-full bg-white/10 backdrop-blur-md border border-white/10">
+              {currentImageIdx + 1} / {productImages.length}
+            </span>
+            <button
+              type="button"
+              onClick={() => setIsLightboxOpen(false)}
+              className="p-2.5 rounded-full bg-white/10 hover:bg-white/20 text-white transition-all hover:scale-105"
+              aria-label="Close lightbox"
+            >
+              <X className="w-6 h-6" />
+            </button>
+          </div>
+
+          {/* Large Image Showcase Container */}
+          <div 
+            className="relative max-w-4xl max-h-[75vh] flex items-center justify-center p-2"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <img
+              src={activeImage}
+              alt={product.name}
+              className="max-w-full max-h-[75vh] object-contain rounded-2xl shadow-2xl border border-white/10"
+            />
+
+            {productImages.length > 1 && (
+              <>
+                <button
+                  type="button"
+                  onClick={handlePrevImage}
+                  className="absolute -left-3 sm:-left-12 top-1/2 -translate-y-1/2 p-3 rounded-full bg-white/15 hover:bg-white/30 text-white backdrop-blur-md transition-all shadow-xl hover:scale-110"
+                  aria-label="Previous image"
+                >
+                  <ChevronLeft className="w-6 h-6" />
+                </button>
+                <button
+                  type="button"
+                  onClick={handleNextImage}
+                  className="absolute -right-3 sm:-right-12 top-1/2 -translate-y-1/2 p-3 rounded-full bg-white/15 hover:bg-white/30 text-white backdrop-blur-md transition-all shadow-xl hover:scale-110"
+                  aria-label="Next image"
+                >
+                  <ChevronRight className="w-6 h-6" />
+                </button>
+              </>
+            )}
+          </div>
+
+          {/* Lightbox Bottom Thumbnails Strip */}
+          {productImages.length > 1 && (
+            <div 
+              className="mt-4 flex items-center gap-2 overflow-x-auto max-w-xl px-4 py-2 bg-white/10 backdrop-blur-md rounded-2xl border border-white/10"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {productImages.map((img, i) => (
+                <button
+                  key={i}
+                  type="button"
+                  onClick={() => setSelectedImage(img)}
+                  className={`w-14 h-14 rounded-xl overflow-hidden border-2 transition-all flex-shrink-0 ${
+                    activeImage === img ? 'border-emerald-400 ring-2 ring-emerald-400/40 scale-105' : 'border-transparent opacity-60 hover:opacity-100'
+                  }`}
+                >
+                  <img src={img} alt="thumb" className="w-full h-full object-cover" />
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       )}
 

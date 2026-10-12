@@ -156,6 +156,12 @@ export default function SellerDashboardPage() {
   const [isSavingProduct, setIsSavingProduct] = useState(false);
   const [isUploadingThumb, setIsUploadingThumb] = useState(false);
   const [isUploadingEditThumb, setIsUploadingEditThumb] = useState(false);
+  const [newCustomImageUrl, setNewCustomImageUrl] = useState('');
+  const [editCustomImageUrl, setEditCustomImageUrl] = useState('');
+  const [isUploadingMultiImages, setIsUploadingMultiImages] = useState(false);
+  const [multiUploadProgress, setMultiUploadProgress] = useState('');
+  const [isUploadingMultiEditImages, setIsUploadingMultiEditImages] = useState(false);
+  const [multiEditUploadProgress, setMultiEditUploadProgress] = useState('');
 
   // Add Product Form State
   const [newProd, setNewProd] = useState({
@@ -175,6 +181,7 @@ export default function SellerDashboardPage() {
     stock_quantity: 50,
     unit: '১ পিস',
     thumbnail: 'https://images.unsplash.com/photo-1587049352846-4a222e784d38?auto=format&fit=crop&w=600&q=80',
+    images: ['https://images.unsplash.com/photo-1587049352846-4a222e784d38?auto=format&fit=crop&w=600&q=80'],
     description: '',
     is_featured: true,
     is_bestseller: false,
@@ -574,6 +581,17 @@ export default function SellerDashboardPage() {
       const finalSellerBn = (newProd.seller_name_bn || newProd.seller_name || sellerInfo.shop_name || sellerInfo.seller_name || user?.name || 'সুন্দরবন অর্গানিক ফার্মস').trim();
       const finalSellerEn = (newProd.seller_name_en || newProd.sellerName || sellerInfo.shop_name || user?.name || 'Sundarban Organic Farms').trim();
 
+      let finalImages = Array.isArray(newProd.images) && newProd.images.length > 0 
+        ? newProd.images.filter(Boolean)
+        : [];
+      if (finalImages.length === 0 && newProd.thumbnail) {
+        finalImages = [newProd.thumbnail];
+      }
+      const finalThumb = newProd.thumbnail || finalImages[0] || 'https://images.unsplash.com/photo-1587049352846-4a222e784d38?auto=format&fit=crop&w=600&q=80';
+      if (finalThumb && !finalImages.includes(finalThumb)) {
+        finalImages.unshift(finalThumb);
+      }
+
       const payload = {
         name: newProd.name.trim(),
         name_bn: (newProd.name_bn || newProd.name).trim(),
@@ -600,8 +618,8 @@ export default function SellerDashboardPage() {
         stock: Number(newProd.stock_quantity) || 50,
         stock_quantity: Number(newProd.stock_quantity) || 50,
         unit: newProd.unit || '১ পিস',
-        thumbnail: newProd.thumbnail || 'https://images.unsplash.com/photo-1587049352846-4a222e784d38?auto=format&fit=crop&w=600&q=80',
-        images: [newProd.thumbnail],
+        thumbnail: finalThumb,
+        images: finalImages,
         description: newProd.description || '১০০% খাঁটি ও নির্ভেজাল পণ্য। সরাসরি বিশ্বস্ত উৎস থেকে সংগৃহীত।',
         isFeatured: newProd.is_featured,
         is_featured: newProd.is_featured,
@@ -633,10 +651,12 @@ export default function SellerDashboardPage() {
           stock_quantity: 50,
           unit: '১ পিস',
           thumbnail: 'https://images.unsplash.com/photo-1587049352846-4a222e784d38?auto=format&fit=crop&w=600&q=80',
+          images: ['https://images.unsplash.com/photo-1587049352846-4a222e784d38?auto=format&fit=crop&w=600&q=80'],
           description: '',
           is_featured: true,
           is_bestseller: false,
         });
+        setNewCustomImageUrl('');
         setIsAddProductFormOpen(false);
         await loadSellerData();
       } else {
@@ -651,6 +671,10 @@ export default function SellerDashboardPage() {
 
   // ✏️ Open Edit Product Modal
   const handleOpenEditModal = (product) => {
+    const editImages = Array.isArray(product.images) && product.images.length > 0
+      ? product.images.filter(Boolean)
+      : (product.thumbnail ? [product.thumbnail] : []);
+
     setEditingProduct({
       ...product,
       id: product.id || product._id,
@@ -666,11 +690,13 @@ export default function SellerDashboardPage() {
       regularPrice: product.regularPrice || product.regular_price || product.price || 0,
       stock_quantity: product.stock_quantity ?? product.stock ?? 50,
       unit: product.unit || '১ পিস',
-      thumbnail: product.thumbnail || (product.images && product.images[0]) || '',
+      thumbnail: product.thumbnail || editImages[0] || '',
+      images: editImages,
       description: product.description || '',
       is_featured: product.is_featured ?? product.isFeatured ?? false,
       is_bestseller: product.is_bestseller ?? product.isBestSeller ?? false,
     });
+    setEditCustomImageUrl('');
   };
 
   // 💾 Save Edited Product to MongoDB
@@ -695,6 +721,17 @@ export default function SellerDashboardPage() {
       const editSellerBn = (editingProduct.seller_name_bn || editingProduct.seller_name || sellerInfo.shop_name || 'সুন্দরবন অর্গানিক ফার্মস').trim();
       const editSellerEn = (editingProduct.seller_name_en || editingProduct.sellerName || sellerInfo.shop_name || 'Sundarban Organic Farms').trim();
 
+      let finalImages = Array.isArray(editingProduct.images) && editingProduct.images.length > 0
+        ? editingProduct.images.filter(Boolean)
+        : [];
+      if (finalImages.length === 0 && editingProduct.thumbnail) {
+        finalImages = [editingProduct.thumbnail];
+      }
+      const finalThumb = editingProduct.thumbnail || finalImages[0] || '';
+      if (finalThumb && !finalImages.includes(finalThumb)) {
+        finalImages.unshift(finalThumb);
+      }
+
       const payload = {
         name: editingProduct.name.trim(),
         name_bn: (editingProduct.name_bn || editingProduct.name).trim(),
@@ -717,8 +754,8 @@ export default function SellerDashboardPage() {
         stock: Number(editingProduct.stock_quantity) || 0,
         stock_quantity: Number(editingProduct.stock_quantity) || 0,
         unit: editingProduct.unit || '১ পিস',
-        thumbnail: editingProduct.thumbnail,
-        images: [editingProduct.thumbnail],
+        thumbnail: finalThumb,
+        images: finalImages,
         description: editingProduct.description,
         isFeatured: editingProduct.is_featured,
         is_featured: editingProduct.is_featured,
@@ -2121,56 +2158,188 @@ export default function SellerDashboardPage() {
                         />
                       </div>
 
-                      {/* Thumbnail Image ImgBB Uploader with Live Preview */}
-                      <div className="md:col-span-2 lg:col-span-3">
-                        <label className="block text-xs font-bold mb-1.5 text-gray-700 dark:text-emerald-300">
-                          {isBangla ? 'পণ্যের মূল ছবি (ImgBB CDN / Image Upload)' : 'Product Image (ImgBB Upload / URL)'}
-                        </label>
-                        <div className="flex flex-col sm:flex-row gap-3 items-center">
-                          {newProd.thumbnail && (
-                            <img
-                              src={newProd.thumbnail}
-                              alt="Thumbnail preview"
-                              className="w-12 h-12 rounded-2xl object-cover border-2 border-amber-500 shadow-sm flex-shrink-0"
-                            />
-                          )}
+                      {/* Multi-Image Upload & CDN Integration */}
+                      <div className="md:col-span-2 lg:col-span-3 p-4 sm:p-5 bg-gradient-to-br from-amber-50/50 via-gray-50 to-emerald-50/30 dark:from-black/30 dark:to-emerald-950/20 border-2 border-dashed border-amber-300 dark:border-amber-800/60 rounded-3xl space-y-4">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                          <div>
+                            <label className="block text-xs sm:text-sm font-black text-brand-950 dark:text-emerald-100 flex items-center gap-2">
+                              <span>📸</span>
+                              <span>{isBangla ? 'পণ্যের একাদিক ছবি ও গ্যালারি আপলোড (Multi-Image Upload)' : 'Multi-Image Gallery Upload'}</span>
+                            </label>
+                            <p className="text-[11px] text-gray-500 dark:text-emerald-400">
+                              {isBangla ? 'একসাথে একাধিক ছবি সিলেক্ট করে ImgBB তে আপলোড করুন অথবা সরাসরি অনলাইন লিংক যুক্ত করুন।' : 'Select and upload multiple photos at once or paste image URLs.'}
+                            </p>
+                          </div>
+
+                          <div className="flex items-center gap-2">
+                            {/* Multi-file ImgBB Upload Button */}
+                            <label className="cursor-pointer px-4 py-2 bg-gradient-to-r from-emerald-600 to-brand-900 hover:from-emerald-500 hover:to-brand-800 text-white rounded-2xl text-xs font-black flex items-center gap-1.5 shadow-md transition-all active:scale-95">
+                              <span>☁️</span>
+                              <span>{isUploadingMultiImages ? (multiUploadProgress || (isBangla ? 'আপলোড হচ্ছে...' : 'Uploading...')) : (isBangla ? 'একাদিক ছবি আপলোড' : 'Upload Multi Images')}</span>
+                              <input
+                                type="file"
+                                multiple
+                                accept="image/*"
+                                className="hidden"
+                                disabled={isUploadingMultiImages}
+                                onChange={async (e) => {
+                                  const files = Array.from(e.target.files || []);
+                                  if (!files.length) return;
+                                  setIsUploadingMultiImages(true);
+                                  const uploadedUrls = [];
+                                  for (let i = 0; i < files.length; i++) {
+                                    setMultiUploadProgress(isBangla ? `আপলোড হচ্ছে (${i + 1}/${files.length})...` : `Uploading (${i + 1}/${files.length})...`);
+                                    try {
+                                      const res = await uploadToImgBB(files[i], `prod_multi_${Date.now()}_${i}`);
+                                      const url = res?.url || (typeof res === 'string' ? res : '');
+                                      if (url) uploadedUrls.push(url);
+                                    } catch (err) {
+                                      console.error('Error uploading file:', err);
+                                    }
+                                  }
+                                  setIsUploadingMultiImages(false);
+                                  setMultiUploadProgress('');
+                                  if (uploadedUrls.length > 0) {
+                                    setNewProd(prev => {
+                                      const currentList = Array.isArray(prev.images) ? [...prev.images] : (prev.thumbnail ? [prev.thumbnail] : []);
+                                      const merged = Array.from(new Set([...currentList, ...uploadedUrls]));
+                                      return {
+                                        ...prev,
+                                        images: merged,
+                                        thumbnail: prev.thumbnail || merged[0]
+                                      };
+                                    });
+                                    showToast(isBangla ? `🎉 সফলভাবে ${uploadedUrls.length} টি ছবি আপলোড হয়েছে!` : `Uploaded ${uploadedUrls.length} images!`);
+                                  } else {
+                                    showToast(isBangla ? 'ছবি আপলোড ব্যর্থ হয়েছে' : 'Upload failed', 'error');
+                                  }
+                                }}
+                              />
+                            </label>
+                          </div>
+                        </div>
+
+                        {/* Add Direct URL Strip */}
+                        <div className="flex flex-col sm:flex-row gap-2 items-center">
                           <input
                             type="url"
-                            placeholder="https://i.ibb.co/... অথবা ফাইল আপলোড করুন"
-                            value={newProd.thumbnail}
-                            onChange={(e) => setNewProd({ ...newProd, thumbnail: e.target.value })}
-                            className="flex-1 w-full px-4 py-2.5 bg-gray-50 dark:bg-black/40 border border-gray-300 dark:border-emerald-900 rounded-2xl text-xs sm:text-sm focus:outline-none focus:border-brand-900"
+                            placeholder="https://... ছবির অনলাইন লিংক লিখে যুক্ত করুন"
+                            value={newCustomImageUrl}
+                            onChange={(e) => setNewCustomImageUrl(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault();
+                                if (!newCustomImageUrl.trim()) return;
+                                const url = newCustomImageUrl.trim();
+                                setNewProd(prev => {
+                                  const currentList = Array.isArray(prev.images) ? [...prev.images] : (prev.thumbnail ? [prev.thumbnail] : []);
+                                  if (!currentList.includes(url)) currentList.push(url);
+                                  return {
+                                    ...prev,
+                                    images: currentList,
+                                    thumbnail: prev.thumbnail || url
+                                  };
+                                });
+                                setNewCustomImageUrl('');
+                              }
+                            }}
+                            className="flex-1 w-full px-4 py-2.5 bg-white dark:bg-black/50 border border-gray-300 dark:border-emerald-900 rounded-2xl text-xs focus:outline-none focus:border-brand-900"
                           />
-                          <label className="cursor-pointer px-4 py-2.5 bg-gradient-to-r from-emerald-600 to-brand-900 hover:from-emerald-500 hover:to-brand-800 text-white rounded-2xl text-xs font-bold flex items-center gap-1.5 shadow-md flex-shrink-0 transition-all">
-                            <span>☁️</span>
-                            <span>{isUploadingThumb ? (isBangla ? 'আপলোড হচ্ছে...' : 'Uploading...') : (isBangla ? 'ImgBB তে ছবি আপলোড' : 'Upload to ImgBB')}</span>
-                            <input
-                              type="file"
-                              accept="image/*"
-                              className="hidden"
-                              disabled={isUploadingThumb}
-                              onChange={async (e) => {
-                                const file = e.target.files?.[0];
-                                if (!file) return;
-                                setIsUploadingThumb(true);
-                                try {
-                                  const res = await uploadToImgBB(file, 'prod_thumb');
-                                  const finalUrl = res?.url || (typeof res === 'string' ? res : '');
-                                  if (finalUrl) {
-                                    setNewProd(prev => ({ ...prev, thumbnail: finalUrl }));
-                                    showToast(isBangla ? 'ছবি সফলভাবে ImgBB তে আপলোড হয়েছে! 🎉' : 'Image uploaded to ImgBB successfully! 🎉');
-                                  } else {
-                                    showToast(res?.message || (isBangla ? 'আপলোড ব্যর্থ হয়েছে' : 'Upload failed'), 'error');
-                                  }
-                                } catch (err) {
-                                  showToast(isBangla ? 'আপলোড ব্যর্থ হয়েছে' : 'Upload failed', 'error');
-                                } finally {
-                                  setIsUploadingThumb(false);
-                                }
-                              }}
-                            />
-                          </label>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (!newCustomImageUrl.trim()) return;
+                              const url = newCustomImageUrl.trim();
+                              setNewProd(prev => {
+                                const currentList = Array.isArray(prev.images) ? [...prev.images] : (prev.thumbnail ? [prev.thumbnail] : []);
+                                if (!currentList.includes(url)) currentList.push(url);
+                                return {
+                                  ...prev,
+                                  images: currentList,
+                                  thumbnail: prev.thumbnail || url
+                                };
+                              });
+                              setNewCustomImageUrl('');
+                              showToast(isBangla ? 'ছবি গ্যালারিতে যুক্ত হয়েছে' : 'Image added');
+                            }}
+                            className="px-4 py-2.5 bg-amber-500 hover:bg-amber-600 text-brand-950 font-bold text-xs rounded-2xl shadow-sm whitespace-nowrap transition-all flex items-center gap-1.5"
+                          >
+                            <span>➕</span>
+                            <span>{isBangla ? 'লিংক যুক্ত করুন' : 'Add URL'}</span>
+                          </button>
                         </div>
+
+                        {/* Live Thumbnail Grid */}
+                        {newProd.images && newProd.images.length > 0 && (
+                          <div className="space-y-2 pt-2 border-t border-amber-200/60 dark:border-emerald-900/40">
+                            <div className="flex items-center justify-between">
+                              <span className="text-[11px] font-bold text-gray-700 dark:text-emerald-300">
+                                {isBangla ? `📸 আপলোডকৃত ছবি (${newProd.images.length} টি):` : `📸 Uploaded Images (${newProd.images.length}):`}
+                                <span className="font-normal text-gray-500 ml-1">
+                                  {isBangla ? '(⭐ মূল ছবি নির্ধারণ করতে চাপ দিন)' : '(Click ⭐ to set as primary)'}
+                                </span>
+                              </span>
+                            </div>
+
+                            <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-3">
+                              {newProd.images.map((imgUrl, idx) => {
+                                const isThumb = newProd.thumbnail === imgUrl;
+                                return (
+                                  <div
+                                    key={idx}
+                                    className={`relative rounded-2xl overflow-hidden border-2 p-1.5 group bg-white dark:bg-black/40 transition-all ${
+                                      isThumb
+                                        ? 'border-amber-500 ring-2 ring-amber-400/40 shadow-md scale-105'
+                                        : 'border-gray-200 dark:border-emerald-900 hover:border-gray-400'
+                                    }`}
+                                  >
+                                    <div className="aspect-square w-full rounded-xl overflow-hidden bg-gray-100 dark:bg-black/20 relative">
+                                      <img src={imgUrl} alt={`Prod ${idx + 1}`} className="w-full h-full object-cover" />
+                                      {isThumb && (
+                                        <span className="absolute top-1 left-1 bg-amber-500 text-brand-950 text-[9px] font-black px-1.5 py-0.5 rounded-full shadow-sm">
+                                          ⭐ {isBangla ? 'মূল ছবি' : 'Main'}
+                                        </span>
+                                      )}
+                                    </div>
+
+                                    <div className="flex items-center justify-between gap-1 mt-1.5 px-0.5">
+                                      {!isThumb ? (
+                                        <button
+                                          type="button"
+                                          onClick={() => setNewProd(prev => ({ ...prev, thumbnail: imgUrl }))}
+                                          className="text-[10px] text-amber-700 dark:text-amber-400 hover:underline font-bold flex items-center gap-0.5"
+                                          title={isBangla ? 'মূল ছবি করুন' : 'Set as main'}
+                                        >
+                                          ⭐ {isBangla ? 'মূল করুন' : 'Make Main'}
+                                        </button>
+                                      ) : (
+                                        <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold">✓ {isBangla ? 'নির্বাচিত' : 'Selected'}</span>
+                                      )}
+
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setNewProd(prev => {
+                                            const filtered = prev.images.filter(x => x !== imgUrl);
+                                            return {
+                                              ...prev,
+                                              images: filtered,
+                                              thumbnail: prev.thumbnail === imgUrl ? (filtered[0] || '') : prev.thumbnail
+                                            };
+                                          });
+                                        }}
+                                        className="p-1 rounded-lg text-red-500 hover:bg-red-50 dark:hover:bg-red-950/40 transition-all"
+                                        title={isBangla ? 'মুছে ফেলুন' : 'Delete'}
+                                      >
+                                        <Trash2 className="w-3.5 h-3.5" />
+                                      </button>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
                       </div>
 
                       {/* Detailed Description */}
@@ -2741,52 +2910,181 @@ export default function SellerDashboardPage() {
                           />
                         </div>
 
-                        <div className="sm:col-span-2">
-                          <label className="block font-bold mb-1 text-xs">{isBangla ? 'পণ্যের ছবি (ImgBB CDN / Image Upload)' : 'Product Image (ImgBB Upload / URL)'}</label>
-                          <div className="flex gap-2 items-center">
-                            {editingProduct.thumbnail && (
-                              <img
-                                src={editingProduct.thumbnail}
-                                alt="Thumb preview"
-                                className="w-12 h-12 rounded-xl object-cover border border-amber-500/40 flex-shrink-0"
-                              />
-                            )}
-                            <input
-                              type="url"
-                              value={editingProduct.thumbnail}
-                              onChange={(e) => setEditingProduct({ ...editingProduct, thumbnail: e.target.value })}
-                              className="flex-1 px-3.5 py-2 bg-gray-50 dark:bg-black/40 border rounded-xl text-xs"
-                            />
-                            <label className="cursor-pointer px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 flex-shrink-0 shadow-sm">
+                        {/* Multi-Image Gallery & Uploader for Edit Modal */}
+                        <div className="sm:col-span-2 p-4 bg-gradient-to-br from-amber-50/50 via-gray-50 to-emerald-50/30 dark:from-black/30 dark:to-emerald-950/20 border-2 border-dashed border-amber-300 dark:border-amber-800/60 rounded-3xl space-y-3">
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                            <div>
+                              <label className="block text-xs font-black text-brand-950 dark:text-emerald-100 flex items-center gap-1.5">
+                                <span>📸</span>
+                                <span>{isBangla ? 'পণ্যের একাদিক ছবি ও গ্যালারি (Multi-Image Gallery)' : 'Multi-Image Gallery'}</span>
+                              </label>
+                              <p className="text-[10px] text-gray-500 dark:text-emerald-400">
+                                {isBangla ? 'একসাথে একাধিক ছবি সিলেক্ট করে আপলোড করুন অথবা অনলাইন লিংক পেস্ট করুন।' : 'Select & upload multiple images at once or paste image URLs.'}
+                              </p>
+                            </div>
+
+                            <label className="cursor-pointer px-3.5 py-1.5 bg-gradient-to-r from-emerald-600 to-brand-900 hover:from-emerald-500 hover:to-brand-800 text-white rounded-xl text-xs font-black flex items-center gap-1.5 shadow-md transition-all active:scale-95">
                               <span>☁️</span>
-                              <span>{isUploadingEditThumb ? (isBangla ? 'আপলোড...' : '...') : (isBangla ? 'ImgBB আপলোড' : 'ImgBB Upload')}</span>
+                              <span>{isUploadingMultiEditImages ? (multiEditUploadProgress || (isBangla ? 'আপলোড হচ্ছে...' : 'Uploading...')) : (isBangla ? 'একাদিক ছবি আপলোড' : 'Upload Images')}</span>
                               <input
                                 type="file"
+                                multiple
                                 accept="image/*"
                                 className="hidden"
-                                disabled={isUploadingEditThumb}
+                                disabled={isUploadingMultiEditImages}
                                 onChange={async (e) => {
-                                  const f = e.target.files?.[0];
-                                  if (!f) return;
-                                  setIsUploadingEditThumb(true);
-                                  try {
-                                    const res = await uploadToImgBB(f, 'prod_edit_thumb');
-                                    const finalUrl = res?.url || (typeof res === 'string' ? res : '');
-                                    if (finalUrl) {
-                                      setEditingProduct(prev => ({ ...prev, thumbnail: finalUrl }));
-                                      showToast(isBangla ? 'ছবি সফলভাবে ImgBB তে আপলোড হয়েছে! 🎉' : 'Image uploaded to ImgBB successfully! 🎉');
-                                    } else {
-                                      showToast(res?.message || 'Upload failed', 'error');
+                                  const files = Array.from(e.target.files || []);
+                                  if (!files.length) return;
+                                  setIsUploadingMultiEditImages(true);
+                                  const uploadedUrls = [];
+                                  for (let i = 0; i < files.length; i++) {
+                                    setMultiEditUploadProgress(isBangla ? `আপলোড (${i + 1}/${files.length})...` : `Uploading (${i + 1}/${files.length})...`);
+                                    try {
+                                      const res = await uploadToImgBB(files[i], `prod_edit_${Date.now()}_${i}`);
+                                      const url = res?.url || (typeof res === 'string' ? res : '');
+                                      if (url) uploadedUrls.push(url);
+                                    } catch (err) {
+                                      console.error('Error uploading edit file:', err);
                                     }
-                                  } catch (err) {
-                                    showToast('Upload failed', 'error');
-                                  } finally {
-                                    setIsUploadingEditThumb(false);
+                                  }
+                                  setIsUploadingMultiEditImages(false);
+                                  setMultiEditUploadProgress('');
+                                  if (uploadedUrls.length > 0) {
+                                    setEditingProduct(prev => {
+                                      const currentList = Array.isArray(prev.images) ? [...prev.images] : (prev.thumbnail ? [prev.thumbnail] : []);
+                                      const merged = Array.from(new Set([...currentList, ...uploadedUrls]));
+                                      return {
+                                        ...prev,
+                                        images: merged,
+                                        thumbnail: prev.thumbnail || merged[0]
+                                      };
+                                    });
+                                    showToast(isBangla ? `🎉 ${uploadedUrls.length} টি ছবি সফলভাবে আপলোড হয়েছে!` : `Uploaded ${uploadedUrls.length} images!`);
+                                  } else {
+                                    showToast(isBangla ? 'ছবি আপলোড ব্যর্থ হয়েছে' : 'Upload failed', 'error');
                                   }
                                 }}
                               />
                             </label>
                           </div>
+
+                          {/* Direct URL input */}
+                          <div className="flex gap-2 items-center">
+                            <input
+                              type="url"
+                              placeholder="https://... ছবির অনলাইন লিংক লিখে যুক্ত করুন"
+                              value={editCustomImageUrl}
+                              onChange={(e) => setEditCustomImageUrl(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  e.preventDefault();
+                                  if (!editCustomImageUrl.trim()) return;
+                                  const url = editCustomImageUrl.trim();
+                                  setEditingProduct(prev => {
+                                    const currentList = Array.isArray(prev.images) ? [...prev.images] : (prev.thumbnail ? [prev.thumbnail] : []);
+                                    if (!currentList.includes(url)) currentList.push(url);
+                                    return {
+                                      ...prev,
+                                      images: currentList,
+                                      thumbnail: prev.thumbnail || url
+                                    };
+                                  });
+                                  setEditCustomImageUrl('');
+                                }
+                              }}
+                              className="flex-1 px-3 py-2 bg-white dark:bg-black/50 border border-gray-300 dark:border-emerald-900 rounded-xl text-xs focus:outline-none focus:border-brand-900"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (!editCustomImageUrl.trim()) return;
+                                const url = editCustomImageUrl.trim();
+                                setEditingProduct(prev => {
+                                  const currentList = Array.isArray(prev.images) ? [...prev.images] : (prev.thumbnail ? [prev.thumbnail] : []);
+                                  if (!currentList.includes(url)) currentList.push(url);
+                                  return {
+                                    ...prev,
+                                    images: currentList,
+                                    thumbnail: prev.thumbnail || url
+                                  };
+                                });
+                                setEditCustomImageUrl('');
+                                showToast(isBangla ? 'ছবি যুক্ত হয়েছে' : 'Image added');
+                              }}
+                              className="px-3.5 py-2 bg-amber-500 hover:bg-amber-600 text-brand-950 font-bold text-xs rounded-xl shadow-sm whitespace-nowrap transition-all"
+                            >
+                              ➕ {isBangla ? 'যুক্ত করুন' : 'Add URL'}
+                            </button>
+                          </div>
+
+                          {/* Live Thumbnail Grid */}
+                          {editingProduct.images && editingProduct.images.length > 0 && (
+                            <div className="space-y-2 pt-2 border-t border-amber-200/60 dark:border-emerald-900/40">
+                              <div className="flex items-center justify-between">
+                                <span className="text-[11px] font-bold text-gray-700 dark:text-emerald-300">
+                                  {isBangla ? `📸 আপলোডকৃত ছবি (${editingProduct.images.length} টি):` : `📸 Images (${editingProduct.images.length}):`}
+                                </span>
+                              </div>
+
+                              <div className="grid grid-cols-3 sm:grid-cols-5 gap-2.5">
+                                {editingProduct.images.map((imgUrl, idx) => {
+                                  const isThumb = editingProduct.thumbnail === imgUrl;
+                                  return (
+                                    <div
+                                      key={idx}
+                                      className={`relative rounded-xl overflow-hidden border-2 p-1 group bg-white dark:bg-black/40 transition-all ${
+                                        isThumb
+                                          ? 'border-amber-500 ring-2 ring-amber-400/40 shadow-sm scale-105'
+                                          : 'border-gray-200 dark:border-emerald-900 hover:border-gray-400'
+                                      }`}
+                                    >
+                                      <div className="aspect-square w-full rounded-lg overflow-hidden bg-gray-100 dark:bg-black/20 relative">
+                                        <img src={imgUrl} alt={`Edit ${idx + 1}`} className="w-full h-full object-cover" />
+                                        {isThumb && (
+                                          <span className="absolute top-1 left-1 bg-amber-500 text-brand-950 text-[8px] font-black px-1 py-0.5 rounded-full shadow-sm">
+                                            ⭐ {isBangla ? 'মূল' : 'Main'}
+                                          </span>
+                                        )}
+                                      </div>
+
+                                      <div className="flex items-center justify-between gap-0.5 mt-1 px-0.5">
+                                        {!isThumb ? (
+                                          <button
+                                            type="button"
+                                            onClick={() => setEditingProduct(prev => ({ ...prev, thumbnail: imgUrl }))}
+                                            className="text-[9px] text-amber-700 dark:text-amber-400 hover:underline font-bold"
+                                            title={isBangla ? 'মূল ছবি করুন' : 'Set as main'}
+                                          >
+                                            ⭐ {isBangla ? 'মূল করুন' : 'Main'}
+                                          </button>
+                                        ) : (
+                                          <span className="text-[9px] text-emerald-600 dark:text-emerald-400 font-bold">✓ {isBangla ? 'মূল ছবি' : 'Active'}</span>
+                                        )}
+
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            setEditingProduct(prev => {
+                                              const filtered = prev.images.filter(x => x !== imgUrl);
+                                              return {
+                                                ...prev,
+                                                images: filtered,
+                                                thumbnail: prev.thumbnail === imgUrl ? (filtered[0] || '') : prev.thumbnail
+                                              };
+                                            });
+                                          }}
+                                          className="p-1 rounded text-red-500 hover:bg-red-50 dark:hover:bg-red-950/40 transition-all"
+                                          title={isBangla ? 'মুছে ফেলুন' : 'Delete'}
+                                        >
+                                          <Trash2 className="w-3 h-3" />
+                                        </button>
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          )}
                         </div>
 
                         <div className="sm:col-span-2">

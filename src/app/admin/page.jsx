@@ -841,7 +841,7 @@ export default function AdminDashboardPage() {
     const payload = {
       ...newProd,
       thumbnail: prodImg,
-      images: prodImg ? [prodImg] : [],
+      images: (Array.isArray(newProd.images) && newProd.images.length > 0) ? newProd.images : (prodImg ? [prodImg] : []),
       category: selectedCat ? (selectedCat.name || selectedCat.name_bn) : 'সকল পণ্য',
       categorySlug: selectedCat ? selectedCat.slug : 'all',
       category_id: selectedCat ? (selectedCat.id || selectedCat._id) : 1,
