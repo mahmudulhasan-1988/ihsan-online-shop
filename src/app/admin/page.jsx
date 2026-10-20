@@ -68,7 +68,9 @@ import {
   Info,
   ShieldAlert,
   Award,
-  ArrowLeftRight
+  ArrowLeftRight,
+  Check,
+  Wallet
 } from 'lucide-react';
 import { 
   getStats, 
@@ -105,6 +107,8 @@ import {
   getPages,
   updatePageContent,
   getSupportTickets, 
+  forwardSupportTicket,
+  deleteSupportTicket,
   getSiteSettings,
   getReviews,
   replyReview, 
@@ -175,6 +179,12 @@ export default function AdminDashboardPage() {
   const [couponsList, setCouponsList] = useState([]);
   const [bannersList, setBannersList] = useState([]);
   const [ticketsList, setTicketsList] = useState([]);
+
+  // 🎧 Support Tickets Forward & Filter States
+  const [forwardModal, setForwardModal] = useState({ isOpen: false, ticket: null, selectedSellerId: '', forwardNote: '' });
+  const [isForwardingTicket, setIsForwardingTicket] = useState(false);
+  const [ticketFilterTab, setTicketFilterTab] = useState('all'); // 'all' | 'open' | 'pending' | 'resolution'
+  const [ticketSearchTerm, setTicketSearchTerm] = useState('');
 
   // 📢 Seller Stock Requests States
   const [stockRequestsList, setStockRequestsList] = useState([]);
@@ -5474,37 +5484,575 @@ export default function AdminDashboardPage() {
           {/* ======================================================== */}
           {/* 8. 💬 SUPPORT & TICKETS                                  */}
           {/* ======================================================== */}
-          {activeMenu === 'support' && (
-            <div className="bg-white dark:bg-[#112318] rounded-3xl p-6 border border-[#e0ebe2] dark:border-[#1d3b28] shadow-sm space-y-6">
-              <div className="border-b border-[#e0ebe2] dark:border-[#1d3b28] pb-4">
-                <h3 className="text-lg font-black text-gray-900 dark:text-emerald-100">
-                  {isBangla ? 'কাস্টমার ও সেলার সাপোর্ট টিকেটস' : 'Support Tickets & Helpdesk'}
-                </h3>
-              </div>
+          {activeMenu === 'support' && (() => {
+            // Filter tickets based on tab and search query
+            const filteredTickets = ticketsList.filter((t) => {
+              const matchesTab = 
+                ticketFilterTab === 'all' ? true :
+                ticketFilterTab === 'open' ? (t.status === 'open' || !t.status) :
+                ticketFilterTab === 'pending' ? (t.status === 'pending') :
+                ticketFilterTab === 'resolution' ? (t.status === 'resolution' || t.status === 'resolved') : true;
 
-              <div className="space-y-3">
-                {ticketsList.map((ticket) => (
-                  <div
-                    key={ticket.id}
-                    className="p-4 bg-gray-50 dark:bg-black/20 rounded-2xl border border-gray-200 dark:border-emerald-900/60 space-y-2"
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-bold text-brand-900 dark:text-emerald-300">
-                        From: {ticket.user_name} ({ticket.user_role})
+              if (!matchesTab) return false;
+
+              if (!ticketSearchTerm.trim()) return true;
+              const q = ticketSearchTerm.toLowerCase();
+              return (
+                (t.ticket_id && t.ticket_id.toLowerCase().includes(q)) ||
+                (t.subject && t.subject.toLowerCase().includes(q)) ||
+                (t.user_name && t.user_name.toLowerCase().includes(q)) ||
+                (t.user_email && t.user_email.toLowerCase().includes(q)) ||
+                (t.assigned_seller_name && t.assigned_seller_name.toLowerCase().includes(q)) ||
+                (t.order_id && t.order_id.toLowerCase().includes(q))
+              );
+            });
+
+            const openCount = ticketsList.filter(t => !t.status || t.status === 'open').length;
+            const pendingCount = ticketsList.filter(t => t.status === 'pending').length;
+            const resolutionCount = ticketsList.filter(t => t.status === 'resolution' || t.status === 'resolved').length;
+
+            const handleForwardToSellerSubmit = async (e) => {
+              e.preventDefault();
+              if (!forwardModal.ticket) return;
+              if (!forwardModal.selectedSellerId) {
+                showToast(isBangla ? 'অনুগ্রহ করে ড্রপডাউন থেকে সেলার নির্বাচন করুন!' : 'Please select a seller from dropdown!', 'error');
+                return;
+              }
+
+              const selectedSeller = sellersList.find(s => 
+                String(s.user_id || s._id || s.id) === String(forwardModal.selectedSellerId) ||
+                s.email === forwardModal.selectedSellerId
+              );
+
+              const sName = selectedSeller?.shop_name || selectedSeller?.seller_name || selectedSeller?.name || 'সেলার';
+              const sId = selectedSeller?.user_id || selectedSeller?._id || selectedSeller?.id || forwardModal.selectedSellerId;
+              const sEmail = selectedSeller?.email || '';
+              const sPhone = selectedSeller?.phone || '';
+
+              setIsForwardingTicket(true);
+              try {
+                const ticketId = forwardModal.ticket.ticket_id || forwardModal.ticket.id || forwardModal.ticket._id;
+                const res = await forwardSupportTicket(ticketId, {
+                  sellerId: sId,
+                  sellerName: sName,
+                  sellerEmail: sEmail,
+                  sellerPhone: sPhone,
+                  forwardNote: forwardModal.forwardNote || 'গ্রাহকের সমস্যাটি দ্রুত সমাধান করার জন্য সেলারের কাছে পাঠানো হয়েছে।'
+                });
+
+                if (res?.success) {
+                  showToast(
+                    isBangla 
+                      ? `✅ সমস্যাটি সফলভাবে '${sName}' এর কাছে Forward করা হয়েছে! এখন এটি Pending অবস্থায় থাকবে।` 
+                      : `Ticket forwarded to '${sName}'! Status is now Pending.`
+                  );
+                  setForwardModal({ isOpen: false, ticket: null, selectedSellerId: '', forwardNote: '' });
+                  loadAllData();
+                } else {
+                  showToast(res?.message || (isBangla ? 'ফরওয়ার্ড ব্যর্থ হয়েছে' : 'Failed to forward ticket'), 'error');
+                }
+              } catch (err) {
+                console.error('Forward ticket error', err);
+                showToast(isBangla ? 'ফরওয়ার্ড করতে ত্রুটি হয়েছে' : 'Error forwarding ticket', 'error');
+              } finally {
+                setIsForwardingTicket(false);
+              }
+            };
+
+            const handleDeleteTicketAction = async (ticket) => {
+              if (!confirm(isBangla ? 'আপনি কি নিশ্চিতভাবে এই সাপোর্ট টিকিটটি মুছে ফেলতে চান?' : 'Are you sure you want to delete this ticket?')) return;
+              try {
+                const ticketId = ticket.ticket_id || ticket.id || ticket._id;
+                const res = await deleteSupportTicket(ticketId);
+                if (res?.success) {
+                  showToast(isBangla ? 'টিকেট মুছে ফেলা হয়েছে' : 'Ticket deleted');
+                  loadAllData();
+                } else {
+                  showToast(res?.message || 'মুছে ফেলতে ব্যর্থ', 'error');
+                }
+              } catch (err) {
+                showToast('ত্রুটি হয়েছে', 'error');
+              }
+            };
+
+            return (
+              <div className="space-y-6">
+                {/* Header Banner */}
+                <div className="bg-white dark:bg-[#112318] rounded-3xl p-6 border border-[#e0ebe2] dark:border-[#1d3b28] shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <span className="p-2 rounded-2xl bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300">
+                        <Headphones className="w-5 h-5" />
                       </span>
-                      <span className={`px-2 py-0.5 rounded-lg text-[10px] font-bold uppercase ${
-                        ticket.status === 'open' ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'
-                      }`}>
-                        {ticket.status}
-                      </span>
+                      <h2 className="text-xl sm:text-2xl font-black text-gray-900 dark:text-emerald-100">
+                        {isBangla ? 'কাস্টমার সাপোর্ট টিকেটস ও সেলার ফরওয়ার্ড' : 'Support Tickets & Helpdesk'}
+                      </h2>
                     </div>
-                    <h4 className="font-bold text-sm">{ticket.subject}</h4>
-                    <p className="text-xs text-gray-600 dark:text-emerald-300 leading-relaxed">{ticket.message}</p>
+                    <p className="text-xs sm:text-sm text-gray-500 dark:text-emerald-400">
+                      {isBangla 
+                        ? 'গ্রাহকদের সমস্যা দেখে ড্রপডাউন থেকে সেলার নির্বাচন করে Forward করুন। সেলার সমাধান না করা পর্যন্ত এটি Pending দেখাবে।' 
+                        : 'Review customer tickets and forward issues to sellers via dropdown. It remains Pending until the seller resolves it.'}
+                    </p>
                   </div>
-                ))}
+                  <button
+                    onClick={() => loadAllData(true)}
+                    className="inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-[#f4f7f4] dark:bg-black/40 hover:bg-emerald-100 dark:hover:bg-emerald-950/60 border border-gray-200 dark:border-emerald-900/60 text-xs sm:text-sm font-bold text-gray-800 dark:text-emerald-200 transition-all self-start md:self-center active:scale-95"
+                  >
+                    <RefreshCw className="w-4 h-4" />
+                    <span>{isBangla ? 'টিকেট রিফ্রেশ' : 'Refresh'}</span>
+                  </button>
+                </div>
+
+                {/* KPI Overview Cards */}
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                  <div 
+                    onClick={() => setTicketFilterTab('all')}
+                    className={`p-5 rounded-3xl border transition-all cursor-pointer ${
+                      ticketFilterTab === 'all' 
+                        ? 'bg-slate-900 text-white border-slate-900 shadow-md ring-2 ring-emerald-500/50' 
+                        : 'bg-white dark:bg-[#112318] border-[#e0ebe2] dark:border-[#1d3b28] hover:border-emerald-500/50'
+                    }`}
+                  >
+                    <div className="text-xs font-bold text-gray-500 dark:text-emerald-400">
+                      {isBangla ? 'মোট টিকিট' : 'Total Tickets'}
+                    </div>
+                    <div className="text-2xl sm:text-3xl font-black mt-1">
+                      {ticketsList.length}
+                    </div>
+                  </div>
+
+                  <div 
+                    onClick={() => setTicketFilterTab('open')}
+                    className={`p-5 rounded-3xl border transition-all cursor-pointer ${
+                      ticketFilterTab === 'open' 
+                        ? 'bg-blue-600 text-white border-blue-600 shadow-md ring-2 ring-blue-400/50' 
+                        : 'bg-white dark:bg-[#112318] border-[#e0ebe2] dark:border-[#1d3b28] hover:border-blue-500/50'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between text-xs font-bold text-blue-600 dark:text-blue-400">
+                      <span>{isBangla ? 'নতুন জমা (Open)' : 'New / Open'}</span>
+                      <span className="w-2.5 h-2.5 rounded-full bg-blue-500 animate-ping"></span>
+                    </div>
+                    <div className="text-2xl sm:text-3xl font-black mt-1 text-blue-600 dark:text-blue-300">
+                      {openCount}
+                    </div>
+                  </div>
+
+                  <div 
+                    onClick={() => setTicketFilterTab('pending')}
+                    className={`p-5 rounded-3xl border transition-all cursor-pointer ${
+                      ticketFilterTab === 'pending' 
+                        ? 'bg-amber-600 text-white border-amber-600 shadow-md ring-2 ring-amber-400/50' 
+                        : 'bg-white dark:bg-[#112318] border-[#e0ebe2] dark:border-[#1d3b28] hover:border-amber-500/50'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between text-xs font-bold text-amber-600 dark:text-amber-400">
+                      <span>{isBangla ? 'পেন্ডিং (সেলার অপেক্ষায়)' : 'Pending with Seller'}</span>
+                      <Clock className="w-3.5 h-3.5" />
+                    </div>
+                    <div className="text-2xl sm:text-3xl font-black mt-1 text-amber-600 dark:text-amber-400">
+                      {pendingCount}
+                    </div>
+                  </div>
+
+                  <div 
+                    onClick={() => setTicketFilterTab('resolution')}
+                    className={`p-5 rounded-3xl border transition-all cursor-pointer ${
+                      ticketFilterTab === 'resolution' 
+                        ? 'bg-emerald-700 text-white border-emerald-700 shadow-md ring-2 ring-emerald-400/50' 
+                        : 'bg-white dark:bg-[#112318] border-[#e0ebe2] dark:border-[#1d3b28] hover:border-emerald-500/50'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between text-xs font-bold text-emerald-600 dark:text-emerald-400">
+                      <span>{isBangla ? 'রেজোলিউশন (সমাধান)' : 'Resolution'}</span>
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                    </div>
+                    <div className="text-2xl sm:text-3xl font-black mt-1 text-emerald-600 dark:text-emerald-300">
+                      {resolutionCount}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Filter Tabs and Search Bar */}
+                <div className="bg-white dark:bg-[#112318] rounded-3xl p-5 border border-[#e0ebe2] dark:border-[#1d3b28] shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+                  {/* Status Tabs */}
+                  <div className="flex flex-wrap items-center gap-2">
+                    {[
+                      { id: 'all', label: isBangla ? 'সকল টিকিট' : 'All', count: ticketsList.length },
+                      { id: 'open', label: isBangla ? 'নতুন জমা (Open)' : 'Open', count: openCount },
+                      { id: 'pending', label: isBangla ? 'পেন্ডিং (Pending)' : 'Pending', count: pendingCount },
+                      { id: 'resolution', label: isBangla ? 'রেজোলিউশন (Resolution)' : 'Resolution', count: resolutionCount },
+                    ].map(tab => (
+                      <button
+                        key={tab.id}
+                        onClick={() => setTicketFilterTab(tab.id)}
+                        className={`px-3.5 py-2 rounded-2xl text-xs font-bold transition-all flex items-center gap-2 ${
+                          ticketFilterTab === tab.id
+                            ? 'bg-brand-900 text-white shadow-sm'
+                            : 'bg-gray-100 dark:bg-black/30 text-gray-700 dark:text-emerald-300 hover:bg-gray-200 dark:hover:bg-black/50'
+                        }`}
+                      >
+                        <span>{tab.label}</span>
+                        <span className={`px-1.5 py-0.5 rounded-lg text-[10px] font-black ${
+                          ticketFilterTab === tab.id ? 'bg-white/20 text-white' : 'bg-gray-200 dark:bg-emerald-950 text-gray-700 dark:text-emerald-300'
+                        }`}>
+                          {tab.count}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Search Bar */}
+                  <div className="relative min-w-[260px]">
+                    <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
+                    <input
+                      type="text"
+                      placeholder={isBangla ? 'টিকেট আইডি, কাস্টমার, বিষয় বা সেলার দিয়ে খুঁজুন...' : 'Search tickets, subject, customer...'}
+                      value={ticketSearchTerm}
+                      onChange={(e) => setTicketSearchTerm(e.target.value)}
+                      className="w-full pl-10 pr-4 py-2.5 bg-gray-50 dark:bg-black/30 border border-gray-200 dark:border-emerald-900/60 rounded-2xl text-xs sm:text-sm font-medium text-gray-900 dark:text-emerald-50 focus:outline-none focus:border-brand-900 transition-colors"
+                    />
+                  </div>
+                </div>
+
+                {/* Tickets List View */}
+                {filteredTickets.length === 0 ? (
+                  <div className="bg-white dark:bg-[#112318] rounded-3xl p-12 text-center border border-[#e0ebe2] dark:border-[#1d3b28] shadow-sm space-y-3">
+                    <div className="w-14 h-14 rounded-full bg-emerald-100 dark:bg-emerald-950 flex items-center justify-center mx-auto text-emerald-600 dark:text-emerald-400">
+                      <Headphones className="w-7 h-7" />
+                    </div>
+                    <h4 className="font-bold text-sm text-gray-800 dark:text-emerald-200">
+                      {isBangla ? 'কোনো সাপোর্ট টিকিট পাওয়া যায়নি' : 'No support tickets found'}
+                    </h4>
+                    <p className="text-xs text-gray-500 dark:text-emerald-400/70 max-w-sm mx-auto">
+                      {isBangla 
+                        ? 'কাস্টমার ড্যাশবোর্ড থেকে কোনো গ্রাহক টিকিট সাবমিট করলে এখানে প্রদর্শিত হবে।' 
+                        : 'Tickets submitted by customers will be listed here.'}
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {filteredTickets.map((ticket, idx) => {
+                      const isPending = ticket.status === 'pending';
+                      const isResolved = ticket.status === 'resolution' || ticket.status === 'resolved';
+                      const isOpen = !isPending && !isResolved;
+
+                      return (
+                        <div
+                          key={ticket.id || ticket._id || idx}
+                          className={`bg-white dark:bg-[#112318] rounded-3xl p-6 border shadow-sm transition-all space-y-4 ${
+                            isResolved
+                              ? 'border-emerald-200 dark:border-emerald-800/80'
+                              : isPending
+                              ? 'border-amber-300 dark:border-amber-800/80 ring-1 ring-amber-400/20'
+                              : 'border-[#e0ebe2] dark:border-[#1d3b28]'
+                          }`}
+                        >
+                          {/* Ticket Header: ID, Date, Customer & Status */}
+                          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 dark:border-emerald-900/60 pb-3.5">
+                            <div className="flex flex-wrap items-center gap-2.5">
+                              <span className="font-mono text-xs font-black px-3 py-1 rounded-xl bg-gray-100 dark:bg-emerald-950 text-gray-800 dark:text-emerald-200">
+                                {ticket.ticket_id || ('TKT-' + (idx + 1001))}
+                              </span>
+                              {ticket.order_id && (
+                                <span className="text-xs font-bold px-2.5 py-1 rounded-xl bg-blue-100 dark:bg-blue-950/80 text-blue-700 dark:text-blue-300">
+                                  Order: {ticket.order_id}
+                                </span>
+                              )}
+                              <span className="text-xs text-gray-500 dark:text-emerald-400">
+                                📅 {ticket.createdAt ? new Date(ticket.createdAt).toLocaleDateString('bn-BD', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'সম্প্রতি'}
+                              </span>
+                            </div>
+
+                            {/* Status Badge */}
+                            <div>
+                              {isResolved ? (
+                                <span className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-black bg-emerald-600 text-white shadow-sm">
+                                  <CheckCircle2 className="w-3.5 h-3.5" />
+                                  <span>Resolution (সমাধান সম্পন্ন)</span>
+                                </span>
+                              ) : isPending ? (
+                                <span className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-black bg-amber-500 text-white shadow-sm">
+                                  <Clock className="w-3.5 h-3.5 animate-spin" />
+                                  <span>Pending (সেলার পর্যালোচনা করছেন)</span>
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-black bg-blue-600 text-white shadow-sm">
+                                  <Clock className="w-3.5 h-3.5" />
+                                  <span>New / Open (নতুন টিকিট)</span>
+                                </span>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Customer & Category Row */}
+                          <div className="flex flex-wrap items-center justify-between gap-3 text-xs">
+                            <div className="flex items-center gap-2 text-gray-700 dark:text-emerald-300">
+                              <span className="font-bold text-brand-900 dark:text-emerald-200">
+                                👤 {ticket.user_name || 'সম্মানিত গ্রাহক'}
+                              </span>
+                              {ticket.user_phone && (
+                                <span className="text-gray-500 dark:text-emerald-400">
+                                  • 📞 {ticket.user_phone}
+                                </span>
+                              )}
+                              {ticket.user_email && (
+                                <span className="text-gray-500 dark:text-emerald-400">
+                                  • ✉️ {ticket.user_email}
+                                </span>
+                              )}
+                            </div>
+                            <span className="font-bold text-emerald-800 dark:text-emerald-300 px-2.5 py-1 rounded-xl bg-emerald-50 dark:bg-emerald-950/60">
+                              🏷️ {ticket.category || 'সাধারণ অনুসন্ধান'}
+                            </span>
+                          </div>
+
+                          {/* Subject & Problem Description */}
+                          <div className="space-y-2">
+                            <h4 className="text-base sm:text-lg font-black text-gray-900 dark:text-emerald-50">
+                              {ticket.subject}
+                            </h4>
+                            <div className="p-4 rounded-2xl bg-gray-50 dark:bg-black/30 border border-gray-100 dark:border-emerald-950 text-xs sm:text-sm text-gray-700 dark:text-emerald-200 leading-relaxed">
+                              {ticket.message}
+                            </div>
+                          </div>
+
+                          {/* 🟠 Pending Status Details (When Forwarded to Seller) */}
+                          {isPending && (
+                            <div className="p-4 rounded-2xl bg-amber-50/70 dark:bg-amber-950/30 border border-amber-300 dark:border-amber-800/80 space-y-2 text-xs text-amber-950 dark:text-amber-100">
+                              <div className="flex flex-wrap items-center justify-between gap-2">
+                                <div className="flex items-center gap-2 font-black text-amber-900 dark:text-amber-200">
+                                  <Clock className="w-4 h-4 text-amber-600 dark:text-amber-400 animate-spin" />
+                                  <span>🏪 ফরোয়ার্ডকৃত সেলার: {ticket.assigned_seller_name || 'সেলার'}</span>
+                                </div>
+                                {ticket.forwarded_at && (
+                                  <span className="text-[11px] text-amber-800/80 dark:text-amber-300">
+                                    ফরোয়ার্ডের তারিখ: {new Date(ticket.forwarded_at).toLocaleDateString('bn-BD', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                  </span>
+                                )}
+                              </div>
+                              {ticket.forward_note && (
+                                <p className="text-xs text-amber-900 dark:text-amber-200 pl-6 italic">
+                                  অ্যাডমিন নোট: &ldquo;{ticket.forward_note}&rdquo;
+                                </p>
+                              )}
+                              <p className="text-[11px] text-amber-800 dark:text-amber-300 font-bold pl-6">
+                                ⚠️ সেলার ড্যাশবোর্ড থেকে &apos;Resolution&apos; বাটনে ক্লিক করার পূর্ব পর্যন্ত এটি Admin ও Customer ড্যাশবোর্ডে Pending দেখাবে।
+                              </p>
+                            </div>
+                          )}
+
+                          {/* 🟢 Resolution Status Details (When Resolved by Seller) */}
+                          {isResolved && (
+                            <div className="p-4 rounded-2xl bg-emerald-50/90 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-800 space-y-2 text-emerald-950 dark:text-emerald-100">
+                              <div className="flex flex-wrap items-center justify-between gap-2">
+                                <div className="flex items-center gap-2 font-black text-emerald-900 dark:text-emerald-200 text-xs sm:text-sm">
+                                  <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                                  <span>🎉 সমস্যাটির সফল সমাধান (Resolution) হয়েছে</span>
+                                </div>
+                                {ticket.resolved_at && (
+                                  <span className="text-[11px] text-emerald-700 dark:text-emerald-400 font-semibold">
+                                    সমাধানের সময়: {new Date(ticket.resolved_at).toLocaleDateString('bn-BD', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                  </span>
+                                )}
+                              </div>
+                              <div className="p-3 bg-white/80 dark:bg-black/30 rounded-xl border border-emerald-200 dark:border-emerald-900/60 text-xs sm:text-sm font-medium leading-relaxed pl-4">
+                                <span className="font-bold text-emerald-800 dark:text-emerald-300">সেলার সমাধান নোট: </span>
+                                {ticket.resolution_note || 'সেলার কর্তৃক সমস্যার সমাধান সম্পন্ন হয়েছে।'}
+                              </div>
+                              <div className="text-[11px] font-bold text-emerald-800 dark:text-emerald-300 pl-4">
+                                সমাধানকারী: {ticket.resolved_by || ticket.assigned_seller_name || 'সেলার'}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Action Buttons Row */}
+                          <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-gray-100 dark:border-emerald-900/60">
+                            <div className="flex flex-wrap items-center gap-2">
+                              {/* Forward to Seller Button (Available for Open or Pending tickets) */}
+                              {!isResolved && (
+                                <button
+                                  onClick={() => {
+                                    setForwardModal({
+                                      isOpen: true,
+                                      ticket,
+                                      selectedSellerId: ticket.assigned_seller_id || '',
+                                      forwardNote: ticket.forward_note || ''
+                                    });
+                                  }}
+                                  className={`px-4 py-2 rounded-2xl text-xs font-black shadow-sm transition-all flex items-center gap-2 active:scale-95 ${
+                                    isPending
+                                      ? 'bg-amber-600 hover:bg-amber-700 text-white'
+                                      : 'bg-gradient-to-r from-brand-900 to-emerald-800 hover:from-brand-950 hover:to-emerald-900 text-white'
+                                  }`}
+                                >
+                                  <Send className="w-3.5 h-3.5" />
+                                  <span>
+                                    {isPending 
+                                      ? (isBangla ? 'সেলার পরিবর্তন / পুনঃ ফরোয়ার্ড' : 'Re-assign Seller') 
+                                      : (isBangla ? 'সেলারের কাছে Forward করুন' : 'Forward to Seller')}
+                                  </span>
+                                </button>
+                              )}
+
+                              {isResolved && (
+                                <span className="text-xs font-bold text-emerald-700 dark:text-emerald-400 flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-100/60 dark:bg-emerald-950/60">
+                                  <Check className="w-4 h-4" />
+                                  <span>{isBangla ? 'পেন্ডিং প্রত্যাহার হয়ে Resolution নিশ্চিত হয়েছে' : 'Pending cleared, Resolution confirmed'}</span>
+                                </span>
+                              )}
+                            </div>
+
+                            {/* Delete Ticket Button */}
+                            <button
+                              onClick={() => handleDeleteTicketAction(ticket)}
+                              className="p-2 rounded-xl text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors"
+                              title={isBangla ? 'টিকেট মুছে ফেলুন' : 'Delete Ticket'}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* 📌 Forward to Seller Modal (With Seller Dropdown) */}
+                {forwardModal.isOpen && forwardModal.ticket && (
+                  <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-200 overflow-y-auto">
+                    <div className="bg-white dark:bg-[#112318] rounded-3xl max-w-xl w-full border border-[#e0ebe2] dark:border-[#1d3b28] shadow-2xl p-6 sm:p-8 space-y-5 my-auto">
+                      
+                      {/* Modal Header */}
+                      <div className="flex items-center justify-between border-b border-gray-100 dark:border-emerald-900/60 pb-4">
+                        <div className="flex items-center gap-2.5">
+                          <span className="p-2.5 rounded-2xl bg-brand-100 dark:bg-emerald-950 text-brand-900 dark:text-emerald-300">
+                            <Send className="w-5 h-5" />
+                          </span>
+                          <div>
+                            <h3 className="text-base sm:text-lg font-black text-gray-900 dark:text-emerald-100">
+                              {isBangla ? 'সেলার ড্যাশবোর্ডে সমস্যা Forward করুন' : 'Forward Issue to Seller'}
+                            </h3>
+                            <p className="text-xs text-gray-500 dark:text-emerald-400">
+                              {isBangla ? 'সেলার ড্রপডাউন থেকে নির্বাচন করুন' : 'Select seller from dropdown'}
+                            </p>
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => setForwardModal({ isOpen: false, ticket: null, selectedSellerId: '', forwardNote: '' })}
+                          className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-emerald-950 text-gray-400 hover:text-gray-600"
+                        >
+                          <X className="w-5 h-5" />
+                        </button>
+                      </div>
+
+                      {/* Ticket Summary Box */}
+                      <div className="p-4 rounded-2xl bg-gray-50 dark:bg-black/30 border border-gray-100 dark:border-emerald-950 space-y-1.5 text-xs">
+                        <div className="flex items-center justify-between text-gray-500 dark:text-emerald-400">
+                          <span className="font-mono font-bold">{forwardModal.ticket.ticket_id}</span>
+                          <span>কাস্টমার: <strong className="text-gray-800 dark:text-emerald-200">{forwardModal.ticket.user_name}</strong></span>
+                        </div>
+                        <h4 className="font-bold text-sm text-gray-900 dark:text-emerald-100">
+                          {forwardModal.ticket.subject}
+                        </h4>
+                        <p className="text-gray-600 dark:text-emerald-300 line-clamp-2">
+                          {forwardModal.ticket.message}
+                        </p>
+                      </div>
+
+                      {/* Forward Form */}
+                      <form onSubmit={handleForwardToSellerSubmit} className="space-y-4">
+                        
+                        {/* 🌟 Seller Dropdown (Admin এর কাছে যত Seller এর নাম গুলো সব Dropdown আকারে থাকবে) */}
+                        <div>
+                          <label className="block text-xs font-bold text-gray-700 dark:text-emerald-300 mb-1.5">
+                            {isBangla ? 'সেলার নির্বাচন করুন (Seller Dropdown) *' : 'Select Seller *'}
+                          </label>
+                          <select
+                            required
+                            value={forwardModal.selectedSellerId}
+                            onChange={(e) => setForwardModal({ ...forwardModal, selectedSellerId: e.target.value })}
+                            className="w-full px-4 py-3 bg-[#f8faf8] dark:bg-black/40 border-2 border-emerald-500/50 dark:border-emerald-700 rounded-2xl text-xs sm:text-sm font-bold text-gray-900 dark:text-emerald-50 focus:outline-none focus:border-brand-900 transition-colors cursor-pointer"
+                          >
+                            <option value="">{isBangla ? '-- ড্রপডাউন থেকে সেলার নির্বাচন করুন --' : '-- Choose a Seller from Dropdown --'}</option>
+                            {sellersList.map((seller, sIdx) => {
+                              const sValue = seller.user_id || seller._id || seller.id;
+                              const shopTitle = seller.shop_name || seller.seller_name || `সেলার #${sIdx + 1}`;
+                              const sellerPerson = seller.seller_name || seller.name || 'সেলার';
+                              const sellerContact = seller.phone || seller.email || '';
+                              return (
+                                <option key={sValue || sIdx} value={sValue}>
+                                  🏪 {shopTitle} — {sellerPerson} {sellerContact ? `(${sellerContact})` : ''}
+                                </option>
+                              );
+                            })}
+                          </select>
+                          <p className="text-[11px] text-gray-500 dark:text-emerald-400/80 mt-1">
+                            {isBangla 
+                              ? 'যে সেলারের পণ্য নিয়ে গ্রাহকের সমস্যা সেই সেলারকে ড্রপডাউন থেকে বেছে নিন।' 
+                              : 'Select the seller responsible for this product or issue.'}
+                          </p>
+                        </div>
+
+                        {/* Note for Seller */}
+                        <div>
+                          <label className="block text-xs font-bold text-gray-700 dark:text-emerald-300 mb-1.5">
+                            {isBangla ? 'সেলারের জন্য নোট বা নির্দেশনা (ঐচ্ছিক)' : 'Note for Seller (Optional)'}
+                          </label>
+                          <textarea
+                            rows={3}
+                            placeholder={isBangla ? 'যেমন: গ্রাহকের সাথে কথা বলে অবিলম্বে ত্রুটিপূর্ণ পণ্য রিপ্লেস করার অনুরোধ।' : 'e.g. Please contact customer and replace the damaged product promptly.'}
+                            value={forwardModal.forwardNote}
+                            onChange={(e) => setForwardModal({ ...forwardModal, forwardNote: e.target.value })}
+                            className="w-full px-4 py-3 bg-[#f8faf8] dark:bg-black/40 border border-gray-200 dark:border-emerald-900/60 rounded-2xl text-xs sm:text-sm font-medium text-gray-900 dark:text-emerald-50 focus:outline-none focus:border-brand-900 transition-colors resize-none leading-relaxed"
+                          />
+                        </div>
+
+                        {/* Status Notice */}
+                        <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900/60 text-xs text-amber-800 dark:text-amber-300">
+                          ℹ️ {isBangla 
+                            ? 'সেলার ড্যাশবোর্ডে পাঠানোর পর যতক্ষণ সেলার সমস্যা সমাধান না করবেন ততক্ষণ স্ট্যাটাস "Pending" দেখাবে।' 
+                            : 'Once forwarded, the status will show "Pending" until the seller marks it as Resolution.'}
+                        </div>
+
+                        {/* Submit & Cancel Buttons */}
+                        <div className="flex items-center justify-end gap-3 pt-2">
+                          <button
+                            type="button"
+                            onClick={() => setForwardModal({ isOpen: false, ticket: null, selectedSellerId: '', forwardNote: '' })}
+                            className="px-5 py-2.5 rounded-2xl bg-gray-100 dark:bg-black/40 hover:bg-gray-200 text-xs sm:text-sm font-bold text-gray-700 dark:text-emerald-300 transition-colors"
+                          >
+                            {isBangla ? 'বাতিল' : 'Cancel'}
+                          </button>
+                          <button
+                            type="submit"
+                            disabled={isForwardingTicket}
+                            className="px-6 py-2.5 rounded-2xl bg-gradient-to-r from-brand-900 to-emerald-800 hover:from-brand-950 hover:to-emerald-900 text-white text-xs sm:text-sm font-black shadow-md hover:shadow-lg transition-all flex items-center gap-2 disabled:opacity-50"
+                          >
+                            {isForwardingTicket ? (
+                              <>
+                                <RefreshCw className="w-4 h-4 animate-spin" />
+                                <span>{isBangla ? 'ফরোয়ার্ড হচ্ছে...' : 'Forwarding...'}</span>
+                              </>
+                            ) : (
+                              <>
+                                <Send className="w-4 h-4" />
+                                <span>{isBangla ? 'সেলারকে Forward করুন (Pending)' : 'Forward to Seller'}</span>
+                              </>
+                            )}
+                          </button>
+                        </div>
+
+                      </form>
+
+                    </div>
+                  </div>
+                )}
+
               </div>
-            </div>
-          )}
+            );
+          })()}
 
           {/* ======================================================== */}
           {/* 🌟 ADMIN PROFILE SETTINGS                                */}

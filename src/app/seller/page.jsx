@@ -66,7 +66,9 @@ import {
   createCoupon, 
   getSellers,
   getSellerProfile,
-  updateSellerProfile
+  updateSellerProfile,
+  getSupportTickets,
+  resolveSupportTicket
 } from '@/lib/api';
 import { uploadToImgBB } from '@/lib/imgbb';
 import { useCart } from '@/context/CartContext';
@@ -137,6 +139,14 @@ export default function SellerDashboardPage() {
   const [myWithdrawals, setMyWithdrawals] = useState([]);
   const [myReviews, setMyReviews] = useState([]);
   const [myStockRequests, setMyStockRequests] = useState([]);
+
+  // 🎧 Support & Helpdesk Tickets States
+  const [myTickets, setMyTickets] = useState([]);
+  const [ticketFilterTab, setTicketFilterTab] = useState('all'); // 'all' | 'pending' | 'resolution'
+  const [ticketSearchTerm, setTicketSearchTerm] = useState('');
+  const [resolveModal, setResolveModal] = useState({ isOpen: false, ticket: null, resolutionNote: '' });
+  const [isResolvingTicket, setIsResolvingTicket] = useState(false);
+
   const [orderSubTab, setOrderSubTab] = useState('all');
   const [selectedOrderForSlip, setSelectedOrderForSlip] = useState(null);
   const [replyTextMap, setReplyTextMap] = useState({});
@@ -235,7 +245,7 @@ export default function SellerDashboardPage() {
     if (showLoading) setLoading(true);
     try {
       const sellerIdentifier = user?.id || user?._id || user?.email || user?.phone || 'seller';
-      const [prodRes, ordRes, withRes, revRes, sellerProfileRes, catRes, stockReqRes] = await Promise.all([
+      const [prodRes, ordRes, withRes, revRes, sellerProfileRes, catRes, stockReqRes, tickRes] = await Promise.all([
         getProducts({ sellerId: sellerIdentifier, limit: 200 }),
         getOrders(),
         getSellerWithdrawals(),
@@ -243,9 +253,11 @@ export default function SellerDashboardPage() {
         getSellerProfile(sellerIdentifier),
         getCategories(),
         getStockRequests({ sellerId: sellerIdentifier }),
+        getSupportTickets({ sellerId: sellerIdentifier }),
       ]);
 
       setMyStockRequests(stockReqRes?.data || []);
+      setMyTickets(tickRes?.data || []);
 
       const allProds = prodRes?.data || [];
       
@@ -902,8 +914,17 @@ export default function SellerDashboardPage() {
     { id: 'products', label: isBangla ? 'পণ্য ব্যবস্থাপনা' : 'Products & Stock', icon: Package, count: myProducts.length },
     { id: 'orders', label: isBangla ? 'অর্ডার প্রসেসিং' : 'Orders Fulfillment', icon: ShoppingCart, count: myOrders.length },
     { id: 'earnings', label: isBangla ? 'আর্নিংস ও উইথড্র' : 'Earnings & Payouts', icon: Wallet },
-    { id: 'reviews', label: isBangla ? 'গ্রাহক রিভিউ ও রেটিং' : 'Reviews & Replies', icon: Star, count: myReviews.length },
-    { id: 'support', label: isBangla ? 'সাপোর্ট ও সাহায্য' : 'Help & Support', icon: Headphones },
+    { 
+      id: 'support', 
+      label: isBangla ? 'সাপোর্ট ও সাহায্য' : 'Help & Support', 
+      icon: Headphones,
+      count: myTickets.filter(t => t.status === 'pending').length > 0 
+        ? `${myTickets.filter(t => t.status === 'pending').length} পেন্ডিং` 
+        : (myTickets.length > 0 ? `${myTickets.length}` : null),
+      countColor: myTickets.filter(t => t.status === 'pending').length > 0 
+        ? 'bg-amber-500 text-slate-950 font-black animate-pulse' 
+        : undefined
+    },
     { id: 'vendor_management', label: isBangla ? '🏪 শপ ও ভেন্ডর সেটিংস' : 'Shop & Vendor Settings', icon: Store },
     { id: 'seller_profile', label: isBangla ? '👤 সেলার প্রোফাইল ও সিকিউরিটি' : 'Seller Profile & Security', icon: User },
   ];
@@ -3791,6 +3812,467 @@ export default function SellerDashboardPage() {
 
             </div>
           )}
+
+          {/* ======================================================== */}
+          {/* 🎧 5. HELP & SUPPORT TICKETS (FORWARDED BY ADMIN)        */}
+          {/* ======================================================== */}
+          {activeMenu === 'support' && (() => {
+            const currentSellerId = String(user?.id || user?._id || user?.userId || '');
+            const currentSellerEmail = (user?.email || '').toLowerCase().trim();
+
+            // Filter tickets assigned to this seller (or all for admin viewing seller panel)
+            const sellerTickets = myTickets.filter(t => {
+              if (user?.role === 'admin') return true;
+              const aId = String(t.assigned_seller_id || '');
+              const aEmail = (t.assigned_seller_email || '').toLowerCase().trim();
+              return (aId && aId === currentSellerId) || (aEmail && aEmail === currentSellerEmail) || (!t.assigned_seller_id && t.status === 'pending');
+            });
+
+            // Filter by tab and search
+            const filteredTickets = sellerTickets.filter(t => {
+              const matchesTab = 
+                ticketFilterTab === 'all' ? true :
+                ticketFilterTab === 'pending' ? (t.status === 'pending') :
+                ticketFilterTab === 'resolution' ? (t.status === 'resolution' || t.status === 'resolved') : true;
+
+              if (!matchesTab) return false;
+
+              if (!ticketSearchTerm.trim()) return true;
+              const q = ticketSearchTerm.toLowerCase();
+              return (
+                (t.ticket_id && t.ticket_id.toLowerCase().includes(q)) ||
+                (t.subject && t.subject.toLowerCase().includes(q)) ||
+                (t.user_name && t.user_name.toLowerCase().includes(q)) ||
+                (t.order_id && t.order_id.toLowerCase().includes(q)) ||
+                (t.message && t.message.toLowerCase().includes(q))
+              );
+            });
+
+            const pendingTickets = sellerTickets.filter(t => t.status === 'pending');
+            const resolvedTickets = sellerTickets.filter(t => t.status === 'resolution' || t.status === 'resolved');
+
+            const handleResolveSubmit = async (e) => {
+              e.preventDefault();
+              if (!resolveModal.ticket) return;
+              if (!resolveModal.resolutionNote.trim()) {
+                showToast(isBangla ? 'অনুগ্রহ করে সমাধানের বিবরণ বা নোট লিখুন!' : 'Please write resolution details!', 'error');
+                return;
+              }
+
+              setIsResolvingTicket(true);
+              try {
+                const ticketId = resolveModal.ticket.ticket_id || resolveModal.ticket.id || resolveModal.ticket._id;
+                const sellerDisplayName = sellerInfo.shop_name || sellerInfo.seller_name || user?.name || 'সেলার';
+
+                const res = await resolveSupportTicket(ticketId, {
+                  resolutionNote: resolveModal.resolutionNote.trim(),
+                  resolvedBy: sellerDisplayName
+                });
+
+                if (res?.success) {
+                  showToast(
+                    isBangla 
+                      ? '🎉 সমস্যাটি সফলভাবে সমাধান (Resolution) করা হয়েছে! Admin Dashboard থেকে Pending চলে গেছে এবং Resolution প্রদর্শিত হচ্ছে।' 
+                      : 'Ticket marked as Resolution! Pending status removed in Admin Dashboard.'
+                  );
+                  setResolveModal({ isOpen: false, ticket: null, resolutionNote: '' });
+                  loadSellerData();
+                } else {
+                  showToast(res?.message || (isBangla ? 'সমাধান ব্যর্থ হয়েছে' : 'Failed to resolve ticket'), 'error');
+                }
+              } catch (err) {
+                console.error('Resolve ticket error', err);
+                showToast(isBangla ? 'সমাধান করতে ত্রুটি হয়েছে' : 'Error resolving ticket', 'error');
+              } finally {
+                setIsResolvingTicket(false);
+              }
+            };
+
+            return (
+              <div className="space-y-6">
+                {/* Header Banner */}
+                <div className="bg-white dark:bg-[#112318] rounded-3xl p-6 border border-[#e0ebe2] dark:border-[#1d3b28] shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <span className="p-2 rounded-2xl bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300">
+                        <Headphones className="w-5 h-5" />
+                      </span>
+                      <h2 className="text-xl sm:text-2xl font-black text-gray-900 dark:text-emerald-100">
+                        {isBangla ? 'সহায়তা ও গ্রাহক সমস্যা সমাধান (Help & Support)' : 'Help & Support - Issue Resolution'}
+                      </h2>
+                    </div>
+                    <p className="text-xs sm:text-sm text-gray-500 dark:text-emerald-400">
+                      {isBangla 
+                        ? 'অ্যাডমিন কর্তৃক আপনার কাছে ফরোয়ার্ডকৃত গ্রাহক সমস্যাগুলো দেখুন এবং সমাধান করে "Resolution" বাটনে ক্লিক করুন।' 
+                        : 'Review customer issues forwarded by Admin. Once solved, click the "Resolution" button to clear Pending.'}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => loadSellerData(true)}
+                    className="inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-[#f4f7f4] dark:bg-black/40 hover:bg-emerald-100 dark:hover:bg-emerald-950/60 border border-gray-200 dark:border-emerald-900/60 text-xs sm:text-sm font-bold text-gray-800 dark:text-emerald-200 transition-all self-start md:self-center active:scale-95"
+                  >
+                    <RefreshCw className="w-4 h-4" />
+                    <span>{isBangla ? 'রিফ্রেশ' : 'Refresh'}</span>
+                  </button>
+                </div>
+
+                {/* KPI Counters */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div 
+                    onClick={() => setTicketFilterTab('all')}
+                    className={`p-5 rounded-3xl border transition-all cursor-pointer ${
+                      ticketFilterTab === 'all' 
+                        ? 'bg-slate-900 text-white border-slate-900 shadow-md ring-2 ring-emerald-500/50' 
+                        : 'bg-white dark:bg-[#112318] border-[#e0ebe2] dark:border-[#1d3b28]'
+                    }`}
+                  >
+                    <div className="text-xs font-bold text-gray-500 dark:text-emerald-400">
+                      {isBangla ? 'মোট ফরোয়ার্ডকৃত টিকিট' : 'Total Forwarded'}
+                    </div>
+                    <div className="text-2xl sm:text-3xl font-black mt-1">
+                      {sellerTickets.length}
+                    </div>
+                  </div>
+
+                  <div 
+                    onClick={() => setTicketFilterTab('pending')}
+                    className={`p-5 rounded-3xl border transition-all cursor-pointer ${
+                      ticketFilterTab === 'pending' 
+                        ? 'bg-amber-600 text-white border-amber-600 shadow-md ring-2 ring-amber-400/50' 
+                        : 'bg-white dark:bg-[#112318] border-[#e0ebe2] dark:border-[#1d3b28]'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between text-xs font-bold text-amber-600 dark:text-amber-400">
+                      <span>{isBangla ? 'অপেক্ষমান (Pending)' : 'Pending Resolution'}</span>
+                      <Clock className="w-3.5 h-3.5 animate-spin" />
+                    </div>
+                    <div className="text-2xl sm:text-3xl font-black mt-1 text-amber-600 dark:text-amber-400">
+                      {pendingTickets.length}
+                    </div>
+                    <p className="text-[10px] text-amber-700/80 dark:text-amber-300/80 mt-1">
+                      {isBangla ? 'যতক্ষণ সমাধান না করবেন ততক্ষণ Pending থাকবে' : 'Remains Pending until resolved'}
+                    </p>
+                  </div>
+
+                  <div 
+                    onClick={() => setTicketFilterTab('resolution')}
+                    className={`p-5 rounded-3xl border transition-all cursor-pointer ${
+                      ticketFilterTab === 'resolution' 
+                        ? 'bg-emerald-700 text-white border-emerald-700 shadow-md ring-2 ring-emerald-400/50' 
+                        : 'bg-white dark:bg-[#112318] border-[#e0ebe2] dark:border-[#1d3b28]'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between text-xs font-bold text-emerald-600 dark:text-emerald-400">
+                      <span>{isBangla ? 'সমাধান সম্পন্ন (Resolution)' : 'Resolution'}</span>
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                    </div>
+                    <div className="text-2xl sm:text-3xl font-black mt-1 text-emerald-600 dark:text-emerald-300">
+                      {resolvedTickets.length}
+                    </div>
+                    <p className="text-[10px] text-emerald-700/80 dark:text-emerald-300/80 mt-1">
+                      {isBangla ? 'অ্যাডমিন ড্যাশবোর্ডে Resolution দেখাচ্ছে' : 'Reflected as Resolution in Admin'}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Filter Tabs & Search */}
+                <div className="bg-white dark:bg-[#112318] rounded-3xl p-5 border border-[#e0ebe2] dark:border-[#1d3b28] shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+                  <div className="flex flex-wrap items-center gap-2">
+                    {[
+                      { id: 'all', label: isBangla ? 'সকল টিকিট' : 'All', count: sellerTickets.length },
+                      { id: 'pending', label: isBangla ? 'অপেক্ষমান (Pending)' : 'Pending', count: pendingTickets.length },
+                      { id: 'resolution', label: isBangla ? 'সমাধান সম্পন্ন (Resolution)' : 'Resolution', count: resolvedTickets.length },
+                    ].map(tab => (
+                      <button
+                        key={tab.id}
+                        onClick={() => setTicketFilterTab(tab.id)}
+                        className={`px-3.5 py-2 rounded-2xl text-xs font-bold transition-all flex items-center gap-2 ${
+                          ticketFilterTab === tab.id
+                            ? 'bg-brand-900 text-white shadow-sm'
+                            : 'bg-gray-100 dark:bg-black/30 text-gray-700 dark:text-emerald-300 hover:bg-gray-200 dark:hover:bg-black/50'
+                        }`}
+                      >
+                        <span>{tab.label}</span>
+                        <span className={`px-1.5 py-0.5 rounded-lg text-[10px] font-black ${
+                          ticketFilterTab === tab.id ? 'bg-white/20 text-white' : 'bg-gray-200 dark:bg-emerald-950 text-gray-700 dark:text-emerald-300'
+                        }`}>
+                          {tab.count}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+
+                  <div className="relative min-w-[260px]">
+                    <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
+                    <input
+                      type="text"
+                      placeholder={isBangla ? 'টিকেট আইডি, কাস্টমার বা বিষয় দিয়ে খুঁজুন...' : 'Search issues, subject...'}
+                      value={ticketSearchTerm}
+                      onChange={(e) => setTicketSearchTerm(e.target.value)}
+                      className="w-full pl-10 pr-4 py-2.5 bg-gray-50 dark:bg-black/30 border border-gray-200 dark:border-emerald-900/60 rounded-2xl text-xs sm:text-sm font-medium text-gray-900 dark:text-emerald-50 focus:outline-none focus:border-brand-900 transition-colors"
+                    />
+                  </div>
+                </div>
+
+                {/* Tickets List */}
+                {filteredTickets.length === 0 ? (
+                  <div className="bg-white dark:bg-[#112318] rounded-3xl p-12 text-center border border-[#e0ebe2] dark:border-[#1d3b28] shadow-sm space-y-3">
+                    <div className="w-14 h-14 rounded-full bg-emerald-100 dark:bg-emerald-950 flex items-center justify-center mx-auto text-emerald-600 dark:text-emerald-400">
+                      <Headphones className="w-7 h-7" />
+                    </div>
+                    <h4 className="font-bold text-sm text-gray-800 dark:text-emerald-200">
+                      {isBangla ? 'কোনো টিকিট পাওয়া যায়নি' : 'No tickets found'}
+                    </h4>
+                    <p className="text-xs text-gray-500 dark:text-emerald-400/70 max-w-sm mx-auto">
+                      {isBangla 
+                        ? 'অ্যাডমিন কোনো গ্রাহক সমস্যা আপনার ড্যাশবোর্ডে Forward করলে এখানে দেখা যাবে।' 
+                        : 'Issues forwarded by Admin will appear here.'}
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {filteredTickets.map((ticket, idx) => {
+                      const isPending = ticket.status === 'pending';
+                      const isResolved = ticket.status === 'resolution' || ticket.status === 'resolved';
+
+                      return (
+                        <div
+                          key={ticket.id || ticket._id || idx}
+                          className={`bg-white dark:bg-[#112318] rounded-3xl p-6 border shadow-sm transition-all space-y-4 ${
+                            isResolved
+                              ? 'border-emerald-200 dark:border-emerald-800/80 bg-emerald-50/10'
+                              : 'border-amber-300 dark:border-amber-800/80 ring-1 ring-amber-400/20 bg-amber-50/10'
+                          }`}
+                        >
+                          {/* Card Header: ID, Date & Status */}
+                          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 dark:border-emerald-900/60 pb-3.5">
+                            <div className="flex flex-wrap items-center gap-2.5">
+                              <span className="font-mono text-xs font-black px-3 py-1 rounded-xl bg-gray-100 dark:bg-emerald-950 text-gray-800 dark:text-emerald-200">
+                                {ticket.ticket_id || ('TKT-' + (idx + 1001))}
+                              </span>
+                              {ticket.order_id && (
+                                <span className="text-xs font-bold px-2.5 py-1 rounded-xl bg-blue-100 dark:bg-blue-950/80 text-blue-700 dark:text-blue-300">
+                                  Order: {ticket.order_id}
+                                </span>
+                              )}
+                              <span className="text-xs text-gray-500 dark:text-emerald-400">
+                                📅 ফরোয়ার্ডের তারিখ: {ticket.forwarded_at ? new Date(ticket.forwarded_at).toLocaleDateString('bn-BD', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : (ticket.createdAt ? new Date(ticket.createdAt).toLocaleDateString('bn-BD', { year: 'numeric', month: 'short', day: 'numeric' }) : 'সম্প্রতি')}
+                              </span>
+                            </div>
+
+                            {/* Status Badge */}
+                            <div>
+                              {isResolved ? (
+                                <span className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-black bg-emerald-600 text-white shadow-sm">
+                                  <CheckCircle2 className="w-3.5 h-3.5" />
+                                  <span>Resolution (সমাধান সম্পন্ন)</span>
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-black bg-amber-500 text-white shadow-sm">
+                                  <Clock className="w-3.5 h-3.5 animate-spin" />
+                                  <span>Pending (অপেক্ষমান - সমাধান প্রয়োজন)</span>
+                                </span>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Customer Info */}
+                          <div className="flex flex-wrap items-center justify-between gap-3 text-xs">
+                            <div className="flex items-center gap-2 text-gray-700 dark:text-emerald-300">
+                              <span className="font-bold text-brand-900 dark:text-emerald-200">
+                                👤 কাস্টমার: {ticket.user_name || 'গ্রাহক'}
+                              </span>
+                              {ticket.user_phone && (
+                                <span className="text-gray-500 dark:text-emerald-400">
+                                  • 📞 {ticket.user_phone}
+                                </span>
+                              )}
+                              {ticket.user_email && (
+                                <span className="text-gray-500 dark:text-emerald-400">
+                                  • ✉️ {ticket.user_email}
+                                </span>
+                              )}
+                            </div>
+                            <span className="font-bold text-amber-800 dark:text-amber-300 px-2.5 py-1 rounded-xl bg-amber-100/60 dark:bg-amber-950/60">
+                              🏷️ {ticket.category || 'পণ্য সমস্যা'}
+                            </span>
+                          </div>
+
+                          {/* Subject & Customer Description */}
+                          <div className="space-y-2">
+                            <h4 className="text-base sm:text-lg font-black text-gray-900 dark:text-emerald-50">
+                              {ticket.subject}
+                            </h4>
+                            <div className="p-4 rounded-2xl bg-gray-50 dark:bg-black/30 border border-gray-100 dark:border-emerald-950 text-xs sm:text-sm text-gray-700 dark:text-emerald-200 leading-relaxed">
+                              {ticket.message}
+                            </div>
+                          </div>
+
+                          {/* Admin Forward Note */}
+                          {ticket.forward_note && (
+                            <div className="p-3.5 rounded-2xl bg-purple-50 dark:bg-purple-950/30 border border-purple-200 dark:border-purple-900/60 text-xs text-purple-900 dark:text-purple-200 space-y-1">
+                              <span className="font-black text-purple-900 dark:text-purple-300 flex items-center gap-1.5">
+                                <span>🛡️</span>
+                                <span>অ্যাডমিন নির্দেশনা (Admin Note):</span>
+                              </span>
+                              <p className="leading-relaxed pl-5">&ldquo;{ticket.forward_note}&rdquo;</p>
+                            </div>
+                          )}
+
+                          {/* 🟠 Pending Notice and Resolution Button */}
+                          {isPending && (
+                            <div className="p-4 rounded-2xl bg-amber-50/80 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800/80 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                              <div className="space-y-1">
+                                <div className="flex items-center gap-2 text-xs font-black text-amber-900 dark:text-amber-200">
+                                  <Clock className="w-4 h-4 text-amber-600 dark:text-amber-400 animate-spin" />
+                                  <span>স্ট্যাটাস: Pending (সমাধানের অপেক্ষায়)</span>
+                                </div>
+                                <p className="text-[11px] text-amber-800 dark:text-amber-300/90 leading-relaxed max-w-xl">
+                                  {isBangla 
+                                    ? 'যতক্ষণ আপনি এই সমস্যাটি সমাধান না করবেন ততক্ষণ Admin ও Customer ড্যাশবোর্ডে এটি Pending দেখাবে। সমাধান হয়ে গেলে পাশের Resolution বাটনে ক্লিক করুন।' 
+                                    : 'This issue remains Pending until you resolve it. Click Resolution once resolved.'}
+                                </p>
+                              </div>
+
+                              {/* 🌟 Resolution Button (Seller সমস্যা সমাধান করা হলে Resolution Button Click করলে তখন Admin Dashboard থেকে Pending চলে যাবে এবং দেখাবে Resolution) */}
+                              <button
+                                onClick={() => setResolveModal({ isOpen: true, ticket, resolutionNote: '' })}
+                                className="px-6 py-3 rounded-2xl bg-gradient-to-r from-emerald-600 via-emerald-700 to-brand-900 hover:from-emerald-700 hover:to-brand-950 text-white font-black text-xs sm:text-sm shadow-md hover:shadow-lg active:scale-95 transition-all flex items-center justify-center gap-2 shrink-0"
+                              >
+                                <CheckCircle2 className="w-4 h-4" />
+                                <span>Resolution (সমস্যা সমাধান করুন)</span>
+                              </button>
+                            </div>
+                          )}
+
+                          {/* 🟢 Resolution Completed Box */}
+                          {isResolved && (
+                            <div className="p-4 rounded-2xl bg-emerald-50/90 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-800 space-y-2 text-emerald-950 dark:text-emerald-100">
+                              <div className="flex flex-wrap items-center justify-between gap-2">
+                                <div className="flex items-center gap-2 font-black text-emerald-900 dark:text-emerald-200 text-xs sm:text-sm">
+                                  <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                                  <span>🎉 সমস্যা সমাধান সম্পন্ন হয়েছে (Resolution)</span>
+                                </div>
+                                {ticket.resolved_at && (
+                                  <span className="text-[11px] text-emerald-700 dark:text-emerald-400 font-semibold">
+                                    সমাধানের সময়: {new Date(ticket.resolved_at).toLocaleDateString('bn-BD', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                  </span>
+                                )}
+                              </div>
+                              <div className="p-3 bg-white/80 dark:bg-black/30 rounded-xl border border-emerald-200 dark:border-emerald-900/60 text-xs sm:text-sm font-medium leading-relaxed pl-4">
+                                <span className="font-bold text-emerald-800 dark:text-emerald-300">আপনার সমাধান নোট: </span>
+                                {ticket.resolution_note || 'সেলার কর্তৃক সমস্যার সন্তোষজনক সমাধান সম্পন্ন হয়েছে।'}
+                              </div>
+                              <div className="text-[11px] font-bold text-emerald-800 dark:text-emerald-300 pl-4">
+                                সমাধানকারী: {ticket.resolved_by || 'আপনি (সেলার)'}
+                              </div>
+                            </div>
+                          )}
+
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* 📌 Resolution Confirmation Modal */}
+                {resolveModal.isOpen && resolveModal.ticket && (
+                  <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-200 overflow-y-auto">
+                    <div className="bg-white dark:bg-[#112318] rounded-3xl max-w-lg w-full border border-[#e0ebe2] dark:border-[#1d3b28] shadow-2xl p-6 sm:p-8 space-y-5 my-auto">
+                      
+                      {/* Modal Header */}
+                      <div className="flex items-center justify-between border-b border-gray-100 dark:border-emerald-900/60 pb-4">
+                        <div className="flex items-center gap-2.5">
+                          <span className="p-2.5 rounded-2xl bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300">
+                            <CheckCircle2 className="w-5 h-5" />
+                          </span>
+                          <div>
+                            <h3 className="text-base sm:text-lg font-black text-gray-900 dark:text-emerald-100">
+                              {isBangla ? 'সমস্যার সমাধান নিশ্চিত করুন (Resolution)' : 'Confirm Issue Resolution'}
+                            </h3>
+                            <p className="text-xs text-gray-500 dark:text-emerald-400">
+                              {isBangla ? 'সমাধানের বিবরণ প্রদান করুন' : 'Provide resolution notes'}
+                            </p>
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => setResolveModal({ isOpen: false, ticket: null, resolutionNote: '' })}
+                          className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-emerald-950 text-gray-400 hover:text-gray-600"
+                        >
+                          <X className="w-5 h-5" />
+                        </button>
+                      </div>
+
+                      {/* Ticket Summary */}
+                      <div className="p-4 rounded-2xl bg-gray-50 dark:bg-black/30 border border-gray-100 dark:border-emerald-950 space-y-1 text-xs">
+                        <div className="flex items-center justify-between text-gray-500 dark:text-emerald-400">
+                          <span className="font-mono font-bold">{resolveModal.ticket.ticket_id}</span>
+                          <span>কাস্টমার: <strong className="text-gray-800 dark:text-emerald-200">{resolveModal.ticket.user_name}</strong></span>
+                        </div>
+                        <h4 className="font-bold text-sm text-gray-900 dark:text-emerald-100 pt-1">
+                          {resolveModal.ticket.subject}
+                        </h4>
+                      </div>
+
+                      {/* Resolution Form */}
+                      <form onSubmit={handleResolveSubmit} className="space-y-4">
+                        <div>
+                          <label className="block text-xs font-bold text-gray-700 dark:text-emerald-300 mb-1.5">
+                            {isBangla ? 'সমাধান বিবরণী বা নোট (Resolution Note) *' : 'Resolution Details / Explanation *'}
+                          </label>
+                          <textarea
+                            rows={4}
+                            required
+                            placeholder={isBangla ? 'কীভাবে সমস্যাটি সমাধান করেছেন বিস্তারিত লিখুন (যেমন: গ্রাহকের সাথে কথা বলে আজকেই নতুন পণ্য কুরিয়ারে বুকিং দেওয়া হয়েছে। ট্র্যাকিং কোড: SA-88912)...' : 'Describe how the issue was resolved...'}
+                            value={resolveModal.resolutionNote}
+                            onChange={(e) => setResolveModal({ ...resolveModal, resolutionNote: e.target.value })}
+                            className="w-full px-4 py-3 bg-[#f8faf8] dark:bg-black/40 border-2 border-emerald-500/50 dark:border-emerald-700 rounded-2xl text-xs sm:text-sm font-medium text-gray-900 dark:text-emerald-50 focus:outline-none focus:border-brand-900 transition-colors resize-none leading-relaxed"
+                          />
+                        </div>
+
+                        {/* Confirmation Notice */}
+                        <div className="p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-900/60 text-xs text-emerald-800 dark:text-emerald-300">
+                          ✅ {isBangla 
+                            ? 'Resolution বাটনে ক্লিক করলে Admin ও Customer ড্যাশবোর্ড থেকে "Pending" চলে যাবে এবং "Resolution" হিসেবে আপডেট হবে।' 
+                            : 'Clicking confirm will clear "Pending" and mark the ticket as "Resolution" across Admin & Customer Dashboards.'}
+                        </div>
+
+                        {/* Actions */}
+                        <div className="flex items-center justify-end gap-3 pt-2">
+                          <button
+                            type="button"
+                            onClick={() => setResolveModal({ isOpen: false, ticket: null, resolutionNote: '' })}
+                            className="px-5 py-2.5 rounded-2xl bg-gray-100 dark:bg-black/40 hover:bg-gray-200 text-xs sm:text-sm font-bold text-gray-700 dark:text-emerald-300 transition-colors"
+                          >
+                            {isBangla ? 'বাতিল' : 'Cancel'}
+                          </button>
+                          <button
+                            type="submit"
+                            disabled={isResolvingTicket}
+                            className="px-6 py-2.5 rounded-2xl bg-gradient-to-r from-emerald-600 via-emerald-700 to-brand-900 hover:from-emerald-700 hover:to-brand-950 text-white text-xs sm:text-sm font-black shadow-md hover:shadow-lg transition-all flex items-center gap-2 disabled:opacity-50"
+                          >
+                            {isResolvingTicket ? (
+                              <>
+                                <RefreshCw className="w-4 h-4 animate-spin" />
+                                <span>{isBangla ? 'আপডেট হচ্ছে...' : 'Updating...'}</span>
+                              </>
+                            ) : (
+                              <>
+                                <CheckCircle2 className="w-4 h-4" />
+                                <span>{isBangla ? 'Resolution নিশ্চিত করুন' : 'Confirm Resolution'}</span>
+                              </>
+                            )}
+                          </button>
+                        </div>
+                      </form>
+
+                    </div>
+                  </div>
+                )}
+
+              </div>
+            );
+          })()}
 
         </main>
       </div>

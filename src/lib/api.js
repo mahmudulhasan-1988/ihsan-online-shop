@@ -1011,24 +1011,6 @@ export const clearAllNotifications = async (filter = {}) => {
   }
 };
 
-export const getSupportTickets = async (params = {}) => {
-  try {
-    const res = await apiClient.get('/support-tickets', { params });
-    return res.data;
-  } catch (error) {
-    return { success: false, data: [] };
-  }
-};
-
-export const createSupportTicket = async (ticketData) => {
-  try {
-    const res = await apiClient.post('/support-tickets', ticketData);
-    return res.data;
-  } catch (error) {
-    return { success: false, message: error.response?.data?.message || 'Failed to submit ticket' };
-  }
-};
-
 // ==========================================
 // 9. Reviews API (MongoDB Connected)
 // ==========================================
@@ -1202,6 +1184,81 @@ export const loginUser = async (data) => {
     return {
       success: false,
       message: error.response?.data?.message || 'ভুল ফোন/ইমেইল অথবা পাসওয়ার্ড দেওয়া হয়েছে।'
+    };
+  }
+};
+
+// ==========================================
+// 14. Support Tickets API (MongoDB Connected)
+// ==========================================
+export const createSupportTicket = async (ticketData) => {
+  try {
+    const res = await apiClient.post('/tickets', ticketData);
+    return res.data;
+  } catch (error) {
+    console.error('Create support ticket error:', error);
+    return {
+      success: false,
+      message: error.response?.data?.message || 'সাপোর্ট টিকিট সাবমিট করতে সমস্যা হয়েছে, পুনরায় চেষ্টা করুন।'
+    };
+  }
+};
+
+export const getSupportTickets = async (params = {}) => {
+  try {
+    const res = await apiClient.get('/tickets', { params });
+    return res.data;
+  } catch (error) {
+    console.error('getSupportTickets error:', error.message);
+    return { success: false, data: [], count: 0 };
+  }
+};
+
+export const getSupportTicketById = async (id) => {
+  try {
+    const res = await apiClient.get(`/tickets/${id}`);
+    return res.data;
+  } catch (error) {
+    console.error('getSupportTicketById error:', error.message);
+    return { success: false, data: null };
+  }
+};
+
+export const forwardSupportTicket = async (id, forwardData) => {
+  try {
+    const res = await apiClient.patch(`/tickets/${id}/forward`, forwardData);
+    return res.data;
+  } catch (error) {
+    console.error('forwardSupportTicket error:', error);
+    return {
+      success: false,
+      message: error.response?.data?.message || 'সেলারকে টিকিট ফরোয়ার্ড করতে সমস্যা হয়েছে।'
+    };
+  }
+};
+
+export const resolveSupportTicket = async (id, resolutionData) => {
+  try {
+    const res = await apiClient.patch(`/tickets/${id}/resolve`, resolutionData);
+    return res.data;
+  } catch (error) {
+    console.error('resolveSupportTicket error:', error);
+    return {
+      success: false,
+      message: error.response?.data?.message || 'টিকিট Resolution করতে সমস্যা হয়েছে।'
+    };
+  }
+};
+
+export const deleteSupportTicket = async (id) => {
+  try {
+    const res = await apiClient.delete(`/tickets/${id}`);
+    return res.data;
+  } catch (error) {
+    console.error('deleteSupportTicket error:', error);
+    return {
+      success: false,
+      message: error.response?.data?.message || 'টিকিট মুছে ফেলতে সমস্যা হয়েছে।'
     };
   }
 };

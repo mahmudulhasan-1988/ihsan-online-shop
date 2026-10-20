@@ -36,7 +36,8 @@ import {
   TrendingUp,
   Activity,
   Award,
-  Settings
+  Settings,
+  Send
 } from 'lucide-react';
 import { 
   getOrders, 
@@ -45,6 +46,7 @@ import {
   getNotifications, 
   getReviews, 
   createSupportTicket, 
+  getSupportTickets,
   getProducts, 
   updateUserProfile 
 } from '@/lib/api';
@@ -109,15 +111,19 @@ export default function CustomerDashboardPage() {
     district: 'Dhaka',
   });
 
-  // Support Ticket Form
+  // Support Ticket Form & States
   const [ticketSubject, setTicketSubject] = useState('');
   const [ticketMsg, setTicketMsg] = useState('');
+  const [ticketCategory, setTicketCategory] = useState('পণ্য বা অর্ডার সংক্রান্ত (Product/Order)');
+  const [ticketOrderId, setTicketOrderId] = useState('');
+  const [myTickets, setMyTickets] = useState([]);
+  const [isSubmittingTicket, setIsSubmittingTicket] = useState(false);
 
   const loadUserData = async (isManual = false, showLoading = false) => {
     if (showLoading) setLoading(true);
     try {
       const currentUserId = user?.id || user?._id || user?.userId;
-      const [ordRes, addrRes, notifRes, prodRes] = await Promise.all([
+      const [ordRes, addrRes, notifRes, prodRes, tickRes] = await Promise.all([
         getOrders({ 
           userId: currentUserId, 
           customerPhone: user?.phone, 
@@ -126,12 +132,16 @@ export default function CustomerDashboardPage() {
         getAddresses(currentUserId || 2),
         getNotifications(currentUserId || 2),
         getProducts(),
+        getSupportTickets({
+          userId: currentUserId || user?.email || user?.phone || 'customer'
+        })
       ]);
 
       setMyOrders(ordRes?.data || []);
       setAddresses(addrRes?.data || []);
       setNotifications(notifRes?.data || []);
       setWishlistProducts((prodRes?.data || []).slice(0, 3));
+      setMyTickets(tickRes?.data || []);
 
       if (isManual) {
         showToast(isBangla ? 'ডাটা সফলভাবে রিফ্রেশ হয়েছে!' : 'Data refreshed successfully!');
@@ -242,17 +252,46 @@ export default function CustomerDashboardPage() {
 
   const handleCreateTicket = async (e) => {
     e.preventDefault();
-    if (!ticketSubject || !ticketMsg) return;
-    await createSupportTicket({
-      user_id: user?.id || user?._id || 2,
-      user_name: profile.name,
-      user_role: 'customer',
-      subject: ticketSubject,
-      message: ticketMsg,
-    });
-    showToast(isBangla ? 'টিকেট সাবমিট হয়েছে!' : 'Ticket submitted!');
-    setTicketSubject('');
-    setTicketMsg('');
+    if (!ticketSubject.trim() || !ticketMsg.trim()) {
+      showToast(isBangla ? 'বিষয় এবং বিস্তারিত তথ্য প্রদান করুন!' : 'Subject and details are required!', 'error');
+      return;
+    }
+
+    setIsSubmittingTicket(true);
+    try {
+      const currentUserId = user?.id || user?._id || user?.userId || 'customer';
+      const res = await createSupportTicket({
+        userId: currentUserId,
+        userName: profile.name || user?.name || 'সম্মানিত গ্রাহক',
+        userEmail: profile.email || user?.email || '',
+        userPhone: profile.phone || user?.phone || '',
+        userRole: 'customer',
+        subject: ticketSubject.trim(),
+        message: ticketMsg.trim(),
+        category: ticketCategory,
+        orderId: ticketOrderId || '',
+        priority: 'medium'
+      });
+
+      if (res?.success) {
+        showToast(
+          isBangla 
+            ? '🎉 আপনার সাপোর্ট টিকিটটি সফলভাবে সাবমিট হয়েছে! অ্যাডমিন এটি পর্যালোচনা করবেন।' 
+            : 'Support ticket submitted successfully! Admin will review it.'
+        );
+        setTicketSubject('');
+        setTicketMsg('');
+        setTicketOrderId('');
+        loadUserData();
+      } else {
+        showToast(res?.message || (isBangla ? 'টিকেট সাবমিট ব্যর্থ হয়েছে' : 'Failed to submit ticket'), 'error');
+      }
+    } catch (err) {
+      console.error('Ticket submit error', err);
+      showToast(isBangla ? 'টিকেট পাঠাতে ত্রুটি হয়েছে' : 'Error submitting ticket', 'error');
+    } finally {
+      setIsSubmittingTicket(false);
+    }
   };
 
   // Dynamic calculations for Customer Charts & Visualizations
@@ -394,7 +433,7 @@ export default function CustomerDashboardPage() {
     { id: 'addresses', label: isBangla ? 'ঠিকানা বই (Address)' : 'Address Book', icon: MapPin, count: addresses.length },
     { id: 'wishlist', label: isBangla ? 'পছন্দের তালিকা' : 'Wishlist', icon: Heart, count: wishlistProducts.length },
     { id: 'notifications', label: isBangla ? 'বিজ্ঞপ্তি' : 'Notifications', icon: Bell, count: notifications.filter(n => !n.is_read).length || null },
-    { id: 'support', label: isBangla ? 'সাহায্য ও টিকিট' : 'Support & Help', icon: Headphones },
+    { id: 'support', label: isBangla ? 'সাহায্য ও টিকিট' : 'Support & Help', icon: Headphones, count: myTickets.length || null, countColor: 'bg-emerald-600 text-white' },
   ];
 
   return (
@@ -1760,29 +1799,297 @@ export default function CustomerDashboardPage() {
           {/* 🎧 8. HELP & SUPPORT TICKET                              */}
           {/* ======================================================== */}
           {activeMenu === 'support' && (
-            <div className="bg-white dark:bg-[#112318] rounded-3xl p-6 border border-[#e0ebe2] dark:border-[#1d3b28] shadow-sm space-y-6 max-w-xl">
-              <h3 className="text-lg font-black border-b pb-4">{isBangla ? 'সাহায্য ও সাপোর্ট টিকেট' : 'Help & Support'}</h3>
-              <form onSubmit={handleCreateTicket} className="space-y-3">
-                <input
-                  type="text"
-                  required
-                  placeholder="Ticket Subject (বিষয়)"
-                  value={ticketSubject}
-                  onChange={(e) => setTicketSubject(e.target.value)}
-                  className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-black/30 border rounded-xl text-xs sm:text-sm"
-                />
-                <textarea
-                  rows={4}
-                  required
-                  placeholder="আপনার সমস্যা বা প্রশ্নের বিস্তারিত লিখুন..."
-                  value={ticketMsg}
-                  onChange={(e) => setTicketMsg(e.target.value)}
-                  className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-black/30 border rounded-xl text-xs sm:text-sm"
-                />
-                <button type="submit" className="w-full bg-brand-900 text-white font-bold py-3 rounded-2xl text-xs sm:text-sm shadow-md">
-                  Submit Ticket
-                </button>
-              </form>
+            <div className="space-y-6">
+              {/* Header Banner */}
+              <div className="p-6 rounded-3xl bg-gradient-to-r from-emerald-800 via-brand-900 to-emerald-950 text-white shadow-lg relative overflow-hidden">
+                <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                  <div className="space-y-1">
+                    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 text-emerald-300 text-xs font-semibold backdrop-blur-sm">
+                      <Headphones className="w-3.5 h-3.5" />
+                      <span>{isBangla ? 'কাস্টমার হেল্পডেস্ক' : 'Customer Helpdesk'}</span>
+                    </div>
+                    <h2 className="text-xl sm:text-2xl font-black">
+                      {isBangla ? 'সাহায্য ও সাপোর্ট সেন্টার (Support & Help)' : 'Support & Help Center'}
+                    </h2>
+                    <p className="text-xs sm:text-sm text-emerald-200/90 max-w-xl">
+                      {isBangla 
+                        ? 'আপনার যেকোনো সমস্যা বা প্রশ্নের বিষয় ও বিস্তারিত লিখে সাবমিট করুন। অ্যাডমিন দ্রুত বিষয়টি দেখে সংশ্লিষ্ট সেলারের সাথে সমন্বয় করে সমাধান করবেন।' 
+                        : 'Submit your query or issue with subject and details. Admin will review and coordinate with the seller to resolve it.'}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => loadUserData(true, true)}
+                    className="self-start md:self-center inline-flex items-center gap-2 px-4 py-2.5 bg-white/10 hover:bg-white/20 active:scale-95 border border-white/20 rounded-2xl text-xs sm:text-sm font-bold backdrop-blur-sm transition-all"
+                  >
+                    <RefreshCw className="w-4 h-4" />
+                    <span>{isBangla ? 'টিকেট রিফ্রেশ' : 'Refresh'}</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* 2-Column Responsive Layout */}
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+                
+                {/* Column 1: Submit Form (5 cols on lg) */}
+                <div className="lg:col-span-5 bg-white dark:bg-[#112318] rounded-3xl p-6 border border-[#e0ebe2] dark:border-[#1d3b28] shadow-sm space-y-5">
+                  <div className="border-b border-gray-100 dark:border-emerald-900/60 pb-3">
+                    <h3 className="text-base sm:text-lg font-black text-gray-900 dark:text-emerald-100 flex items-center gap-2">
+                      <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                      {isBangla ? 'নতুন সাপোর্ট টিকেট সাবমিট করুন' : 'Submit New Ticket'}
+                    </h3>
+                    <p className="text-xs text-gray-500 dark:text-emerald-400/80 mt-0.5">
+                      {isBangla ? 'বিষয় এবং বিস্তারিত তথ্য লিখুন' : 'Enter subject and detailed explanation'}
+                    </p>
+                  </div>
+
+                  <form onSubmit={handleCreateTicket} className="space-y-4">
+                    {/* Subject (বিষয়) */}
+                    <div>
+                      <label className="block text-xs font-bold text-gray-700 dark:text-emerald-300 mb-1.5">
+                        {isBangla ? 'বিষয় (Subject) *' : 'Ticket Subject *'}
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        placeholder={isBangla ? 'যেমন: পণ্য ভাঙা এসেছে / ডেলিভারি বিলম্ব' : 'e.g. Damaged product received / Delivery delay'}
+                        value={ticketSubject}
+                        onChange={(e) => setTicketSubject(e.target.value)}
+                        className="w-full px-4 py-3 bg-[#f8faf8] dark:bg-black/30 border border-gray-200 dark:border-emerald-900/60 rounded-2xl text-xs sm:text-sm font-medium text-gray-900 dark:text-emerald-50 focus:outline-none focus:border-brand-900 transition-colors"
+                      />
+                    </div>
+
+                    {/* Category */}
+                    <div>
+                      <label className="block text-xs font-bold text-gray-700 dark:text-emerald-300 mb-1.5">
+                        {isBangla ? 'ক্যাটাগরি (Category)' : 'Issue Category'}
+                      </label>
+                      <select
+                        value={ticketCategory}
+                        onChange={(e) => setTicketCategory(e.target.value)}
+                        className="w-full px-4 py-3 bg-[#f8faf8] dark:bg-black/30 border border-gray-200 dark:border-emerald-900/60 rounded-2xl text-xs sm:text-sm font-medium text-gray-900 dark:text-emerald-50 focus:outline-none focus:border-brand-900 transition-colors cursor-pointer"
+                      >
+                        <option value="পণ্য বা অর্ডার সংক্রান্ত (Product/Order)">{isBangla ? '📦 পণ্য বা অর্ডার সংক্রান্ত' : '📦 Product / Order Related'}</option>
+                        <option value="ভাঙা বা নষ্ট পণ্য (Damaged Product)">{isBangla ? '⚠️ ভাঙা বা নষ্ট পণ্য' : '⚠️ Damaged Product'}</option>
+                        <option value="ডেলিভারি সংক্রান্ত (Delivery Issue)">{isBangla ? '🚚 ডেলিভারি সংক্রান্ত' : '🚚 Delivery Issue'}</option>
+                        <option value="পেমেন্ট বা রিফান্ড (Payment/Refund)">{isBangla ? '💳 পেমেন্ট বা রিফান্ড' : '💳 Payment / Refund'}</option>
+                        <option value="সাধারণ অনুসন্ধান (General Inquiry)">{isBangla ? '❓ সাধারণ অনুসন্ধান' : '❓ General Inquiry'}</option>
+                      </select>
+                    </div>
+
+                    {/* Related Order (Optional) */}
+                    <div>
+                      <label className="block text-xs font-bold text-gray-700 dark:text-emerald-300 mb-1.5 flex items-center justify-between">
+                        <span>{isBangla ? 'সম্পর্কিত অর্ডার (যদি থাকে)' : 'Related Order (Optional)'}</span>
+                        <span className="text-[11px] font-normal text-gray-400">ঐচ্ছিক</span>
+                      </label>
+                      {myOrders.length > 0 ? (
+                        <select
+                          value={ticketOrderId}
+                          onChange={(e) => setTicketOrderId(e.target.value)}
+                          className="w-full px-4 py-3 bg-[#f8faf8] dark:bg-black/30 border border-gray-200 dark:border-emerald-900/60 rounded-2xl text-xs sm:text-sm font-medium text-gray-900 dark:text-emerald-50 focus:outline-none focus:border-brand-900 transition-colors cursor-pointer"
+                        >
+                          <option value="">{isBangla ? '-- অর্ডার নির্বাচন করুন (প্রয়োজনে) --' : '-- Select Order (Optional) --'}</option>
+                          {myOrders.map((ord, idx) => {
+                            const oNum = ord.order_number || ord.orderId || ('ORD-' + idx);
+                            return (
+                              <option key={idx} value={oNum}>
+                                {oNum} — ৳{ord.total || ord.totalAmount || 0} ({ord.status || 'Pending'})
+                              </option>
+                            );
+                          })}
+                        </select>
+                      ) : (
+                        <input
+                          type="text"
+                          placeholder={isBangla ? 'অর্ডার নম্বর লিখুন (যেমন: GB-ORD-1001)' : 'Order Number (e.g. GB-ORD-1001)'}
+                          value={ticketOrderId}
+                          onChange={(e) => setTicketOrderId(e.target.value)}
+                          className="w-full px-4 py-3 bg-[#f8faf8] dark:bg-black/30 border border-gray-200 dark:border-emerald-900/60 rounded-2xl text-xs sm:text-sm font-medium text-gray-900 dark:text-emerald-50 focus:outline-none focus:border-brand-900 transition-colors"
+                        />
+                      )}
+                    </div>
+
+                    {/* Details (বিস্তারিত) */}
+                    <div>
+                      <label className="block text-xs font-bold text-gray-700 dark:text-emerald-300 mb-1.5">
+                        {isBangla ? 'বিস্তারিত সমস্যা বা বার্তা (Details) *' : 'Problem Details *'}
+                      </label>
+                      <textarea
+                        rows={5}
+                        required
+                        placeholder={isBangla ? 'আপনার সমস্যা বা অভিযোগের প্রতিটি বিষয় বিস্তারিত লিখুন যেন দ্রুত সমাধান দেওয়া সম্ভব হয়...' : 'Describe your issue in detail so that we can resolve it promptly...'}
+                        value={ticketMsg}
+                        onChange={(e) => setTicketMsg(e.target.value)}
+                        className="w-full px-4 py-3 bg-[#f8faf8] dark:bg-black/30 border border-gray-200 dark:border-emerald-900/60 rounded-2xl text-xs sm:text-sm font-medium text-gray-900 dark:text-emerald-50 focus:outline-none focus:border-brand-900 transition-colors resize-none leading-relaxed"
+                      />
+                    </div>
+
+                    {/* Submit Button */}
+                    <button
+                      type="submit"
+                      disabled={isSubmittingTicket}
+                      className="w-full py-3.5 px-6 rounded-2xl bg-gradient-to-r from-emerald-700 to-brand-900 hover:from-emerald-800 hover:to-brand-950 text-white font-black text-sm shadow-md hover:shadow-lg active:scale-[0.98] transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                    >
+                      {isSubmittingTicket ? (
+                        <>
+                          <RefreshCw className="w-4 h-4 animate-spin" />
+                          <span>{isBangla ? 'সাবমিট হচ্ছে...' : 'Submitting...'}</span>
+                        </>
+                      ) : (
+                        <>
+                          <Send className="w-4 h-4" />
+                          <span>{isBangla ? 'সাপোর্ট টিকিট সাবমিট করুন' : 'Submit Support Ticket'}</span>
+                        </>
+                      )}
+                    </button>
+                  </form>
+                </div>
+
+                {/* Column 2: Tickets History (7 cols on lg) */}
+                <div className="lg:col-span-7 bg-white dark:bg-[#112318] rounded-3xl p-6 border border-[#e0ebe2] dark:border-[#1d3b28] shadow-sm space-y-4">
+                  <div className="flex items-center justify-between border-b border-gray-100 dark:border-emerald-900/60 pb-3">
+                    <div>
+                      <h3 className="text-base sm:text-lg font-black text-gray-900 dark:text-emerald-100">
+                        {isBangla ? 'আমার জমাকৃত টিকিটসমূহ' : 'My Support Tickets'}
+                      </h3>
+                      <p className="text-xs text-gray-500 dark:text-emerald-400/80">
+                        {isBangla ? 'সকল টিকিটের লাইভ অগ্রগতি ও সমাধান' : 'Live progress and resolutions of your tickets'}
+                      </p>
+                    </div>
+                    <span className="px-3 py-1 bg-emerald-100 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-300 rounded-full text-xs font-black">
+                      {myTickets.length} {isBangla ? 'টি টিকিট' : 'Tickets'}
+                    </span>
+                  </div>
+
+                  {myTickets.length === 0 ? (
+                    <div className="text-center py-12 px-4 rounded-2xl bg-[#f8faf8] dark:bg-black/20 border border-dashed border-gray-200 dark:border-emerald-900/40 space-y-3">
+                      <div className="w-14 h-14 rounded-full bg-emerald-100 dark:bg-emerald-950/80 flex items-center justify-center mx-auto text-emerald-600 dark:text-emerald-400">
+                        <Headphones className="w-7 h-7" />
+                      </div>
+                      <h4 className="font-bold text-sm text-gray-800 dark:text-emerald-200">
+                        {isBangla ? 'এখনো কোনো সাপোর্ট টিকিট সাবমিট করেননি' : 'No support tickets submitted yet'}
+                      </h4>
+                      <p className="text-xs text-gray-500 dark:text-emerald-400/70 max-w-sm mx-auto">
+                        {isBangla 
+                          ? 'পণ্য, অর্ডার বা ডেলিভারি নিয়ে কোনো সমস্যা থাকলে বামপাশের ফর্মটি পূরণ করে সাবমিট করুন।' 
+                          : 'If you have any issues with products, delivery or orders, fill out the form on the left.'}
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-4 max-h-[750px] overflow-y-auto pr-1">
+                      {myTickets.map((t, idx) => {
+                        const isResolved = t.status === 'resolution' || t.status === 'resolved';
+                        const isPending = t.status === 'pending';
+                        const isOpen = !isResolved && !isPending;
+
+                        return (
+                          <div
+                            key={t.id || t._id || idx}
+                            className={`p-5 rounded-2xl border transition-all space-y-3.5 ${
+                              isResolved
+                                ? 'bg-emerald-50/50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800/60'
+                                : isPending
+                                ? 'bg-amber-50/40 dark:bg-amber-950/20 border-amber-200 dark:border-amber-800/60'
+                                : 'bg-[#f8faf8] dark:bg-black/20 border-gray-200 dark:border-emerald-900/50'
+                            }`}
+                          >
+                            {/* Card Top: ID, Date & Status */}
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <div className="flex items-center gap-2">
+                                <span className="font-mono text-xs font-black px-2.5 py-1 rounded-xl bg-gray-200 dark:bg-emerald-950 text-gray-800 dark:text-emerald-200">
+                                  {t.ticket_id || ('TKT-' + (idx + 1001))}
+                                </span>
+                                {t.order_id && (
+                                  <span className="text-[11px] font-bold px-2 py-0.5 rounded-lg bg-blue-100 dark:bg-blue-950/80 text-blue-700 dark:text-blue-300">
+                                    {t.order_id}
+                                  </span>
+                                )}
+                                <span className="text-[11px] text-gray-500 dark:text-emerald-400">
+                                  {t.createdAt ? new Date(t.createdAt).toLocaleDateString('bn-BD', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'সম্প্রতি'}
+                                </span>
+                              </div>
+
+                              {/* Status Badge */}
+                              <div>
+                                {isResolved ? (
+                                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black bg-emerald-600 text-white shadow-sm">
+                                    <CheckCircle2 className="w-3.5 h-3.5" />
+                                    <span>Resolution (সমাধান সম্পন্ন)</span>
+                                  </span>
+                                ) : isPending ? (
+                                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black bg-amber-500 text-white shadow-sm">
+                                    <Clock className="w-3.5 h-3.5 animate-spin" />
+                                    <span>Pending (সেলার কাজ করছেন)</span>
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black bg-blue-600 text-white shadow-sm">
+                                    <Clock className="w-3.5 h-3.5" />
+                                    <span>Submitted (জমা দেওয়া হয়েছে)</span>
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Subject & Category */}
+                            <div>
+                              <div className="text-[11px] font-bold text-emerald-700 dark:text-emerald-400 uppercase tracking-wider mb-0.5">
+                                {t.category || 'সাধারণ অনুসন্ধান'}
+                              </div>
+                              <h4 className="font-black text-sm sm:text-base text-gray-900 dark:text-emerald-50">
+                                {t.subject}
+                              </h4>
+                            </div>
+
+                            {/* Problem Message */}
+                            <div className="p-3.5 rounded-xl bg-white/80 dark:bg-black/40 border border-gray-100 dark:border-emerald-950 text-xs sm:text-sm text-gray-700 dark:text-emerald-200 leading-relaxed">
+                              {t.message}
+                            </div>
+
+                            {/* Pending State Message */}
+                            {isPending && (
+                              <div className="p-3 rounded-xl bg-amber-100/70 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-900/60 flex items-start gap-2.5 text-xs text-amber-900 dark:text-amber-200">
+                                <Clock className="w-4 h-4 shrink-0 mt-0.5 text-amber-600 dark:text-amber-400" />
+                                <div>
+                                  <p className="font-bold">
+                                    {isBangla ? 'অ্যাডমিন সমস্যাটি সেলারের কাছে পাঠিয়েছেন' : 'Forwarded to Seller by Admin'}
+                                  </p>
+                                  <p className="text-[11px] text-amber-800 dark:text-amber-300/90 mt-0.5">
+                                    {isBangla 
+                                      ? `সেলার '${t.assigned_seller_name || 'সেলার'}' সমস্যাটি সমাধান করার কাজ করছেন। সেলার সমাধান সম্পন্ন না করা পর্যন্ত এটি Pending দেখাবে।` 
+                                      : `Seller '${t.assigned_seller_name || 'Seller'}' is working on this problem. It will remain Pending until resolution.`}
+                                  </p>
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Resolution Details Card */}
+                            {isResolved && (
+                              <div className="p-4 rounded-xl bg-emerald-100/80 dark:bg-emerald-950/60 border border-emerald-300 dark:border-emerald-800 space-y-1.5 text-emerald-950 dark:text-emerald-100">
+                                <div className="flex items-center gap-2 font-black text-xs text-emerald-900 dark:text-emerald-300">
+                                  <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                                  <span>{isBangla ? '🎉 সমস্যা সমাধান বিবরণী (Resolution Details):' : '🎉 Resolution Details:'}</span>
+                                </div>
+                                <p className="text-xs sm:text-sm font-medium leading-relaxed pl-6 text-gray-800 dark:text-emerald-100">
+                                  {t.resolution_note || 'সেলার কর্তৃক সমস্যার সন্তোষজনক সমাধান করা হয়েছে।'}
+                                </p>
+                                <div className="pl-6 text-[10px] text-emerald-700 dark:text-emerald-400 font-semibold pt-1">
+                                  {isBangla ? 'সমাধানকারী: ' : 'Resolved by: '}
+                                  <span className="font-bold">{t.resolved_by || t.assigned_seller_name || 'সেলার'}</span>
+                                  {t.resolved_at && (
+                                    <span> • {new Date(t.resolved_at).toLocaleDateString('bn-BD', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+                                  )}
+                                </div>
+                              </div>
+                            )}
+
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+
+              </div>
             </div>
           )}
 
