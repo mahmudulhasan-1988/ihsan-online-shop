@@ -3,13 +3,14 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 
 import { sendHeartbeat, sendUserOffline } from '@/lib/api';
+import { trackIncompleteOrder } from '@/lib/incompleteTracker';
 
 const CartContext = createContext();
 
 export function CartProvider({ children }) {
   const [cart, setCart] = useState([]);
   const [isCartOpen, setIsCartOpen] = useState(false);
-  const [fastOrderData, setFastOrderData] = useState({ isOpen: false, product: null, variant: null });
+  const [fastOrderData, setFastOrderData] = useState({ isOpen: false, product: null, variant: null, source: '' });
   const [user, setUser] = useState(null);
   const [toast, setToast] = useState(null);
 
@@ -139,6 +140,27 @@ export function CartProvider({ children }) {
       }
     });
 
+    // 🛒 Track Incomplete Order on "Add to Cart" action
+    try {
+      const itemToTrack = {
+        productId: product.id || product._id,
+        name: product.name,
+        weight: itemWeight,
+        price: itemPrice,
+        quantity: Math.max(1, quantity),
+        image: itemImage,
+      };
+      const existingInCart = cart.filter(it => it.cartItemId !== cartItemId);
+      trackIncompleteOrder({
+        items: [itemToTrack],
+        source: 'কার্টে যোগ করেছেন (Add to Cart)',
+        user,
+        debounceMs: 500
+      });
+    } catch (e) {
+      console.warn('Track on Add to Cart error:', e);
+    }
+
     showToast(`"${product.name}" কার্টে যোগ করা হয়েছে!`);
     if (openDrawer) {
       setIsCartOpen(true);
@@ -180,7 +202,7 @@ export function CartProvider({ children }) {
   };
 
   // Fast Order Trigger (1-Click Buy Modal)
-  const openFastOrder = (product, variant = null) => {
+  const openFastOrder = (product, variant = null, source = '১-ক্লিক সরাসরি অর্ডার') => {
     const stock = product.stock_quantity != null ? Number(product.stock_quantity) : (product.stock != null ? Number(product.stock) : 0);
     if (stock <= 0) {
       showToast(`দুঃখিত, "${product.name}" বর্তমানে স্টক আউট (Out Of Stock)!`, 'error');
@@ -191,11 +213,12 @@ export function CartProvider({ children }) {
       isOpen: true,
       product,
       variant: selectedVariant,
+      source: source || '১-ক্লিক সরাসরি অর্ডার'
     });
   };
 
   const closeFastOrder = () => {
-    setFastOrderData({ isOpen: false, product: null, variant: null });
+    setFastOrderData({ isOpen: false, product: null, variant: null, source: '' });
   };
 
   // User Auth

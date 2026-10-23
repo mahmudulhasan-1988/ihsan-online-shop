@@ -70,7 +70,14 @@ import {
   Award,
   ArrowLeftRight,
   Check,
-  Wallet
+  Wallet,
+  PhoneCall,
+  Phone,
+  MapPin,
+  Zap,
+  MessageCircle,
+  ShoppingBag,
+  ArrowRight
 } from 'lucide-react';
 import { 
   getStats, 
@@ -109,6 +116,10 @@ import {
   getSupportTickets, 
   forwardSupportTicket,
   deleteSupportTicket,
+  getIncompleteOrders,
+  updateIncompleteOrderStatus,
+  convertIncompleteOrder,
+  deleteIncompleteOrder,
   getSiteSettings,
   getReviews,
   replyReview, 
@@ -179,6 +190,17 @@ export default function AdminDashboardPage() {
   const [couponsList, setCouponsList] = useState([]);
   const [bannersList, setBannersList] = useState([]);
   const [ticketsList, setTicketsList] = useState([]);
+
+  // 🛒 Incomplete Orders States (MongoDB Connected)
+  const [incompleteOrdersList, setIncompleteOrdersList] = useState([]);
+  const [incompleteStats, setIncompleteStats] = useState(null);
+  const [incompleteFilterTab, setIncompleteFilterTab] = useState('all'); // 'all' | 'pending' | 'contacted' | 'recovered' | 'cancelled'
+  const [incompleteSearchTerm, setIncompleteSearchTerm] = useState('');
+  const [selectedIncompleteForConvert, setSelectedIncompleteForConvert] = useState(null);
+  const [convertCustomNotes, setConvertCustomNotes] = useState('');
+  const [isConvertingIncomplete, setIsConvertingIncomplete] = useState(false);
+  const [incompleteStatusModal, setIncompleteStatusModal] = useState({ isOpen: false, order: null, status: 'contacted', adminNotes: '' });
+  const [isUpdatingIncomplete, setIsUpdatingIncomplete] = useState(false);
 
   // 🎧 Support Tickets Forward & Filter States
   const [forwardModal, setForwardModal] = useState({ isOpen: false, ticket: null, selectedSellerId: '', forwardNote: '' });
@@ -386,6 +408,7 @@ export default function AdminDashboardPage() {
         popupRes,
         revRes,
         stockReqRes,
+        incompleteRes,
       ] = await Promise.all([
         getStats(),
         getUsers(),
@@ -403,6 +426,7 @@ export default function AdminDashboardPage() {
         getPopupMessage(),
         getReviews('all'),
         getStockRequests(),
+        getIncompleteOrders(),
       ]);
 
       setStats(statsRes?.data || null);
@@ -419,6 +443,8 @@ export default function AdminDashboardPage() {
       setBannersList(banRes?.data || []);
       setTicketsList(tickRes?.data || []);
       setStockRequestsList(stockReqRes?.data || []);
+      setIncompleteOrdersList(incompleteRes?.data || []);
+      setIncompleteStats(incompleteRes?.stats || null);
       const defaultSettings = {
         siteName: 'ইহসান অনলাইন শপ',
         siteTagline: '১০০% খাঁটি ও প্রাকৃতিক পণ্য',
@@ -1245,6 +1271,80 @@ export default function AdminDashboardPage() {
     showToast(isBangla ? '🎉 সেলস রিপোর্ট CSV ফাইলে ডাউনলোড হয়েছে!' : 'Sales report CSV downloaded successfully!');
   };
 
+  // 🛒 Incomplete Orders Handlers
+  const handleConvertIncompleteOrder = async (orderId, notes) => {
+    if (!orderId) return;
+    setIsConvertingIncomplete(true);
+    try {
+      const res = await convertIncompleteOrder(orderId, { customNotes: notes });
+      if (res.success) {
+        showToast(isBangla ? `🎉 ${res.message || 'অর্ডারে সফলভাবে রূপান্তর হয়েছে!'}` : 'Order converted successfully!');
+        setSelectedIncompleteForConvert(null);
+        setConvertCustomNotes('');
+        await loadAllData(true);
+      } else {
+        showToast(res.message || 'অর্ডার রূপান্তর করতে সমস্যা হয়েছে', 'error');
+      }
+    } catch (err) {
+      console.error('Convert incomplete order error:', err);
+      showToast('সার্ভারে সমস্যা হয়েছে', 'error');
+    } finally {
+      setIsConvertingIncomplete(false);
+    }
+  };
+
+  const handleUpdateIncompleteStatus = async (orderId, status, notes) => {
+    if (!orderId) return;
+    setIsUpdatingIncomplete(true);
+    try {
+      const res = await updateIncompleteOrderStatus(orderId, { status, adminNotes: notes });
+      if (res.success) {
+        showToast(isBangla ? 'স্ট্যাটাস আপডেট সম্পন্ন হয়েছে' : 'Status updated successfully');
+        setIncompleteStatusModal({ isOpen: false, order: null, status: 'contacted', adminNotes: '' });
+        await loadAllData(true);
+      } else {
+        showToast(res.message || 'স্ট্যাটাস আপডেট করতে সমস্যা হয়েছে', 'error');
+      }
+    } catch (err) {
+      console.error('Update status error:', err);
+      showToast('ত্রুটি হয়েছে', 'error');
+    } finally {
+      setIsUpdatingIncomplete(false);
+    }
+  };
+
+  const handleDeleteIncompleteOrder = async (orderId) => {
+    if (!orderId) return;
+    if (!confirm(isBangla ? 'আপনি কি নিশ্চিতভাবে এই অসম্পূর্ণ অর্ডারটি মুছে ফেলতে চান?' : 'Are you sure you want to delete this incomplete order?')) {
+      return;
+    }
+    try {
+      const res = await deleteIncompleteOrder(orderId);
+      if (res.success) {
+        showToast(isBangla ? 'অসম্পূর্ণ অর্ডারটি মুছে ফেলা হয়েছে' : 'Incomplete order deleted');
+        await loadAllData(true);
+      } else {
+        showToast(res.message || 'মুছে ফেলতে সমস্যা হয়েছে', 'error');
+      }
+    } catch (err) {
+      console.error('Delete error:', err);
+      showToast('মুছতে সমস্যা হয়েছে', 'error');
+    }
+  };
+
+  const getIncompleteWhatsAppLink = (order) => {
+    let rawPhone = (order.customerPhone || '').replace(/[^0-9]/g, '');
+    if (rawPhone.startsWith('0')) {
+      rawPhone = '88' + rawPhone;
+    } else if (!rawPhone.startsWith('880') && rawPhone.length === 10) {
+      rawPhone = '880' + rawPhone;
+    }
+    const itemNames = (order.items || []).map(i => `${i.name} (${i.quantity}টি)`).join(', ');
+    const custName = order.customerName && order.customerName !== 'অজ্ঞাত ক্রেতা (Guest)' ? order.customerName : 'সম্মানিত ক্রেতা';
+    const text = `আসসালামু আলাইকুম ${custName}! ইহসান অনলাইন শপ (Ihsan Online Shop) থেকে যোগাযোগ করা হচ্ছে। আপনি আমাদের ওয়েবসাইট থেকে ${itemNames || 'পণ্য'} অর্ডার করতে চেয়েছিলেন। আপনার অর্ডারটি সম্পন্ন করতে বা কোনো সহায়তা লাগলে আমাদের জানান। আমরা দ্রুত ডেলিভারি নিশ্চিত করব। ধন্যবাদ!`;
+    return `https://wa.me/${rawPhone}?text=${encodeURIComponent(text)}`;
+  };
+
   // Nav Items Menu Configuration (Admin Profile & System Settings at Bottom as requested)
   const navMenuItems = [
     { id: 'dashboard', label: isBangla ? 'ড্যাশবোর্ড ওভারভিউ' : 'Dashboard', icon: BarChart3, count: null },
@@ -1268,6 +1368,17 @@ export default function AdminDashboardPage() {
       count: productsList.length, 
     },
     { id: 'orders', label: isBangla ? 'অর্ডার ম্যানেজমেন্ট' : 'Order Management', icon: ShoppingCart, count: ordersList.filter(o => o.status === 'Pending').length || null, countColor: 'bg-red-500' },
+    { 
+      id: 'incomplete_orders', 
+      label: isBangla ? '🛒 অসম্পূর্ণ অর্ডারসমূহ' : 'Incomplete Orders', 
+      icon: ShoppingBag, 
+      count: incompleteOrdersList.filter(o => o.status === 'pending').length > 0 
+        ? `${incompleteOrdersList.filter(o => o.status === 'pending').length} রিকভারি` 
+        : (incompleteOrdersList.length > 0 ? `${incompleteOrdersList.length}` : null), 
+      countColor: incompleteOrdersList.filter(o => o.status === 'pending').length > 0 
+        ? 'bg-rose-500 text-white font-black animate-pulse' 
+        : undefined 
+    },
     { id: 'payments', label: isBangla ? 'পেমেন্ট ও উইথড্রয়াল' : 'Payment Management', icon: CreditCard, count: withdrawalsList.filter(w => w.status === 'pending').length || null },
     { id: 'reviews', label: isBangla ? 'রিভিউ ও ফিডব্যাক' : 'Reviews & Replies', icon: Star, count: reviewsList.length, countColor: 'bg-amber-600' },
     { id: 'popup', label: isBangla ? 'পপআপ বার্তা' : 'Popup Message', icon: MessageSquare, count: popupSettings.isActive ? 'Active' : 'Off', countColor: popupSettings.isActive ? 'bg-emerald-600 text-white' : 'bg-gray-400 text-white' },
@@ -3995,6 +4106,39 @@ export default function AdminDashboardPage() {
                 </div>
               </div>
 
+              {/* 🛒 Quick Jump to Incomplete Orders Banner */}
+              {incompleteOrdersList.filter(o => o.status === 'pending').length > 0 && (
+                <div 
+                  onClick={() => {
+                    setActiveMenu('incomplete_orders');
+                    setIncompleteFilterTab('pending');
+                  }}
+                  className="bg-gradient-to-r from-rose-500/10 via-amber-500/10 to-rose-500/10 border-2 border-rose-300 dark:border-rose-900/60 p-4 rounded-3xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 cursor-pointer hover:shadow-lg transition-all group"
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="w-10 h-10 rounded-2xl bg-rose-600 text-white flex items-center justify-center font-black animate-pulse flex-shrink-0 shadow-md">
+                      <ShoppingBag className="w-5 h-5" />
+                    </span>
+                    <div>
+                      <p className="text-xs sm:text-sm font-black text-rose-950 dark:text-rose-200">
+                        {isBangla 
+                          ? `⚠️ ${incompleteOrdersList.filter(o => o.status === 'pending').length} জন ক্রেতা পণ্য কার্টে যোগ বা Instant Order করতে গিয়ে বাদ দিয়েছেন!` 
+                          : `⚠️ ${incompleteOrdersList.filter(o => o.status === 'pending').length} customers left checkout or instant order incomplete!`}
+                      </p>
+                      <p className="text-[11px] text-rose-700 dark:text-rose-300">
+                        {isBangla 
+                          ? 'সরাসরি ফোন কল বা হোয়াটসঅ্যাপের মাধ্যমে যোগাযোগ করে তাদের অর্ডার সফলভাবে রিকভার করুন।' 
+                          : 'Contact customers via call or WhatsApp to recover pending orders.'}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1.5 px-4 py-2 rounded-2xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold shadow-md transition-all flex-shrink-0 group-hover:scale-105 self-start sm:self-center">
+                    <span>{isBangla ? 'অসম্পূর্ণ অর্ডার দেখুন' : 'View Incomplete Orders'}</span>
+                    <ArrowRight className="w-4 h-4" />
+                  </div>
+                </div>
+              )}
+
               {/* 📊 6 Top Statistical KPI Cards for Orders */}
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
                 {/* 1. Total Orders */}
@@ -6045,6 +6189,735 @@ export default function AdminDashboardPage() {
                         </div>
 
                       </form>
+
+                    </div>
+                  </div>
+                )}
+
+              </div>
+            );
+          })()}
+
+          {/* ======================================================== */}
+          {/* 🛒 INCOMPLETE ORDERS & ABANDONED CART RECOVERY SYSTEM     */}
+          {/* ======================================================== */}
+          {activeMenu === 'incomplete_orders' && (() => {
+            // Filter incomplete orders based on tab and search
+            const filteredIncompleteOrders = incompleteOrdersList.filter((order) => {
+              if (incompleteFilterTab !== 'all' && order.status !== incompleteFilterTab) {
+                return false;
+              }
+              if (incompleteSearchTerm.trim()) {
+                const term = incompleteSearchTerm.toLowerCase().trim();
+                const matchName = (order.customerName || '').toLowerCase().includes(term);
+                const matchPhone = (order.customerPhone || '').toLowerCase().includes(term);
+                const matchEmail = (order.customerEmail || '').toLowerCase().includes(term);
+                const matchId = (order.incomplete_order_id || '').toLowerCase().includes(term);
+                const matchItems = (order.items || []).some(it => (it.name || '').toLowerCase().includes(term));
+                return matchName || matchPhone || matchEmail || matchId || matchItems;
+              }
+              return true;
+            });
+
+            const pendingCount = incompleteOrdersList.filter(o => o.status === 'pending').length;
+            const contactedCount = incompleteOrdersList.filter(o => o.status === 'contacted').length;
+            const recoveredCount = incompleteOrdersList.filter(o => o.status === 'recovered').length;
+            const cancelledCount = incompleteOrdersList.filter(o => o.status === 'cancelled').length;
+
+            const potentialRevenue = incompleteOrdersList
+              .filter(o => o.status === 'pending' || o.status === 'contacted')
+              .reduce((sum, o) => sum + (Number(o.totalAmount) || 0), 0);
+
+            const recoveredRevenue = incompleteOrdersList
+              .filter(o => o.status === 'recovered')
+              .reduce((sum, o) => sum + (Number(o.totalAmount) || 0), 0);
+
+            return (
+              <div className="space-y-6">
+                
+                {/* 1. Header Card */}
+                <div className="bg-white dark:bg-[#112318] rounded-3xl p-6 border border-[#e0ebe2] dark:border-[#1d3b28] shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2.5">
+                      <span className="p-2.5 rounded-2xl bg-rose-100 dark:bg-rose-950/80 text-rose-700 dark:text-rose-300">
+                        <ShoppingBag className="w-5 h-5" />
+                      </span>
+                      <div>
+                        <h2 className="text-xl sm:text-2xl font-black text-gray-900 dark:text-emerald-100 flex items-center gap-2">
+                          <span>{isBangla ? 'অসম্পূর্ণ অর্ডারসমূহ ও রিকভারি ম্যানেজমেন্ট' : 'Incomplete Orders & Cart Recovery'}</span>
+                          <span className="text-xs px-2.5 py-0.5 rounded-full bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300 font-bold border border-rose-300 dark:border-rose-800">
+                            Live MongoDB 🟢
+                          </span>
+                        </h2>
+                      </div>
+                    </div>
+                    <p className="text-xs sm:text-sm text-gray-500 dark:text-emerald-400">
+                      {isBangla 
+                        ? 'যেসব কাস্টমার Add to Cart, Fast Order বা Product Details থেকে Instant Order করতে গিয়ে বাদ দিয়েছেন তাদের বিবরণ। সরাসরি কল বা হোয়াটসঅ্যাপের মাধ্যমে তাদের সাথে যোগাযোগ করে বিক্রয় রিকভার করুন।' 
+                        : 'Track customers who initiated order, added items to cart, or opened instant checkout without completing. Recover lost sales with direct Call or WhatsApp.'}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => loadAllData(true)}
+                    className="inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-[#f4f7f4] dark:bg-black/40 hover:bg-emerald-100 dark:hover:bg-emerald-950/60 border border-gray-200 dark:border-emerald-900/60 text-xs sm:text-sm font-bold text-gray-800 dark:text-emerald-200 transition-all self-start md:self-center active:scale-95"
+                  >
+                    <RefreshCw className="w-4 h-4" />
+                    <span>{isBangla ? 'ডাটা রিফ্রেশ' : 'Refresh'}</span>
+                  </button>
+                </div>
+
+                {/* 2. KPI Metrics Cards */}
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+                  {/* Total Incomplete */}
+                  <div 
+                    onClick={() => setIncompleteFilterTab('all')}
+                    className={`p-5 rounded-3xl border transition-all cursor-pointer ${
+                      incompleteFilterTab === 'all'
+                        ? 'bg-slate-900 text-white border-slate-900 shadow-md ring-2 ring-emerald-500/50'
+                        : 'bg-white dark:bg-[#112318] border-[#e0ebe2] dark:border-[#1d3b28] hover:border-emerald-500/50'
+                    }`}
+                  >
+                    <div className="text-xs font-bold text-gray-500 dark:text-emerald-400">
+                      {isBangla ? 'মোট অসম্পূর্ণ অর্ডার' : 'Total Incomplete'}
+                    </div>
+                    <div className="text-2xl sm:text-3xl font-black mt-1">
+                      {incompleteOrdersList.length}
+                    </div>
+                    <div className="text-[11px] text-gray-400 mt-1">
+                      {isBangla ? 'সর্বমোট নথিবদ্ধ ট্র্যাকিং' : 'Total abandoned sessions'}
+                    </div>
+                  </div>
+
+                  {/* Pending Recovery */}
+                  <div 
+                    onClick={() => setIncompleteFilterTab('pending')}
+                    className={`p-5 rounded-3xl border transition-all cursor-pointer ${
+                      incompleteFilterTab === 'pending'
+                        ? 'bg-rose-950 text-white border-rose-900 shadow-md ring-2 ring-rose-500/50'
+                        : 'bg-white dark:bg-[#112318] border-[#e0ebe2] dark:border-[#1d3b28] hover:border-rose-500/50'
+                    }`}
+                  >
+                    <div className="text-xs font-bold text-rose-600 dark:text-rose-400 flex items-center justify-between">
+                      <span>{isBangla ? 'অপেক্ষমান রিকভারি' : 'Pending Recovery'}</span>
+                      {pendingCount > 0 && (
+                        <span className="w-2 h-2 rounded-full bg-rose-500 animate-ping" />
+                      )}
+                    </div>
+                    <div className="text-2xl sm:text-3xl font-black mt-1 text-rose-600 dark:text-rose-400">
+                      {pendingCount}
+                    </div>
+                    <div className="text-[11px] text-rose-500/80 mt-1">
+                      {isBangla ? 'যোগাযোগের অপেক্ষায়' : 'Awaiting contact'}
+                    </div>
+                  </div>
+
+                  {/* Potential Lost Revenue */}
+                  <div 
+                    className="p-5 rounded-3xl bg-white dark:bg-[#112318] border border-[#e0ebe2] dark:border-[#1d3b28] shadow-sm"
+                  >
+                    <div className="text-xs font-bold text-amber-600 dark:text-amber-400">
+                      {isBangla ? 'সম্ভাব্য বিক্রয় ক্ষতি (Pending)' : 'Potential Lost Value'}
+                    </div>
+                    <div className="text-2xl sm:text-3xl font-black mt-1 text-amber-600 dark:text-amber-400">
+                      ৳ {potentialRevenue.toLocaleString()}
+                    </div>
+                    <div className="text-[11px] text-gray-400 mt-1">
+                      {isBangla ? 'রিকভারযোগ্য সম্ভাব্য বিক্রয়' : 'Recoverable amount'}
+                    </div>
+                  </div>
+
+                  {/* Successfully Recovered */}
+                  <div 
+                    onClick={() => setIncompleteFilterTab('recovered')}
+                    className={`p-5 rounded-3xl border transition-all cursor-pointer ${
+                      incompleteFilterTab === 'recovered'
+                        ? 'bg-emerald-950 text-white border-emerald-900 shadow-md ring-2 ring-emerald-500/50'
+                        : 'bg-white dark:bg-[#112318] border-[#e0ebe2] dark:border-[#1d3b28] hover:border-emerald-500/50'
+                    }`}
+                  >
+                    <div className="text-xs font-bold text-emerald-600 dark:text-emerald-400 flex items-center justify-between">
+                      <span>{isBangla ? 'সফল রিকভারি' : 'Recovered Orders'}</span>
+                      <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                    </div>
+                    <div className="text-2xl sm:text-3xl font-black mt-1 text-emerald-600 dark:text-emerald-400">
+                      {recoveredCount}
+                    </div>
+                    <div className="text-[11px] text-emerald-600/80 font-bold mt-1">
+                      ৳ {recoveredRevenue.toLocaleString()} {isBangla ? 'রিকভার হয়েছে' : 'recovered'}
+                    </div>
+                  </div>
+                </div>
+
+                {/* 3. Filter Tabs & Search Bar */}
+                <div className="bg-white dark:bg-[#112318] rounded-3xl p-4 border border-[#e0ebe2] dark:border-[#1d3b28] shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-3">
+                  {/* Status Tabs */}
+                  <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+                    {[
+                      { id: 'all', label: isBangla ? 'সকল' : 'All', count: incompleteOrdersList.length },
+                      { id: 'pending', label: isBangla ? 'অপেক্ষমান' : 'Pending', count: pendingCount, color: 'bg-rose-500 text-white' },
+                      { id: 'contacted', label: isBangla ? 'যোগাযোগ হয়েছে' : 'Contacted', count: contactedCount, color: 'bg-amber-500 text-slate-950' },
+                      { id: 'recovered', label: isBangla ? 'সফল রিকভারি' : 'Recovered', count: recoveredCount, color: 'bg-emerald-600 text-white' },
+                      { id: 'cancelled', label: isBangla ? 'বাতিল' : 'Cancelled', count: cancelledCount }
+                    ].map(tab => (
+                      <button
+                        key={tab.id}
+                        onClick={() => setIncompleteFilterTab(tab.id)}
+                        className={`px-3.5 py-1.5 rounded-2xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+                          incompleteFilterTab === tab.id
+                            ? 'bg-brand-900 dark:bg-emerald-600 text-white shadow-sm'
+                            : 'bg-gray-100 dark:bg-black/30 hover:bg-gray-200 dark:hover:bg-emerald-950 text-gray-700 dark:text-emerald-300'
+                        }`}
+                      >
+                        <span>{tab.label}</span>
+                        <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-black ${
+                          tab.color || 'bg-gray-200 dark:bg-black/50 text-gray-800 dark:text-emerald-200'
+                        }`}>
+                          {tab.count}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Search Input */}
+                  <div className="relative min-w-[260px]">
+                    <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
+                    <input
+                      type="text"
+                      placeholder={isBangla ? 'কাস্টমারের নাম, ফোন বা পণ্য সার্চ...' : 'Search customer, phone or product...'}
+                      value={incompleteSearchTerm}
+                      onChange={(e) => setIncompleteSearchTerm(e.target.value)}
+                      className="w-full pl-9 pr-8 py-2 bg-[#f8faf8] dark:bg-black/40 border border-gray-200 dark:border-emerald-900/60 rounded-2xl text-xs font-medium text-gray-900 dark:text-emerald-50 focus:outline-none focus:border-brand-900"
+                    />
+                    {incompleteSearchTerm && (
+                      <button
+                        onClick={() => setIncompleteSearchTerm('')}
+                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* 4. Incomplete Orders List */}
+                {filteredIncompleteOrders.length === 0 ? (
+                  <div className="bg-white dark:bg-[#112318] rounded-3xl p-12 text-center border border-[#e0ebe2] dark:border-[#1d3b28] space-y-3">
+                    <div className="w-16 h-16 rounded-full bg-emerald-50 dark:bg-emerald-950/60 flex items-center justify-center mx-auto text-brand-900 dark:text-emerald-300">
+                      <ShoppingBag className="w-8 h-8 text-emerald-600" />
+                    </div>
+                    <h3 className="text-base sm:text-lg font-black text-gray-800 dark:text-emerald-100">
+                      {isBangla ? 'কোনো অসম্পূর্ণ অর্ডার পাওয়া যায়নি' : 'No incomplete orders found'}
+                    </h3>
+                    <p className="text-xs text-gray-500 dark:text-emerald-400 max-w-md mx-auto">
+                      {isBangla 
+                        ? 'বর্তমানে কোনো গ্রাহকের অসম্পূর্ণ অর্ডার বা পরিত্যক্ত চেকআউট নেই। গ্রাহক Add to Cart বা Instant Order করতে গিয়ে বাদ দিলে তা স্বয়ংক্রিয়ভাবে এখানে চলে আসবে।' 
+                        : 'No abandoned carts or incomplete orders match your current filters.'}
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {filteredIncompleteOrders.map((order) => {
+                      const isPending = order.status === 'pending';
+                      const isContacted = order.status === 'contacted';
+                      const isRecovered = order.status === 'recovered';
+                      const isCancelled = order.status === 'cancelled';
+                      const hasPhone = order.customerPhone && order.customerPhone !== 'নম্বর দেয়নি / অপেক্ষমান' && order.customerPhone.length >= 10;
+
+                      const customerOtherOrdersCount = incompleteOrdersList.filter(o => {
+                        if (o.incomplete_order_id === order.incomplete_order_id) return false;
+                        if (order.customerPhone && order.customerPhone !== 'নম্বর দেয়নি / অপেক্ষমান' && o.customerPhone === order.customerPhone) return true;
+                        if (order.session_id && o.session_id === order.session_id) return true;
+                        if (order.user_id && o.user_id === order.user_id) return true;
+                        return false;
+                      }).length;
+
+                      return (
+                        <div
+                          key={order._id || order.incomplete_order_id}
+                          className="bg-white dark:bg-[#112318] rounded-3xl p-5 sm:p-6 border border-[#e0ebe2] dark:border-[#1d3b28] hover:border-emerald-500/50 shadow-sm hover:shadow-md transition-all space-y-4"
+                        >
+                          {/* Row 1: Header / Status / Timestamp */}
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-100 dark:border-emerald-900/40 pb-3.5">
+                            <div className="flex items-center gap-2.5 flex-wrap">
+                              <span className="font-mono text-xs font-bold px-2.5 py-1 rounded-xl bg-gray-100 dark:bg-black/40 text-gray-800 dark:text-emerald-300 border border-gray-200 dark:border-emerald-900/60">
+                                #{order.incomplete_order_id}
+                              </span>
+                              {/* Source Badge */}
+                              <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300 border border-blue-200 dark:border-blue-900">
+                                📍 {order.source || 'Instant Order'}
+                              </span>
+                              {/* Customer Type */}
+                              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                                order.user_id 
+                                  ? 'bg-purple-100 text-purple-700 dark:bg-purple-950 dark:text-purple-300' 
+                                  : 'bg-gray-100 text-gray-600 dark:bg-black/30 dark:text-gray-400'
+                              }`}>
+                                {order.user_id ? '👤 নিবন্ধিত ক্রেতা' : '🌐 অতিথি ক্রেতা (Guest)'}
+                              </span>
+                            </div>
+
+                            <div className="flex items-center gap-2">
+                              {/* Status Pill */}
+                              {isPending && (
+                                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300 border border-rose-300 dark:border-rose-900 animate-pulse">
+                                  <Clock className="w-3.5 h-3.5" />
+                                  <span>{isBangla ? 'অপেক্ষমান (Pending)' : 'Pending Recovery'}</span>
+                                </span>
+                              )}
+                              {isContacted && (
+                                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 border border-amber-300 dark:border-amber-900">
+                                  <PhoneCall className="w-3.5 h-3.5" />
+                                  <span>{isBangla ? 'যোগাযোগ হয়েছে' : 'Contacted'}</span>
+                                </span>
+                              )}
+                              {isRecovered && (
+                                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-900">
+                                  <CheckCircle className="w-3.5 h-3.5" />
+                                  <span>{isBangla ? 'সফল রিকভারি' : 'Recovered'}</span>
+                                </span>
+                              )}
+                              {isCancelled && (
+                                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black bg-gray-100 text-gray-600 dark:bg-black/40 dark:text-gray-400 border border-gray-300 dark:border-gray-800">
+                                  <XCircle className="w-3.5 h-3.5" />
+                                  <span>{isBangla ? 'বাতিল' : 'Cancelled'}</span>
+                                </span>
+                              )}
+
+                              {/* Time */}
+                              <span className="text-[11px] text-gray-400 dark:text-emerald-400/80">
+                                {new Date(order.updatedAt || order.createdAt).toLocaleString(isBangla ? 'bn-BD' : 'en-US', {
+                                  month: 'short',
+                                  day: 'numeric',
+                                  hour: '2-digit',
+                                  minute: '2-digit'
+                                })}
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Row 2: Customer Details & Products */}
+                          <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+                            
+                            {/* Customer Profile Column (5 cols) */}
+                            <div className="lg:col-span-5 space-y-2.5 p-4 rounded-2xl bg-gray-50/80 dark:bg-black/20 border border-gray-100 dark:border-emerald-950">
+                              <div className="text-xs font-black text-gray-500 dark:text-emerald-400 uppercase tracking-wider">
+                                {isBangla ? 'গ্রাহকের বিস্তারিত তথ্য' : 'Customer Details'}
+                              </div>
+
+                              <div className="space-y-1.5 text-xs">
+                                {/* Name */}
+                                <div className="flex items-center gap-2">
+                                  <span className="w-7 h-7 rounded-xl bg-emerald-100 dark:bg-emerald-950 text-brand-900 dark:text-emerald-300 flex items-center justify-center font-bold text-xs flex-shrink-0">
+                                    <User className="w-3.5 h-3.5" />
+                                  </span>
+                                  <div>
+                                    <p className="font-extrabold text-sm text-gray-900 dark:text-emerald-100">
+                                      {order.customerName || 'অজ্ঞাত ক্রেতা (Guest)'}
+                                    </p>
+                                    {order.customerEmail && (
+                                      <p className="text-[11px] text-gray-500 dark:text-emerald-400">
+                                        ✉️ {order.customerEmail}
+                                      </p>
+                                    )}
+                                  </div>
+                                </div>
+
+                                {/* Phone */}
+                                <div className="flex items-center justify-between pt-1">
+                                  <div className="flex items-center gap-2">
+                                    <span className="w-7 h-7 rounded-xl bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300 flex items-center justify-center font-bold text-xs flex-shrink-0">
+                                      <Phone className="w-3.5 h-3.5" />
+                                    </span>
+                                    <span className="font-mono font-black text-sm text-gray-900 dark:text-emerald-100">
+                                      {order.customerPhone || 'নম্বর দেয়নি / অপেক্ষমান'}
+                                    </span>
+                                  </div>
+                                  {hasPhone && (
+                                    <a
+                                      href={`tel:${order.customerPhone}`}
+                                      className="px-2.5 py-1 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[11px] flex items-center gap-1 shadow-sm transition-all active:scale-95"
+                                    >
+                                      <PhoneCall className="w-3 h-3" />
+                                      <span>কল করুন</span>
+                                    </a>
+                                  )}
+                                </div>
+
+                                {/* Address */}
+                                {order.deliveryAddress && (
+                                  <div className="flex items-start gap-2 pt-1 border-t border-gray-200/60 dark:border-emerald-950">
+                                    <span className="w-7 h-7 rounded-xl bg-blue-100 dark:bg-blue-950 text-blue-800 dark:text-blue-300 flex items-center justify-center font-bold text-xs flex-shrink-0 mt-0.5">
+                                      <MapPin className="w-3.5 h-3.5" />
+                                    </span>
+                                    <div>
+                                      <p className="text-gray-700 dark:text-emerald-200 font-medium">
+                                        {order.deliveryAddress}
+                                      </p>
+                                      <span className="text-[10px] text-gray-400 font-bold">
+                                        {order.deliveryZone === 'inside_dhaka' ? 'ঢাকার ভেতরে (৳৭০ ডেলিভারি)' : 'ঢাকার বাইরে (৳১২০ ডেলিভারি)'}
+                                      </span>
+                                    </div>
+                                  </div>
+                                )}
+
+                                {/* Admin Notes if any */}
+                                {order.adminNotes && (
+                                  <div className="p-2.5 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200/60 dark:border-amber-900/40 text-[11px] text-amber-900 dark:text-amber-300 mt-2">
+                                    <strong>নোট:</strong> {order.adminNotes}
+                                  </div>
+                                )}
+
+                                {/* Converted Order link */}
+                                {order.convertedOrderId && (
+                                  <div className="p-2 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-[11px] text-emerald-900 dark:text-emerald-300 font-bold flex items-center justify-between">
+                                    <span>🎉 রূপান্তরিত অর্ডার: <strong>{order.convertedOrderId}</strong></span>
+                                    <button
+                                      onClick={() => {
+                                        setActiveMenu('orders');
+                                        setSearchQuery(order.convertedOrderId);
+                                      }}
+                                      className="underline hover:text-emerald-600"
+                                    >
+                                      দেখুন
+                                    </button>
+                                  </div>
+                                )}
+
+                                {/* Multiple Orders Badge for Same Customer */}
+                                {customerOtherOrdersCount > 0 && (
+                                  <button
+                                    type="button"
+                                    onClick={() => setIncompleteSearchTerm(order.customerPhone && order.customerPhone !== 'নম্বর দেয়নি / অপেক্ষমান' ? order.customerPhone : order.customerName)}
+                                    className="w-full mt-2.5 p-2.5 rounded-2xl bg-purple-50 dark:bg-purple-950/40 hover:bg-purple-100 dark:hover:bg-purple-900/60 border border-purple-200 dark:border-purple-800 text-[11px] font-bold text-purple-900 dark:text-purple-300 flex items-center justify-between transition-colors shadow-sm"
+                                  >
+                                    <span>🛍️ এই কাস্টমারের আরও {customerOtherOrdersCount}টি পণ্যের অসম্পূর্ণ অর্ডার আছে</span>
+                                    <span className="underline font-black text-purple-700 dark:text-purple-300">সবগুলো দেখুন →</span>
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Products & Price Column (7 cols) */}
+                            <div className="lg:col-span-7 flex flex-col justify-between space-y-3">
+                              <div className="space-y-2">
+                                <div className="text-xs font-black text-gray-500 dark:text-emerald-400 uppercase tracking-wider flex items-center justify-between">
+                                  <span>{isBangla ? 'যেসব পণ্য নিতে চেয়েছিলেন' : 'Selected Products'}</span>
+                                  <span className="text-[11px] font-bold text-brand-900 dark:text-emerald-300">
+                                    {order.items?.length || 0} টি আইটেম
+                                  </span>
+                                </div>
+
+                                <div className="space-y-2 max-h-48 overflow-y-auto custom-scrollbar pr-1">
+                                  {(order.items || []).map((item, itIdx) => (
+                                    <div
+                                      key={itIdx}
+                                      className="flex items-center justify-between gap-3 p-2.5 rounded-2xl bg-gray-50/60 dark:bg-black/20 border border-gray-100 dark:border-emerald-950"
+                                    >
+                                      <div className="flex items-center gap-3 overflow-hidden">
+                                        <img
+                                          src={item.image || 'https://images.unsplash.com/photo-1587049352846-4a222e784d38?auto=format&fit=crop&w=600&q=80'}
+                                          alt={item.name}
+                                          className="w-12 h-12 rounded-xl object-cover flex-shrink-0 border border-gray-200 dark:border-emerald-900"
+                                        />
+                                        <div className="truncate">
+                                          <h5 className="font-bold text-xs text-gray-900 dark:text-emerald-100 truncate">
+                                            {item.name}
+                                          </h5>
+                                          <span className="text-[11px] text-gray-500 dark:text-emerald-400 block">
+                                            ওজন/সাইজ: {item.weight || 'Standard'} | পরিমাণ: <strong className="text-gray-800 dark:text-emerald-200">{item.quantity}টি</strong>
+                                          </span>
+                                        </div>
+                                      </div>
+
+                                      <div className="text-right flex-shrink-0">
+                                        <span className="font-black text-xs text-brand-900 dark:text-emerald-300 block">
+                                          ৳ {Number(item.price || 0) * Number(item.quantity || 1)}
+                                        </span>
+                                        <span className="text-[10px] text-gray-400 block">
+                                          (৳ {item.price}/টি)
+                                        </span>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+
+                              {/* Price Summary Bar */}
+                              <div className="p-3 rounded-2xl bg-emerald-50/60 dark:bg-emerald-950/20 border border-emerald-100 dark:border-emerald-900/60 flex items-center justify-between text-xs">
+                                <div>
+                                  <span className="text-gray-500 dark:text-emerald-400">সাবটোটাল: ৳{order.subtotal}</span>
+                                  <span className="text-gray-400 mx-1.5">•</span>
+                                  <span className="text-gray-500 dark:text-emerald-400">ডেলিভারি: ৳{order.deliveryCharge || 70}</span>
+                                </div>
+                                <div className="text-right">
+                                  <span className="text-[11px] text-gray-500 dark:text-emerald-400 mr-1.5 font-bold">মোট সম্ভাব্য মূল্য:</span>
+                                  <strong className="text-base font-black text-brand-900 dark:text-emerald-300">
+                                    ৳ {order.totalAmount}
+                                  </strong>
+                                </div>
+                              </div>
+
+                            </div>
+                          </div>
+
+                          {/* Row 3: Admin Action Buttons */}
+                          <div className="pt-3 border-t border-gray-100 dark:border-emerald-900/40 flex flex-wrap items-center justify-between gap-2.5">
+                            <div className="flex flex-wrap items-center gap-2">
+                              {/* Direct Phone Call */}
+                              {hasPhone ? (
+                                <a
+                                  href={`tel:${order.customerPhone}`}
+                                  className="px-3.5 py-2 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-bold text-xs shadow-sm hover:shadow transition-all flex items-center gap-1.5 active:scale-95"
+                                  title="সরাসরি গ্রাহককে কল করুন"
+                                >
+                                  <PhoneCall className="w-3.5 h-3.5" />
+                                  <span>{isBangla ? 'কল করুন' : 'Call'}</span>
+                                </a>
+                              ) : (
+                                <button
+                                  disabled
+                                  className="px-3.5 py-2 rounded-2xl bg-gray-100 text-gray-400 dark:bg-black/30 text-xs font-bold flex items-center gap-1.5 cursor-not-allowed"
+                                >
+                                  <PhoneCall className="w-3.5 h-3.5" />
+                                  <span>ফোন নম্বর নেই</span>
+                                </button>
+                              )}
+
+                              {/* WhatsApp Recovery Button */}
+                              {hasPhone && (
+                                <a
+                                  href={getIncompleteWhatsAppLink(order)}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="px-3.5 py-2 rounded-2xl bg-[#25D366] hover:bg-[#20ba59] text-white font-bold text-xs shadow-sm hover:shadow transition-all flex items-center gap-1.5 active:scale-95"
+                                  title="হোয়াটসঅ্যাপে রিকভারি বার্তা পাঠান"
+                                >
+                                  <MessageCircle className="w-3.5 h-3.5" />
+                                  <span>{isBangla ? 'WhatsApp বার্তা' : 'WhatsApp'}</span>
+                                </a>
+                              )}
+
+                              {/* Status Update / Notes Modal */}
+                              <button
+                                onClick={() => setIncompleteStatusModal({
+                                  isOpen: true,
+                                  order,
+                                  status: order.status || 'contacted',
+                                  adminNotes: order.adminNotes || ''
+                                })}
+                                className="px-3 py-2 rounded-2xl bg-gray-100 dark:bg-black/40 hover:bg-gray-200 text-gray-700 dark:text-emerald-200 font-bold text-xs border border-gray-200 dark:border-emerald-900/60 transition-all flex items-center gap-1.5"
+                              >
+                                <Edit className="w-3.5 h-3.5" />
+                                <span>{isBangla ? 'স্ট্যাটাস ও নোট' : 'Status & Note'}</span>
+                              </button>
+                            </div>
+
+                            <div className="flex items-center gap-2">
+                              {/* 1-Click Convert to Real Order */}
+                              {!isRecovered && (
+                                <button
+                                  onClick={() => setSelectedIncompleteForConvert(order)}
+                                  className="px-4 py-2 rounded-2xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-slate-950 font-black text-xs shadow-md hover:shadow-lg transition-all flex items-center gap-1.5 active:scale-95"
+                                >
+                                  <Zap className="w-4 h-4 fill-slate-950" />
+                                  <span>{isBangla ? 'পূর্ণাঙ্গ অর্ডারে রূপান্তর করুন' : 'Convert to Order'}</span>
+                                </button>
+                              )}
+
+                              {/* Delete button */}
+                              <button
+                                onClick={() => handleDeleteIncompleteOrder(order.incomplete_order_id || order._id)}
+                                className="p-2 rounded-2xl bg-rose-50 dark:bg-rose-950/40 hover:bg-rose-100 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-900/60 transition-all"
+                                title={isBangla ? 'মুছে ফেলুন' : 'Delete'}
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </div>
+
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* 📌 Modal 1: Convert to Real Order Confirmation Modal */}
+                {selectedIncompleteForConvert && (
+                  <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-200 overflow-y-auto">
+                    <div className="bg-white dark:bg-[#112318] rounded-3xl max-w-lg w-full border border-[#e0ebe2] dark:border-[#1d3b28] shadow-2xl p-6 sm:p-7 space-y-5 my-auto">
+                      
+                      {/* Modal Header */}
+                      <div className="flex items-center justify-between border-b border-gray-100 dark:border-emerald-900/60 pb-3.5">
+                        <div className="flex items-center gap-2.5">
+                          <span className="p-2.5 rounded-2xl bg-gradient-to-tr from-amber-400 to-orange-500 text-slate-950 shadow-sm">
+                            <Zap className="w-5 h-5 fill-slate-950" />
+                          </span>
+                          <div>
+                            <h3 className="text-base sm:text-lg font-black text-gray-900 dark:text-emerald-100">
+                              {isBangla ? 'পূর্ণাঙ্গ অর্ডারে রূপান্তর নিশ্চিতকরণ' : 'Convert to Official Order'}
+                            </h3>
+                            <p className="text-xs text-gray-500 dark:text-emerald-400">
+                              #{selectedIncompleteForConvert.incomplete_order_id}
+                            </p>
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => setSelectedIncompleteForConvert(null)}
+                          className="p-1.5 rounded-full hover:bg-gray-100 dark:hover:bg-emerald-950 text-gray-400"
+                        >
+                          <X className="w-5 h-5" />
+                        </button>
+                      </div>
+
+                      {/* Customer summary */}
+                      <div className="p-4 rounded-2xl bg-gray-50 dark:bg-black/30 border border-gray-100 dark:border-emerald-950 space-y-2 text-xs">
+                        <div className="flex justify-between">
+                          <span className="text-gray-500 dark:text-emerald-400">ক্রেতার নাম:</span>
+                          <strong className="text-gray-900 dark:text-emerald-100">{selectedIncompleteForConvert.customerName}</strong>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-500 dark:text-emerald-400">মোবাইল নম্বর:</span>
+                          <strong className="font-mono text-gray-900 dark:text-emerald-100">{selectedIncompleteForConvert.customerPhone}</strong>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-500 dark:text-emerald-400">ডেলিভারি ঠিকানা:</span>
+                          <span className="text-right text-gray-700 dark:text-emerald-200 max-w-[240px]">
+                            {selectedIncompleteForConvert.deliveryAddress || 'ফোন কলের মাধ্যমে নিশ্চিত করা হবে'}
+                          </span>
+                        </div>
+                        <div className="flex justify-between border-t border-gray-200 dark:border-emerald-900/60 pt-2 font-bold text-sm">
+                          <span className="text-brand-900 dark:text-emerald-300">মোট বিল:</span>
+                          <span className="text-brand-900 dark:text-emerald-300">৳ {selectedIncompleteForConvert.totalAmount}</span>
+                        </div>
+                      </div>
+
+                      {/* Custom Admin Note Input */}
+                      <div>
+                        <label className="block text-xs font-bold text-gray-700 dark:text-emerald-300 mb-1.5">
+                          {isBangla ? 'অর্ডারের সাথে কোনো বিশেষ নোট যোগ করতে চান? (ঐচ্ছিক)' : 'Custom Order Note (Optional)'}
+                        </label>
+                        <textarea
+                          rows={2}
+                          value={convertCustomNotes}
+                          onChange={(e) => setConvertCustomNotes(e.target.value)}
+                          placeholder={isBangla ? 'যেমন: ফোনে কথা হয়েছে, আগামীকাল ডেলিভারি করতে হবে।' : 'e.g. Confirmed with customer over phone, expedite delivery.'}
+                          className="w-full px-4 py-2.5 bg-[#f8faf8] dark:bg-black/40 border border-gray-200 dark:border-emerald-900/60 rounded-2xl text-xs text-gray-900 dark:text-emerald-50 focus:outline-none focus:border-brand-900 resize-none"
+                        />
+                      </div>
+
+                      {/* Action buttons */}
+                      <div className="flex items-center justify-end gap-3 pt-2">
+                        <button
+                          type="button"
+                          onClick={() => setSelectedIncompleteForConvert(null)}
+                          className="px-4 py-2.5 rounded-2xl bg-gray-100 dark:bg-black/40 hover:bg-gray-200 text-xs font-bold text-gray-700 dark:text-emerald-300 transition-colors"
+                        >
+                          {isBangla ? 'বাতিল' : 'Cancel'}
+                        </button>
+                        <button
+                          type="button"
+                          disabled={isConvertingIncomplete}
+                          onClick={() => handleConvertIncompleteOrder(selectedIncompleteForConvert.incomplete_order_id, convertCustomNotes)}
+                          className="px-5 py-2.5 rounded-2xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-slate-950 text-xs font-black shadow-md transition-all flex items-center gap-2 disabled:opacity-50"
+                        >
+                          {isConvertingIncomplete ? (
+                            <>
+                              <RefreshCw className="w-4 h-4 animate-spin" />
+                              <span>{isBangla ? 'অর্ডার তৈরি হচ্ছে...' : 'Converting...'}</span>
+                            </>
+                          ) : (
+                            <>
+                              <Check className="w-4 h-4" />
+                              <span>{isBangla ? 'হ্যাঁ, অর্ডার সম্পন্ন করুন' : 'Confirm & Convert'}</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
+
+                    </div>
+                  </div>
+                )}
+
+                {/* 📌 Modal 2: Status & Admin Note Modal */}
+                {incompleteStatusModal.isOpen && incompleteStatusModal.order && (
+                  <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-200 overflow-y-auto">
+                    <div className="bg-white dark:bg-[#112318] rounded-3xl max-w-md w-full border border-[#e0ebe2] dark:border-[#1d3b28] shadow-2xl p-6 space-y-4 my-auto">
+                      
+                      <div className="flex items-center justify-between border-b border-gray-100 dark:border-emerald-900/60 pb-3">
+                        <h3 className="text-base font-black text-gray-900 dark:text-emerald-100 flex items-center gap-2">
+                          <Edit className="w-4 h-4 text-emerald-600" />
+                          <span>{isBangla ? 'স্ট্যাটাস ও অ্যাডমিন নোট পরিবর্তন' : 'Update Status & Notes'}</span>
+                        </h3>
+                        <button
+                          onClick={() => setIncompleteStatusModal({ isOpen: false, order: null, status: 'contacted', adminNotes: '' })}
+                          className="p-1 rounded-full text-gray-400 hover:text-gray-600"
+                        >
+                          <X className="w-5 h-5" />
+                        </button>
+                      </div>
+
+                      <div className="space-y-3">
+                        <div>
+                          <label className="block text-xs font-bold text-gray-700 dark:text-emerald-300 mb-1.5">
+                            {isBangla ? 'স্ট্যাটাস নির্বাচন করুন' : 'Select Status'}
+                          </label>
+                          <select
+                            value={incompleteStatusModal.status}
+                            onChange={(e) => setIncompleteStatusModal({ ...incompleteStatusModal, status: e.target.value })}
+                            className="w-full px-4 py-2.5 bg-[#f8faf8] dark:bg-black/40 border border-gray-200 dark:border-emerald-900/60 rounded-2xl text-xs font-bold text-gray-900 dark:text-emerald-50 focus:outline-none focus:border-brand-900 cursor-pointer"
+                          >
+                            <option value="pending">⏳ অপেক্ষমান (Pending Recovery)</option>
+                            <option value="contacted">📞 যোগাযোগ হয়েছে (Contacted / Follow-up)</option>
+                            <option value="recovered">✅ সফল রিকভারি (Recovered / Ordered)</option>
+                            <option value="cancelled">❌ বাতিল (Cancelled / Not interested)</option>
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-bold text-gray-700 dark:text-emerald-300 mb-1.5">
+                            {isBangla ? 'যোগাযোগের নোট বা বিবরণ' : 'Contact Note'}
+                          </label>
+                          <textarea
+                            rows={3}
+                            value={incompleteStatusModal.adminNotes}
+                            onChange={(e) => setIncompleteStatusModal({ ...incompleteStatusModal, adminNotes: e.target.value })}
+                            placeholder={isBangla ? 'যেমন: ফোনে কথা হয়েছে, গ্রাহক সন্ধ্যায় অর্ডার নিশ্চিত করবেন।' : 'e.g. Customer called, will confirm order in the evening.'}
+                            className="w-full px-4 py-2.5 bg-[#f8faf8] dark:bg-black/40 border border-gray-200 dark:border-emerald-900/60 rounded-2xl text-xs text-gray-900 dark:text-emerald-50 focus:outline-none focus:border-brand-900 resize-none"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-end gap-2.5 pt-2">
+                        <button
+                          type="button"
+                          onClick={() => setIncompleteStatusModal({ isOpen: false, order: null, status: 'contacted', adminNotes: '' })}
+                          className="px-4 py-2 rounded-2xl bg-gray-100 dark:bg-black/40 hover:bg-gray-200 text-xs font-bold text-gray-700 dark:text-emerald-300"
+                        >
+                          {isBangla ? 'বাতিল' : 'Cancel'}
+                        </button>
+                        <button
+                          type="button"
+                          disabled={isUpdatingIncomplete}
+                          onClick={() => handleUpdateIncompleteStatus(
+                            incompleteStatusModal.order.incomplete_order_id,
+                            incompleteStatusModal.status,
+                            incompleteStatusModal.adminNotes
+                          )}
+                          className="px-5 py-2 rounded-2xl bg-brand-900 hover:bg-brand-950 dark:bg-emerald-600 dark:hover:bg-emerald-700 text-white text-xs font-bold shadow-md transition-all flex items-center gap-1.5"
+                        >
+                          {isUpdatingIncomplete ? (
+                            <>
+                              <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                              <span>সংরক্ষণ হচ্ছে...</span>
+                            </>
+                          ) : (
+                            <>
+                              <Save className="w-3.5 h-3.5" />
+                              <span>আপডেট করুন</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
 
                     </div>
                   </div>

@@ -1263,6 +1263,76 @@ export const deleteSupportTicket = async (id) => {
   }
 };
 
+// ==========================================
+// 15. Incomplete Orders API (MongoDB Connected)
+// ==========================================
+export const saveIncompleteOrder = async (orderData) => {
+  try {
+    const res = await apiClient.post('/incomplete-orders', orderData);
+    return res.data;
+  } catch (error) {
+    console.error('saveIncompleteOrder error:', error.message);
+    return {
+      success: false,
+      message: error.response?.data?.message || 'Failed to save incomplete order'
+    };
+  }
+};
+
+export const getIncompleteOrders = async (params = {}) => {
+  try {
+    const res = await apiClient.get('/incomplete-orders', { params });
+    return res.data;
+  } catch (error) {
+    console.error('getIncompleteOrders error:', error.message);
+    return {
+      success: false,
+      data: [],
+      count: 0,
+      stats: { total: 0, pending: 0, contacted: 0, recovered: 0, cancelled: 0, potentialLostRevenue: 0, recoveredRevenue: 0 }
+    };
+  }
+};
+
+export const updateIncompleteOrderStatus = async (id, statusData) => {
+  try {
+    const res = await apiClient.patch(`/incomplete-orders/${id}/status`, statusData);
+    return res.data;
+  } catch (error) {
+    console.error('updateIncompleteOrderStatus error:', error);
+    return {
+      success: false,
+      message: error.response?.data?.message || 'স্ট্যাটাস আপডেট করতে সমস্যা হয়েছে'
+    };
+  }
+};
+
+export const convertIncompleteOrder = async (id, convertData = {}) => {
+  try {
+    const res = await apiClient.post(`/incomplete-orders/${id}/convert`, convertData);
+    return res.data;
+  } catch (error) {
+    console.error('convertIncompleteOrder error:', error);
+    return {
+      success: false,
+      message: error.response?.data?.message || 'অর্ডার রূপান্তর করতে সমস্যা হয়েছে'
+    };
+  }
+};
+
+export const deleteIncompleteOrder = async (id) => {
+  try {
+    const res = await apiClient.delete(`/incomplete-orders/${id}`);
+    return res.data;
+  } catch (error) {
+    console.error('deleteIncompleteOrder error:', error);
+    return {
+      success: false,
+      message: error.response?.data?.message || 'অসম্পূর্ণ অর্ডার মুছতে সমস্যা হয়েছে'
+    };
+  }
+};
+
 export default apiClient;
 
 

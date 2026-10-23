@@ -17,6 +17,7 @@ import {
 import { useCart } from '@/context/CartContext';
 import { useThemeLanguage } from '@/context/ThemeLanguageContext';
 import { placeOrder } from '@/lib/api';
+import { trackIncompleteOrder, getSessionId } from '@/lib/incompleteTracker';
 
 export default function CheckoutPage() {
   const router = useRouter();
@@ -37,6 +38,26 @@ export default function CheckoutPage() {
       if (!customerPhone) setCustomerPhone(user.phone || '');
     }
   }, [user]);
+
+  // 🛒 Track incomplete order when checkout page is opened or details updated
+  React.useEffect(() => {
+    if (cart.length === 0) return;
+    const deliveryCharge = deliveryZone === 'inside_dhaka' ? 70 : 120;
+    trackIncompleteOrder({
+      items: cart,
+      subtotal,
+      deliveryZone,
+      deliveryCharge,
+      totalAmount: subtotal + deliveryCharge,
+      customerName,
+      customerPhone,
+      customerEmail: user?.email || '',
+      deliveryAddress,
+      source: 'চেকআউট পেজ (Checkout Page)',
+      user,
+      debounceMs: 600
+    });
+  }, [customerName, customerPhone, deliveryAddress, deliveryZone, cart, subtotal]);
 
   if (cart.length === 0) {
     return (
@@ -87,6 +108,7 @@ export default function CheckoutPage() {
     try {
       const currentUserId = user?.id || user?._id || user?.userId || null;
       const orderData = {
+        sessionId: getSessionId(),
         userId: currentUserId,
         user_id: currentUserId,
         customerName: customerName.trim(),

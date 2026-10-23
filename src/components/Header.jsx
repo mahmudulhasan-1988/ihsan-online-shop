@@ -233,9 +233,9 @@ export default function Header() {
 
             <span className="opacity-40 hidden sm:inline">|</span>
 
-            <a href="tel:09613827282" className="hover:text-white flex items-center gap-1 font-semibold transition-colors">
+            <a href="tel:09611-562080" className="hover:text-white flex items-center gap-1 font-semibold transition-colors">
               <PhoneCall className="w-3.5 h-3.5 text-secondary animate-pulse" />
-              <span>{t('hotline')}: 09613-827282</span>
+              <span>{t('hotline')}: 09611-562080</span>
             </a>
 
             {/* Language Switcher Pill */}
@@ -367,7 +367,7 @@ export default function Header() {
 
             {/* Quick Hotline Call */}
             <a
-              href="tel:09613827282"
+              href="tel:09611-562080"
               className="hidden xl:flex items-center gap-2.5 bg-emerald-50/80 dark:bg-[#14291d] text-brand-900 dark:text-emerald-300 px-3.5 py-2 rounded-2xl border border-emerald-200/80 dark:border-[#254933] hover:bg-emerald-100/80 dark:hover:bg-[#1a3827] transition-colors"
             >
               <div className="w-8 h-8 rounded-full bg-brand-800 dark:bg-emerald-600 text-white flex items-center justify-center shadow-sm">
@@ -377,7 +377,7 @@ export default function Header() {
                 <p className="text-[10px] text-gray-500 dark:text-gray-400 font-medium leading-tight">
                   {isBangla ? 'কল করে অর্ডার করুন' : 'Call to Order'}
                 </p>
-                <p className="text-xs sm:text-sm font-bold text-brand-900 dark:text-emerald-300 leading-tight">09613-827282</p>
+                <p className="text-xs sm:text-sm font-bold text-brand-900 dark:text-emerald-300 leading-tight">09611-562080</p>
               </div>
             </a>
 
@@ -398,10 +398,10 @@ export default function Header() {
                         {user.name}
                       </span>
                       <span className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded-full mt-0.5 ${user.role === 'admin'
-                          ? 'bg-purple-600 text-white'
-                          : user.role === 'seller'
-                            ? 'bg-amber-500 text-brand-950'
-                            : 'bg-emerald-600 text-white'
+                        ? 'bg-purple-600 text-white'
+                        : user.role === 'seller'
+                          ? 'bg-amber-500 text-brand-950'
+                          : 'bg-emerald-600 text-white'
                         }`}>
                         {user.role || 'customer'}
                       </span>
@@ -480,7 +480,7 @@ export default function Header() {
               {/* Notification Popover Dropdown */}
               {isNotifOpen && (
                 <div className="absolute right-0 sm:right-0 mt-2 w-[calc(100vw-32px)] sm:w-96 max-w-sm sm:max-w-md bg-white dark:bg-[#112419] rounded-3xl shadow-2xl border border-gray-200/80 dark:border-[#244530] overflow-hidden z-50 animate-in fade-in slide-in-from-top-2 duration-200">
-                  
+
                   {/* Header */}
                   <div className="p-3.5 bg-gradient-to-r from-brand-950 via-brand-900 to-emerald-950 text-white flex items-center justify-between">
                     <div className="flex items-center gap-2">
@@ -490,11 +490,11 @@ export default function Header() {
                           {isBangla ? 'নোটিফিকেশন সেন্টার' : 'Notification Center'}
                         </h4>
                         <p className="text-[10px] text-emerald-200/80">
-                          {user?.role === 'admin' 
+                          {user?.role === 'admin'
                             ? (isBangla ? 'অ্যাডমিন অর্ডার ও সিস্টেম এলার্ট' : 'Admin Order & System Alerts')
                             : user?.role === 'seller'
-                            ? (isBangla ? 'সেলার স্টোর ও অর্ডার নোটিফিকেশন' : 'Seller Store & Order Alerts')
-                            : (isBangla ? 'অফার, ডিসকাউন্ট ও নতুন প্রোডাক্ট' : 'Offers, Discounts & New Products')}
+                              ? (isBangla ? 'সেলার স্টোর ও অর্ডার নোটিফিকেশন' : 'Seller Store & Order Alerts')
+                              : (isBangla ? 'অফার, ডিসকাউন্ট ও নতুন প্রোডাক্ট' : 'Offers, Discounts & New Products')}
                         </p>
                       </div>
                     </div>
@@ -534,7 +534,7 @@ export default function Header() {
                   </div>
 
                   {/* Notification Items List - Smooth Mouse Scrollable */}
-                  <div 
+                  <div
                     tabIndex={0}
                     onWheel={(e) => e.stopPropagation()}
                     className="max-h-[350px] overflow-y-auto overscroll-contain focus:outline-none divide-y divide-gray-100 dark:divide-emerald-950/60 p-1.5 space-y-1 select-text scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-emerald-800"
@@ -563,14 +563,12 @@ export default function Header() {
                           <div
                             key={n.id || n._id}
                             onClick={() => handleMarkRead(n.id || n._id, targetLink)}
-                            className={`group relative p-2.5 rounded-2xl cursor-pointer transition-all flex items-start gap-2.5 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 border border-transparent hover:border-emerald-200/50 dark:hover:border-emerald-800/40 ${
-                              !n.is_read ? 'bg-amber-50/70 dark:bg-emerald-950/30 font-medium' : 'bg-transparent'
-                            }`}
+                            className={`group relative p-2.5 rounded-2xl cursor-pointer transition-all flex items-start gap-2.5 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 border border-transparent hover:border-emerald-200/50 dark:hover:border-emerald-800/40 ${!n.is_read ? 'bg-amber-50/70 dark:bg-emerald-950/30 font-medium' : 'bg-transparent'
+                              }`}
                           >
                             {/* Icon */}
-                            <div className={`w-8 h-8 rounded-xl flex items-center justify-center text-sm flex-shrink-0 shadow-sm ${
-                              isOrder ? 'bg-amber-100 dark:bg-amber-950/80 text-amber-600' : 'bg-emerald-100 dark:bg-emerald-950/80 text-emerald-600'
-                            }`}>
+                            <div className={`w-8 h-8 rounded-xl flex items-center justify-center text-sm flex-shrink-0 shadow-sm ${isOrder ? 'bg-amber-100 dark:bg-amber-950/80 text-amber-600' : 'bg-emerald-100 dark:bg-emerald-950/80 text-emerald-600'
+                              }`}>
                               {isOrder ? '📦' : '🎁'}
                             </div>
 

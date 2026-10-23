@@ -39,7 +39,7 @@ export default function ProductCard({ product }) {
   const handleFastOrder = (e) => {
     e.preventDefault();
     e.stopPropagation();
-    openFastOrder(product, selectedVariant);
+    openFastOrder(product, selectedVariant, 'প্রোডাক্ট কার্ড - অর্ডার করুন');
   };
 
   const displayName = isBangla ? product.name : (product.nameEn || product.name);

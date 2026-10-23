@@ -541,7 +541,7 @@ export default function ProductDetailPage() {
             ) : (
               <>
                 <button
-                  onClick={() => openFastOrder(product, selectedVariant)}
+                  onClick={() => openFastOrder(product, selectedVariant, 'প্রোডাক্ট ডিটেইলস - Instant Order')}
                   className="bg-secondary hover:bg-gold-600 text-brand-950 font-extrabold py-4 px-6 rounded-2xl shadow-xl transition-all flex items-center justify-center gap-2 text-sm sm:text-base active:scale-95"
                 >
                   <Zap className="w-5 h-5 fill-brand-950" />

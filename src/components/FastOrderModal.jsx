@@ -22,12 +22,13 @@ import {
 import { useCart } from '@/context/CartContext';
 import { useThemeLanguage } from '@/context/ThemeLanguageContext';
 import { placeOrder } from '@/lib/api';
+import { trackIncompleteOrder, getSessionId } from '@/lib/incompleteTracker';
 
 export default function FastOrderModal() {
   const router = useRouter();
   const { fastOrderData, closeFastOrder, showToast, user } = useCart();
   const { isBangla } = useThemeLanguage();
-  const { isOpen, product, variant } = fastOrderData;
+  const { isOpen, product, variant, source } = fastOrderData;
 
   const [quantity, setQuantity] = useState(1);
   const [selectedVariant, setSelectedVariant] = useState(null);
@@ -43,13 +44,73 @@ export default function FastOrderModal() {
   useEffect(() => {
     if (product) {
       setQuantity(1);
-      setSelectedVariant(variant || (product.variants && product.variants.length > 0 ? product.variants[0] : null));
+      const activeVar = variant || (product.variants && product.variants.length > 0 ? product.variants[0] : null);
+      setSelectedVariant(activeVar);
       if (user) {
         if (!customerName) setCustomerName(user.name || '');
         if (!customerPhone) setCustomerPhone(user.phone || '');
       }
+
+      // 🛒 Immediately track incomplete order when Fast Order / Instant Order modal is opened
+      const unitPrice = activeVar ? activeVar.price : product.price;
+      trackIncompleteOrder({
+        items: [
+          {
+            productId: product.id || product._id,
+            name: product.name,
+            weight: activeVar ? activeVar.weight : product.unit || 'Standard',
+            price: unitPrice,
+            quantity: 1,
+            image: product.images?.[0] || product.thumbnail || '',
+          }
+        ],
+        subtotal: unitPrice,
+        deliveryZone,
+        deliveryCharge: deliveryZone === 'inside_dhaka' ? 70 : 120,
+        totalAmount: unitPrice + (deliveryZone === 'inside_dhaka' ? 70 : 120),
+        customerName: customerName || user?.name || '',
+        customerPhone: customerPhone || user?.phone || '',
+        customerEmail: user?.email || '',
+        deliveryAddress: deliveryAddress || '',
+        source: source || '১-ক্লিক সরাসরি অর্ডার (Modal)',
+        user,
+        debounceMs: 0
+      });
     }
-  }, [product, variant, user]);
+  }, [product, variant, user, isOpen]);
+
+  // Debounce track as customer enters details in Fast Order form
+  useEffect(() => {
+    if (!isOpen || !product) return;
+    const unitPrice = selectedVariant ? selectedVariant.price : product.price;
+    const subtotal = unitPrice * quantity;
+    const deliveryCharge = deliveryZone === 'inside_dhaka' ? 70 : 120;
+    const totalAmount = subtotal + deliveryCharge;
+
+    trackIncompleteOrder({
+      items: [
+        {
+          productId: product.id || product._id,
+          name: product.name,
+          weight: selectedVariant ? selectedVariant.weight : product.unit || 'Standard',
+          price: unitPrice,
+          quantity,
+          image: product.images?.[0] || product.thumbnail || '',
+        }
+      ],
+      subtotal,
+      deliveryZone,
+      deliveryCharge,
+      totalAmount,
+      customerName,
+      customerPhone,
+      customerEmail: user?.email || '',
+      deliveryAddress,
+      source: source || '১-ক্লিক সরাসরি অর্ডার (Modal)',
+      user,
+      debounceMs: 700
+    });
+  }, [customerName, customerPhone, deliveryAddress, deliveryZone, quantity, selectedVariant]);
 
   // Lock background scroll when modal is active
   useEffect(() => {
@@ -111,6 +172,7 @@ export default function FastOrderModal() {
     try {
       const currentUserId = user?.id || user?._id || user?.userId || null;
       const orderPayload = {
+        sessionId: getSessionId(),
         userId: currentUserId,
         user_id: currentUserId,
         customerName: customerName.trim(),
