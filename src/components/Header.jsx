@@ -100,7 +100,11 @@ export default function Header() {
       }
     }
     document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    document.addEventListener('touchstart', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('touchstart', handleClickOutside);
+    };
   }, []);
 
   const handleMarkRead = async (notifId, link) => {
@@ -276,15 +280,15 @@ export default function Header() {
           </button>
 
           {/* Brand Logo */}
-          <Link href="/" className="flex items-center gap-2.5 group flex-shrink-0">
-            <div>
-              <Image src="https://i.ibb.co.com/7dMKpCNL/Ihsan-Logo.png" className="w-15 h-15 sm:w-12 sm:h-12 rounded-2xl bg-gradient-to-br from-brand-800 to-emerald-950 flex items-center justify-center text-white shadow-md group-hover:scale-105 transition-transform border border-emerald-600/30" alt="Ihsan Logo" width={70} height={70} />
+          <Link href="/" className="flex items-center gap-2 sm:gap-2.5 group flex-shrink-0">
+            <div className="relative flex-shrink-0">
+              <Image src="https://i.ibb.co.com/7dMKpCNL/Ihsan-Logo.png" className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-gradient-to-br from-brand-800 to-emerald-950 flex items-center justify-center text-white shadow-md group-hover:scale-105 transition-transform border border-emerald-600/30 object-contain" alt="Ihsan Logo" width={48} height={48} />
             </div>
-            <div className="flex flex-col">
-              <span className="text-xl sm:text-2xl font-black text-brand-900 dark:text-emerald-400 tracking-tight leading-none">
+            <div className="flex flex-col min-w-0">
+              <span className="text-lg sm:text-2xl font-black text-brand-900 dark:text-emerald-400 tracking-tight leading-none">
                 {t('appName')}
               </span>
-              <span className="text-[10px] sm:text-xs text-brand-700 dark:text-emerald-300/80 font-medium tracking-wide mt-0.5">
+              <span className="hidden min-[380px]:block text-[9px] sm:text-xs text-brand-700 dark:text-emerald-300/80 font-medium tracking-wide mt-0.5 truncate max-w-[130px] sm:max-w-none">
                 {t('appTagline')}
               </span>
             </div>
@@ -362,13 +366,13 @@ export default function Header() {
             )}
           </div>
 
-          {/* Action Buttons: Hotline, Auth, Cart */}
-          <div className="flex items-center gap-2 sm:gap-3.5">
+          {/* Action Buttons: Hotline, Auth, Notification Bell */}
+          <div className="flex items-center gap-1.5 sm:gap-3 flex-shrink-0">
 
             {/* Quick Hotline Call */}
             <a
               href="tel:09611-562080"
-              className="hidden xl:flex items-center gap-2.5 bg-emerald-50/80 dark:bg-[#14291d] text-brand-900 dark:text-emerald-300 px-3.5 py-2 rounded-2xl border border-emerald-200/80 dark:border-[#254933] hover:bg-emerald-100/80 dark:hover:bg-[#1a3827] transition-colors"
+              className="hidden xl:flex items-center gap-2.5 bg-emerald-50/80 dark:bg-[#14291d] text-brand-900 dark:text-emerald-300 px-3.5 py-2 rounded-2xl border border-emerald-200/80 dark:border-[#254933] hover:bg-emerald-100/80 dark:hover:bg-[#1a3827] transition-colors flex-shrink-0"
             >
               <div className="w-8 h-8 rounded-full bg-brand-800 dark:bg-emerald-600 text-white flex items-center justify-center shadow-sm">
                 <PhoneCall className="w-4 h-4" />
@@ -382,14 +386,14 @@ export default function Header() {
             </a>
 
             {/* Auth / Profile */}
-            <div className="relative group">
+            <div className="relative group flex-shrink-0">
               {user ? (
                 <>
-                  <div className="flex items-center gap-2 cursor-pointer bg-[#f4f7f4] dark:bg-[#14291d] px-3 py-2 rounded-2xl border border-gray-200 dark:border-[#254933] hover:bg-gray-100 dark:hover:bg-[#1b3627]">
+                  <div className="flex items-center gap-1.5 sm:gap-2 cursor-pointer bg-[#f4f7f4] dark:bg-[#14291d] p-1.5 sm:px-3 sm:py-2 rounded-xl sm:rounded-2xl border border-gray-200 dark:border-[#254933] hover:bg-gray-100 dark:hover:bg-[#1b3627] transition-all">
                     {user.avatar ? (
-                      <img src={user.avatar} alt={user.name} className="w-7 h-7 rounded-full object-cover shadow-sm border border-emerald-500/30" />
+                      <img src={user.avatar} alt={user.name} className="w-6 h-6 sm:w-7 sm:h-7 rounded-full object-cover shadow-sm border border-emerald-500/30" />
                     ) : (
-                      <div className="w-7 h-7 rounded-full bg-brand-800 dark:bg-emerald-600 text-white flex items-center justify-center text-xs font-bold shadow-sm">
+                      <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-brand-800 dark:bg-emerald-600 text-white flex items-center justify-center text-xs font-bold shadow-sm">
                         {user.name?.charAt(0) || 'U'}
                       </div>
                     )}
@@ -406,7 +410,7 @@ export default function Header() {
                         {user.role || 'customer'}
                       </span>
                     </div>
-                    <ChevronDown className="w-3.5 h-3.5 text-gray-500" />
+                    <ChevronDown className="w-3.5 h-3.5 text-gray-500 hidden sm:block" />
                   </div>
 
                   {/* Logged in User Dropdown */}
@@ -452,26 +456,38 @@ export default function Header() {
               ) : (
                 <Link
                   href="/auth"
-                  className="flex items-center gap-1.5 text-gray-700 dark:text-gray-200 hover:text-brand-800 dark:hover:text-emerald-400 px-3 py-2 rounded-2xl hover:bg-emerald-50 dark:hover:bg-[#14291d] text-sm font-semibold transition-colors"
+                  className="flex items-center justify-center p-2 sm:px-3 sm:py-2 rounded-xl sm:rounded-2xl bg-gray-50 dark:bg-[#14291d] sm:bg-transparent border border-gray-200 sm:border-transparent dark:border-[#254933] dark:sm:border-transparent hover:bg-emerald-50 dark:hover:bg-[#14291d] text-gray-700 dark:text-gray-200 hover:text-brand-800 dark:hover:text-emerald-400 text-sm font-semibold transition-colors flex-shrink-0"
                   title={isBangla ? 'লগইন / রেজিস্টার' : 'Login / Register'}
                 >
                   <User className="w-5 h-5 text-brand-800 dark:text-emerald-400" />
-                  <span className="hidden sm:inline">{isBangla ? 'লগইন / রেজিস্টার' : 'Login / Register'}</span>
+                  <span className="hidden sm:inline">{isBangla ? 'লগইন' : 'Login'}</span>
                 </Link>
               )}
             </div>
 
             {/* 🔔 Role-Aware Interactive Notification Bell */}
-            <div className="relative" ref={notifRef}>
+            <div className="relative flex-shrink-0" ref={notifRef}>
               <button
+                type="button"
                 onClick={() => setIsNotifOpen(!isNotifOpen)}
-                className="relative p-2.5 sm:p-2.5 rounded-2xl bg-gray-50 dark:bg-[#14291d] text-gray-700 dark:text-emerald-300 border border-gray-200 dark:border-[#254933] hover:bg-emerald-50 dark:hover:bg-[#1a3827] transition-all transform active:scale-95 shadow-sm"
+                className={`relative flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl transition-all duration-200 active:scale-95 flex-shrink-0 shadow-sm border ${
+                  isNotifOpen
+                    ? 'bg-emerald-100 dark:bg-[#1c3a27] text-brand-900 dark:text-emerald-300 border-emerald-500 dark:border-emerald-500 shadow-md ring-2 ring-emerald-500/20'
+                    : 'bg-white dark:bg-[#14291d] text-gray-700 dark:text-emerald-300 border-gray-200 dark:border-[#254933] hover:bg-emerald-50 dark:hover:bg-[#1a3827] hover:border-emerald-300 dark:hover:border-[#355f44]'
+                }`}
                 title={isBangla ? 'নোটিফিকেশন' : 'Notifications'}
                 aria-label="Notifications"
+                aria-expanded={isNotifOpen}
               >
-                <Bell className={`w-5 h-5 ${unreadNotifCount > 0 ? 'text-amber-500 animate-bounce' : 'text-gray-600 dark:text-emerald-300'}`} />
+                <Bell
+                  className={`w-4.5 h-4.5 sm:w-5 sm:h-5 transition-transform duration-200 ${
+                    unreadNotifCount > 0
+                      ? 'text-amber-500 dark:text-amber-400 animate-bounce'
+                      : 'text-gray-700 dark:text-emerald-300'
+                  }`}
+                />
                 {unreadNotifCount > 0 && (
-                  <span className="absolute -top-1.5 -right-1.5 bg-red-600 text-white text-[10px] font-black w-5 h-5 rounded-full flex items-center justify-center shadow-md animate-pulse">
+                  <span className="absolute -top-1 -right-1 flex h-4.5 min-w-4.5 sm:h-5 sm:min-w-5 items-center justify-center rounded-full bg-gradient-to-r from-red-600 to-rose-600 px-1 text-[9px] sm:text-[10px] font-black text-white shadow-md ring-2 ring-white dark:ring-[#14291d] animate-pulse leading-none">
                     {unreadNotifCount > 9 ? '9+' : unreadNotifCount}
                   </span>
                 )}
@@ -479,167 +495,198 @@ export default function Header() {
 
               {/* Notification Popover Dropdown */}
               {isNotifOpen && (
-                <div className="absolute right-0 sm:right-0 mt-2 w-[calc(100vw-32px)] sm:w-96 max-w-sm sm:max-w-md bg-white dark:bg-[#112419] rounded-3xl shadow-2xl border border-gray-200/80 dark:border-[#244530] overflow-hidden z-50 animate-in fade-in slide-in-from-top-2 duration-200">
+                <>
+                  {/* Mobile Backdrop Overlay (closes on tap outside) */}
+                  <div
+                    className="fixed inset-0 bg-black/40 backdrop-blur-[2px] z-40 sm:hidden animate-in fade-in duration-150"
+                    onClick={() => setIsNotifOpen(false)}
+                    aria-hidden="true"
+                  />
 
-                  {/* Header */}
-                  <div className="p-3.5 bg-gradient-to-r from-brand-950 via-brand-900 to-emerald-950 text-white flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <span className="text-lg">🔔</span>
-                      <div>
-                        <h4 className="font-black text-xs sm:text-sm">
-                          {isBangla ? 'নোটিফিকেশন সেন্টার' : 'Notification Center'}
-                        </h4>
-                        <p className="text-[10px] text-emerald-200/80">
-                          {user?.role === 'admin'
-                            ? (isBangla ? 'অ্যাডমিন অর্ডার ও সিস্টেম এলার্ট' : 'Admin Order & System Alerts')
-                            : user?.role === 'seller'
-                              ? (isBangla ? 'সেলার স্টোর ও অর্ডার নোটিফিকেশন' : 'Seller Store & Order Alerts')
-                              : (isBangla ? 'অফার, ডিসকাউন্ট ও নতুন প্রোডাক্ট' : 'Offers, Discounts & New Products')}
-                        </p>
+                  {/* Dropdown Container */}
+                  <div className="fixed inset-x-2.5 top-[60px] sm:top-auto sm:inset-x-auto sm:absolute sm:right-0 sm:mt-2 w-auto sm:w-96 max-w-none sm:max-w-md max-h-[calc(100dvh-130px)] sm:max-h-[520px] flex flex-col bg-white dark:bg-[#112419] rounded-2xl sm:rounded-3xl shadow-2xl border border-gray-200/90 dark:border-[#244530] overflow-hidden z-50 animate-in fade-in slide-in-from-top-2 duration-200">
+
+                    {/* Header */}
+                    <div className="p-3 sm:p-3.5 bg-gradient-to-r from-brand-950 via-brand-900 to-emerald-950 text-white flex items-center justify-between flex-shrink-0">
+                      <div className="flex items-center gap-2">
+                        <span className="text-base sm:text-lg">🔔</span>
+                        <div>
+                          <div className="flex items-center gap-1.5">
+                            <h4 className="font-black text-xs sm:text-sm">
+                              {isBangla ? 'নোটিফিকেশন সেন্টার' : 'Notification Center'}
+                            </h4>
+                            {unreadNotifCount > 0 && (
+                              <span className="bg-red-500/90 text-white text-[9px] font-black px-1.5 py-0.2 rounded-full">
+                                {unreadNotifCount} {isBangla ? 'নতুন' : 'new'}
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-[10px] text-emerald-200/80 leading-tight">
+                            {user?.role === 'admin'
+                              ? (isBangla ? 'অ্যাডমিন অর্ডার ও সিস্টেম এলার্ট' : 'Admin Order & System Alerts')
+                              : user?.role === 'seller'
+                                ? (isBangla ? 'সেলার স্টোর ও অর্ডার নোটিফিকেশন' : 'Seller Store & Order Alerts')
+                                : (isBangla ? 'অফার, ডিসকাউন্ট ও নতুন প্রোডাক্ট' : 'Offers, Discounts & New Products')}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-1 sm:gap-1.5">
+                        {notifications.length > 0 && (
+                          <>
+                            {unreadNotifCount > 0 && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  handleMarkAllRead();
+                                }}
+                                className="text-[10px] bg-white/15 hover:bg-white/25 px-2 py-1 rounded-lg font-bold transition-colors flex items-center gap-1 text-emerald-100 hover:text-white"
+                                title={isBangla ? 'সব পঠিত হিসেবে চিহ্নিত করুন' : 'Mark all as read'}
+                              >
+                                <CheckCheck className="w-3 h-3" />
+                                <span>{isBangla ? 'পঠিত' : 'Read'}</span>
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                handleClearAll();
+                              }}
+                              className="text-[10px] bg-red-500/20 hover:bg-red-500/30 text-red-200 hover:text-white px-2 py-1 rounded-lg font-bold transition-colors flex items-center gap-1 border border-red-500/30"
+                              title={isBangla ? 'সব নোটিফিকেশন মুছে ফেলুন' : 'Clear all notifications'}
+                            >
+                              <Trash2 className="w-3 h-3" />
+                              <span>{isBangla ? 'মুছুন' : 'Clear'}</span>
+                            </button>
+                          </>
+                        )}
+
+                        {/* Mobile Close Button */}
+                        <button
+                          type="button"
+                          onClick={() => setIsNotifOpen(false)}
+                          className="sm:hidden p-1 rounded-lg text-emerald-200 hover:text-white hover:bg-white/15 transition-colors"
+                          aria-label="Close notifications"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
                       </div>
                     </div>
 
-                    {notifications.length > 0 && (
-                      <div className="flex items-center gap-1.5">
-                        {unreadNotifCount > 0 && (
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              handleMarkAllRead();
-                            }}
-                            className="text-[10px] bg-white/15 hover:bg-white/25 px-2 py-1 rounded-lg font-bold transition-colors flex items-center gap-1 text-emerald-100 hover:text-white"
-                            title={isBangla ? 'সব পঠিত হিসেবে চিহ্নিত করুন' : 'Mark all as read'}
-                          >
-                            <CheckCheck className="w-3 h-3" />
-                            <span>{isBangla ? 'পঠিত' : 'Read'}</span>
-                          </button>
-                        )}
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            handleClearAll();
-                          }}
-                          className="text-[10px] bg-red-500/20 hover:bg-red-500/30 text-red-200 hover:text-white px-2 py-1 rounded-lg font-bold transition-colors flex items-center gap-1 border border-red-500/30"
-                          title={isBangla ? 'সব নোটিফিকেশন মুছে ফেলুন' : 'Clear all notifications'}
-                        >
-                          <Trash2 className="w-3 h-3" />
-                          <span>{isBangla ? 'মুছুন' : 'Clear'}</span>
-                        </button>
-                      </div>
-                    )}
-                  </div>
+                    {/* Notification Items List - Smooth Scrollable */}
+                    <div
+                      tabIndex={0}
+                      data-lenis-prevent="true"
+                      onWheel={(e) => e.stopPropagation()}
+                      onTouchMove={(e) => e.stopPropagation()}
+                      className="lenis-prevent overflow-y-auto overscroll-contain focus:outline-none divide-y divide-gray-100 dark:divide-emerald-950/60 p-1.5 space-y-1 select-text scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-emerald-800 max-h-[calc(100dvh-200px)] sm:max-h-[360px]"
+                      style={{
+                        WebkitOverflowScrolling: 'touch'
+                      }}
+                    >
+                      {notifications.length === 0 ? (
+                        <div className="py-10 text-center text-gray-400 space-y-2">
+                          <span className="text-3xl block animate-pulse">🎉</span>
+                          <p className="text-xs font-bold text-gray-700 dark:text-emerald-200">
+                            {isBangla ? 'কোনো নোটিফিকেশন নেই' : 'No notifications'}
+                          </p>
+                          <p className="text-[10px] text-gray-400">
+                            {isBangla ? 'নতুন নোটিফিকেশন আসলে এখানে দেখতে পাবেন।' : 'New notifications will appear here.'}
+                          </p>
+                        </div>
+                      ) : (
+                        notifications.map((n) => {
+                          const isOrder = n.type === 'order';
+                          const targetLink = n.link || (user?.role === 'admin' ? '/admin' : user?.role === 'seller' ? '/seller' : (n.order_id ? '/track-order' : '/products'));
 
-                  {/* Notification Items List - Smooth Mouse Scrollable */}
-                  <div
-                    tabIndex={0}
-                    onWheel={(e) => e.stopPropagation()}
-                    className="max-h-[350px] overflow-y-auto overscroll-contain focus:outline-none divide-y divide-gray-100 dark:divide-emerald-950/60 p-1.5 space-y-1 select-text scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-emerald-800"
-                    style={{
-                      maxHeight: '350px',
-                      overflowY: 'auto',
-                      WebkitOverflowScrolling: 'touch'
-                    }}
-                  >
-                    {notifications.length === 0 ? (
-                      <div className="py-10 text-center text-gray-400 space-y-2">
-                        <span className="text-3xl block animate-pulse">🎉</span>
-                        <p className="text-xs font-bold text-gray-700 dark:text-emerald-200">
-                          {isBangla ? 'কোনো নোটিফিকেশন নেই' : 'No notifications'}
-                        </p>
-                        <p className="text-[10px] text-gray-400">
-                          {isBangla ? 'নতুন নোটিফিকেশন আসলে এখানে দেখতে পাবেন।' : 'New notifications will appear here.'}
-                        </p>
-                      </div>
-                    ) : (
-                      notifications.map((n) => {
-                        const isOrder = n.type === 'order';
-                        const targetLink = n.link || (user?.role === 'admin' ? '/admin' : user?.role === 'seller' ? '/seller' : (n.order_id ? '/track-order' : '/products'));
-
-                        return (
-                          <div
-                            key={n.id || n._id}
-                            onClick={() => handleMarkRead(n.id || n._id, targetLink)}
-                            className={`group relative p-2.5 rounded-2xl cursor-pointer transition-all flex items-start gap-2.5 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 border border-transparent hover:border-emerald-200/50 dark:hover:border-emerald-800/40 ${!n.is_read ? 'bg-amber-50/70 dark:bg-emerald-950/30 font-medium' : 'bg-transparent'
+                          return (
+                            <div
+                              key={n.id || n._id}
+                              onClick={() => handleMarkRead(n.id || n._id, targetLink)}
+                              className={`group relative p-2.5 rounded-2xl cursor-pointer transition-all flex items-start gap-2.5 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 border border-transparent hover:border-emerald-200/50 dark:hover:border-emerald-800/40 active:scale-[0.99] ${
+                                !n.is_read ? 'bg-amber-50/70 dark:bg-emerald-950/30 font-medium' : 'bg-transparent'
                               }`}
-                          >
-                            {/* Icon */}
-                            <div className={`w-8 h-8 rounded-xl flex items-center justify-center text-sm flex-shrink-0 shadow-sm ${isOrder ? 'bg-amber-100 dark:bg-amber-950/80 text-amber-600' : 'bg-emerald-100 dark:bg-emerald-950/80 text-emerald-600'
-                              }`}>
-                              {isOrder ? '📦' : '🎁'}
-                            </div>
-
-                            {/* Content */}
-                            <div className="flex-1 min-w-0 pr-4">
-                              <div className="flex items-center justify-between gap-1">
-                                <h5 className="text-xs font-bold text-gray-900 dark:text-emerald-100 truncate">
-                                  {isBangla ? n.title : (n.title_en || n.title)}
-                                </h5>
-                                {!n.is_read && (
-                                  <span className="w-2 h-2 rounded-full bg-amber-500 flex-shrink-0 animate-ping" />
-                                )}
-                              </div>
-                              <p className="text-[11px] text-gray-600 dark:text-gray-300 line-clamp-2 mt-0.5 leading-snug">
-                                {isBangla ? n.message : (n.message_en || n.message)}
-                              </p>
-                              <div className="flex items-center justify-between mt-1 text-[10px] text-gray-400">
-                                <span>
-                                  {n.created_at ? new Date(n.created_at).toLocaleTimeString(isBangla ? 'bn-BD' : 'en-US', { hour: '2-digit', minute: '2-digit' }) : 'সবেমাত্র'}
-                                </span>
-                                <span className="font-bold text-brand-900 dark:text-emerald-400 hover:underline">
-                                  {isBangla ? 'দেখুন →' : 'View →'}
-                                </span>
-                              </div>
-                            </div>
-
-                            {/* Delete single notification button */}
-                            <button
-                              type="button"
-                              onClick={(e) => handleDeleteSingle(e, n.id || n._id)}
-                              className="opacity-0 group-hover:opacity-100 p-1 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/50 transition-opacity absolute right-2 top-2"
-                              title={isBangla ? 'মুছে ফেলুন' : 'Delete'}
                             >
-                              <X className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        );
-                      })
-                    )}
-                  </div>
+                              {/* Icon */}
+                              <div className={`w-8 h-8 rounded-xl flex items-center justify-center text-sm flex-shrink-0 shadow-sm ${
+                                isOrder ? 'bg-amber-100 dark:bg-amber-950/80 text-amber-600' : 'bg-emerald-100 dark:bg-emerald-950/80 text-emerald-600'
+                              }`}>
+                                {isOrder ? '📦' : '🎁'}
+                              </div>
 
-                  {/* Footer */}
-                  <div className="p-2.5 bg-gray-50 dark:bg-black/40 border-t border-gray-100 dark:border-emerald-950 text-center">
-                    {user?.role === 'admin' ? (
-                      <Link
-                        href="/admin"
-                        onClick={() => setIsNotifOpen(false)}
-                        className="text-xs font-bold text-brand-900 dark:text-emerald-400 hover:underline"
-                      >
-                        🛠️ {isBangla ? 'অ্যাডমিন অর্ডার ম্যানেজমেন্টে যান' : 'Go to Admin Orders'}
-                      </Link>
-                    ) : user?.role === 'seller' ? (
-                      <Link
-                        href="/seller"
-                        onClick={() => setIsNotifOpen(false)}
-                        className="text-xs font-bold text-amber-700 dark:text-amber-400 hover:underline"
-                      >
-                        🏪 {isBangla ? 'সেলার সেন্টারে যান' : 'Go to Seller Center'}
-                      </Link>
-                    ) : (
-                      <Link
-                        href="/products"
-                        onClick={() => setIsNotifOpen(false)}
-                        className="text-xs font-bold text-emerald-800 dark:text-emerald-400 hover:underline"
-                      >
-                        🛍️ {isBangla ? 'সকল স্পেশাল অফার ও পণ্য দেখুন' : 'Explore All Special Offers'}
-                      </Link>
-                    )}
-                  </div>
+                              {/* Content */}
+                              <div className="flex-1 min-w-0 pr-6">
+                                <div className="flex items-center justify-between gap-1">
+                                  <h5 className="text-xs font-bold text-gray-900 dark:text-emerald-100 truncate">
+                                    {isBangla ? n.title : (n.title_en || n.title)}
+                                  </h5>
+                                  {!n.is_read && (
+                                    <span className="w-2 h-2 rounded-full bg-amber-500 flex-shrink-0 animate-ping" />
+                                  )}
+                                </div>
+                                <p className="text-[11px] text-gray-600 dark:text-gray-300 line-clamp-2 mt-0.5 leading-snug">
+                                  {isBangla ? n.message : (n.message_en || n.message)}
+                                </p>
+                                <div className="flex items-center justify-between mt-1 text-[10px] text-gray-400">
+                                  <span>
+                                    {n.created_at ? new Date(n.created_at).toLocaleTimeString(isBangla ? 'bn-BD' : 'en-US', { hour: '2-digit', minute: '2-digit' }) : 'সবেমাত্র'}
+                                  </span>
+                                  <span className="font-bold text-brand-900 dark:text-emerald-400 hover:underline">
+                                    {isBangla ? 'দেখুন →' : 'View →'}
+                                  </span>
+                                </div>
+                              </div>
 
-                </div>
+                              {/* Delete single notification button */}
+                              <button
+                                type="button"
+                                onClick={(e) => handleDeleteSingle(e, n.id || n._id)}
+                                className="opacity-70 sm:opacity-0 sm:group-hover:opacity-100 p-1 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/50 transition-opacity absolute right-2 top-2"
+                                title={isBangla ? 'মুছে ফেলুন' : 'Delete'}
+                              >
+                                <X className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+
+                    {/* Footer */}
+                    <div className="p-2.5 bg-gray-50 dark:bg-black/40 border-t border-gray-100 dark:border-emerald-950 text-center flex-shrink-0">
+                      {user?.role === 'admin' ? (
+                        <Link
+                          href="/admin"
+                          onClick={() => setIsNotifOpen(false)}
+                          className="text-xs font-bold text-brand-900 dark:text-emerald-400 hover:underline"
+                        >
+                          🛠️ {isBangla ? 'অ্যাডমিন অর্ডার ম্যানেজমেন্টে যান' : 'Go to Admin Orders'}
+                        </Link>
+                      ) : user?.role === 'seller' ? (
+                        <Link
+                          href="/seller"
+                          onClick={() => setIsNotifOpen(false)}
+                          className="text-xs font-bold text-amber-700 dark:text-amber-400 hover:underline"
+                        >
+                          🏪 {isBangla ? 'সেলার সেন্টারে যান' : 'Go to Seller Center'}
+                        </Link>
+                      ) : (
+                        <Link
+                          href="/products"
+                          onClick={() => setIsNotifOpen(false)}
+                          className="text-xs font-bold text-emerald-800 dark:text-emerald-400 hover:underline"
+                        >
+                          🛍️ {isBangla ? 'সকল স্পেশাল অফার ও পণ্য দেখুন' : 'Explore All Special Offers'}
+                        </Link>
+                      )}
+                    </div>
+
+                  </div>
+                </>
               )}
             </div>
 
