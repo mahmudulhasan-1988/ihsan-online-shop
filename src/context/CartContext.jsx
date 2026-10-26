@@ -14,6 +14,21 @@ export function CartProvider({ children }) {
   const [user, setUser] = useState(null);
   const [toast, setToast] = useState(null);
 
+  // 🤖 AI Chat State
+  const [isAiChatOpen, setIsAiChatOpen] = useState(false);
+  const [aiInitialPrompt, setAiInitialPrompt] = useState('');
+
+  const openAiChat = (prompt = '') => {
+    if (prompt) setAiInitialPrompt(prompt);
+    setIsAiChatOpen(true);
+  };
+  const closeAiChat = () => {
+    setIsAiChatOpen(false);
+  };
+  const toggleAiChat = () => {
+    setIsAiChatOpen(prev => !prev);
+  };
+
   // Load cart and user from localStorage on initial render
   useEffect(() => {
     try {
@@ -269,6 +284,12 @@ export function CartProvider({ children }) {
         logout,
         toast,
         showToast,
+        isAiChatOpen,
+        openAiChat,
+        closeAiChat,
+        toggleAiChat,
+        aiInitialPrompt,
+        setAiInitialPrompt,
       }}
     >
       {children}

@@ -9,10 +9,8 @@ import {
   Sparkles,
   CheckCircle2,
   Star,
-  Truck,
   Zap,
-  ShoppingBag,
-  Award
+  ShoppingBag
 } from 'lucide-react';
 import { useCart } from '@/context/CartContext';
 import { useThemeLanguage } from '@/context/ThemeLanguageContext';
@@ -227,7 +225,7 @@ export default function HeroSlider({ banners = [] }) {
                 />
                 {/* 🌟 Light Bottom-to-Top Gradient Overlay allowing Background Image to be clearly visible */}
                 <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-black/10 dark:from-black/85 dark:via-black/35 dark:to-transparent" />
-                <div className="absolute inset-0 bg-gradient-to-r from-black/40 via-transparent to-black/20" />
+                <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/45 to-transparent" />
                 <div className={`absolute inset-0 opacity-20 mix-blend-overlay bg-gradient-to-t ${slide.bgGradient}`} />
               </div>
 
@@ -238,13 +236,13 @@ export default function HeroSlider({ banners = [] }) {
               {/* Subtle Texture Overlay */}
               <div className="absolute inset-0 opacity-[0.04] bg-[radial-gradient(#ffffff_1.5px,transparent_1.5px)] [background-size:28px_28px] pointer-events-none" />
 
-              {/* Slide Content Grid */}
-              <div className="max-w-7xl mx-auto px-6 sm:px-12 lg:px-16 w-full relative z-10 grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-14 items-center">
+              {/* Slide Content */}
+              <div className="max-w-7xl mx-auto px-6 sm:px-12 lg:px-16 w-full relative z-10 flex items-center">
 
-                {/* Left: Text & Actions (7 Columns) */}
-                <div className="lg:col-span-7 space-y-5 sm:space-y-6 text-center lg:text-left">
+                {/* Text & Actions */}
+                <div className="max-w-3xl lg:max-w-4xl space-y-5 sm:space-y-6 text-center lg:text-left">
 
-                  {/* Top Badge & Discount Pill */}
+                  {/* Top Badge, Discount & Rating */}
                   <div className="flex flex-wrap items-center justify-center lg:justify-start gap-3">
                     {slide.badge && (
                       <div className="inline-flex items-center gap-2 bg-white/20 backdrop-blur-md border border-white/30 text-white text-xs sm:text-sm font-bold px-4 py-1.5 rounded-full shadow-lg">
@@ -257,6 +255,15 @@ export default function HeroSlider({ banners = [] }) {
                         <Zap className="w-4 h-4 fill-current" />
                         {slide.discount}
                       </span>
+                    )}
+                    {slide.rating && (
+                      <div className="inline-flex items-center gap-1.5 bg-black/50 backdrop-blur-md border border-white/20 text-white text-xs sm:text-sm font-bold px-3.5 py-1.5 rounded-full shadow-md">
+                        <Star className="w-3.5 h-3.5 text-amber-400 fill-amber-400" />
+                        <span>{slide.rating}</span>
+                        {slide.reviewsCount && (
+                          <span className="text-gray-300 text-xs font-normal">({slide.reviewsCount})</span>
+                        )}
+                      </div>
                     )}
                   </div>
 
@@ -324,60 +331,6 @@ export default function HeroSlider({ banners = [] }) {
                     </Link>
                   </div>
 
-                </div>
-
-                {/* Right: Big Showcase Card (5 Columns) */}
-                <div className="lg:col-span-5 flex justify-center items-center relative">
-                  <div className="relative w-72 h-72 sm:w-96 sm:h-96 md:w-[400px] md:h-[400px] lg:w-[440px] lg:h-[440px] group">
-
-                    {/* Glowing Aura Ring */}
-                    <div className="absolute inset-0 rounded-3xl bg-gradient-to-tr from-amber-400/30 via-emerald-400/20 to-teal-400/30 blur-3xl group-hover:blur-3xl transition-all duration-500" />
-
-                    {/* Showcase Image */}
-                    <div className="relative w-full h-full rounded-3xl overflow-hidden border-4 border-white/30 shadow-2xl bg-black/50 backdrop-blur-sm">
-                      <img
-                        src={slide.image}
-                        alt={slide.title}
-                        className="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-700 ease-out"
-                      />
-                    </div>
-
-                    {/* Floating Trust Card 1: Top Right (Reviews / Rating) */}
-                    <div className="absolute -top-3 sm:-top-4 -right-3 sm:-right-4 bg-white/95 dark:bg-[#112419]/95 backdrop-blur-md text-gray-900 dark:text-gray-100 px-4 py-2.5 rounded-2xl shadow-xl border border-gray-100 dark:border-[#22442f] flex items-center gap-3 transform group-hover:-translate-y-1 transition-transform">
-                      <div className="p-2 bg-amber-50 dark:bg-amber-950/40 rounded-xl text-amber-500">
-                        <Star className="w-5 h-5 fill-amber-400" />
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-1 font-black text-sm sm:text-base">
-                          <span>{slide.rating}</span>
-                          <span className="text-xs text-gray-400 font-normal">/ ৫.০</span>
-                        </div>
-                        <p className="text-[11px] text-gray-500 dark:text-gray-400 leading-none">{slide.reviewsCount}</p>
-                      </div>
-                    </div>
-
-                    {/* Floating Trust Card 2: Bottom Left (100% Pure Guarantee) */}
-                    <div className="absolute -bottom-3 sm:-bottom-4 -left-3 sm:-left-4 bg-brand-900/95 dark:bg-[#0d2218]/95 backdrop-blur-md text-white px-5 py-3 rounded-2xl shadow-xl border border-emerald-500/30 flex items-center gap-3 transform group-hover:translate-y-1 transition-transform">
-                      <div className="p-2 bg-emerald-500/20 rounded-xl text-emerald-300">
-                        <Award className="w-5 h-5" />
-                      </div>
-                      <div>
-                        <h4 className="text-sm sm:text-base font-bold text-white leading-tight">
-                          {isBangla ? '১০০% খাঁটি ও নির্ভেজাল' : '100% Pure & Organic'}
-                        </h4>
-                        <p className="text-xs text-emerald-200 leading-none mt-0.5">
-                          {isBangla ? 'ল্যাব টেস্টেড গ্যারান্টি' : 'Lab Tested Guarantee'}
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* Floating Trust Card 3: Free Delivery Pill */}
-                    <div className="hidden sm:flex absolute top-1/2 -left-6 -translate-y-1/2 bg-slate-900/95 backdrop-blur-md text-white px-3.5 py-2 rounded-2xl shadow-lg border border-white/20 items-center gap-2 text-xs font-semibold">
-                      <Truck className="w-4 h-4 text-amber-400" />
-                      <span>{t('freeDelivery')}</span>
-                    </div>
-
-                  </div>
                 </div>
 
               </div>

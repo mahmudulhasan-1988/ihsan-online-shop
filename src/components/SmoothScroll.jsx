@@ -28,6 +28,14 @@ export default function SmoothScroll({ children }) {
       smoothWheel: true,
       wheelMultiplier: 1,
       touchMultiplier: 2,
+      prevent: (node) => {
+        return (
+          node?.hasAttribute?.('data-lenis-prevent') ||
+          node?.classList?.contains?.('lenis-prevent') ||
+          Boolean(node?.closest?.('[data-lenis-prevent]')) ||
+          Boolean(node?.closest?.('.lenis-prevent'))
+        );
+      }
     });
 
     lenisRef.current = lenis;

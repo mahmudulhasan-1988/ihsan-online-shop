@@ -1333,6 +1333,42 @@ export const deleteIncompleteOrder = async (id) => {
   }
 };
 
+// ==========================================
+// 🤖 20. AI Auto Chat & Product Advisor (MongoDB Connected)
+// ==========================================
+export const sendAiChatMessage = async (data) => {
+  try {
+    const res = await apiClient.post('/ai-chat', data);
+    return res.data;
+  } catch (error) {
+    console.error('sendAiChatMessage error:', error);
+    return {
+      success: false,
+      message: error.response?.data?.message || 'AI চ্যাট সার্ভারের সাথে সংযোগে ত্রুটি হয়েছে'
+    };
+  }
+};
+
+export const getAiChatHistory = async (sessionId) => {
+  try {
+    const res = await apiClient.get('/ai-chat/history', { params: { sessionId } });
+    return res.data;
+  } catch (error) {
+    console.error('getAiChatHistory error:', error);
+    return { success: false, history: [] };
+  }
+};
+
+export const clearAiChatHistory = async (sessionId) => {
+  try {
+    const res = await apiClient.delete('/ai-chat/history', { params: { sessionId } });
+    return res.data;
+  } catch (error) {
+    console.error('clearAiChatHistory error:', error);
+    return { success: false, message: 'চ্যাট মুছতে ব্যর্থ হয়েছে' };
+  }
+};
+
 export default apiClient;
 
 
