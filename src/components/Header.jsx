@@ -19,8 +19,7 @@ import {
   ShieldCheck,
   Bell,
   CheckCheck,
-  Trash2,
-  Bot
+  Trash2
 } from 'lucide-react';
 import { useCart } from '@/context/CartContext';
 import { useThemeLanguage } from '@/context/ThemeLanguageContext';
@@ -37,7 +36,7 @@ import Image from 'next/image';
 export default function Header() {
   const router = useRouter();
   const pathname = usePathname();
-  const { cart, totalItems, subtotal, openCartDrawer, user, logout, openAiChat } = useCart();
+  const { cart, totalItems, subtotal, openCartDrawer, user, logout } = useCart();
   const { isDark, toggleTheme, isBangla, toggleLanguage, t, lang } = useThemeLanguage();
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -224,20 +223,8 @@ export default function Header() {
             </span>
           </div>
 
-          {/* Top Quick Actions (AI Chat, Track, Hotline, Language, Theme) */}
+          {/* Top Quick Actions (Track, Hotline, Language, Theme) */}
           <div className="flex items-center gap-3 sm:gap-5 text-emerald-100 text-xs">
-
-            {/* AI Auto Chat Top Pill */}
-            <button
-              onClick={() => openAiChat()}
-              className="flex items-center gap-1.5 bg-gradient-to-r from-amber-400 via-secondary to-yellow-300 hover:from-amber-500 hover:to-yellow-400 text-brand-950 font-black px-2.5 py-0.5 rounded-full text-[11px] shadow-sm transform hover:scale-105 active:scale-95 transition-all"
-              title={isBangla ? 'পণ্য বা দাম জানতে AI চ্যাট করুন' : 'Ask AI about products'}
-            >
-              <Bot className="w-3.5 h-3.5" />
-              <span>{isBangla ? 'AI চ্যাট' : 'AI Chat'}</span>
-            </button>
-
-            <span className="opacity-40 hidden sm:inline">|</span>
 
             <Link href="/track-order" className="hover:text-white flex items-center gap-1 transition-colors">
               <Truck className="w-3.5 h-3.5 text-secondary" />
@@ -375,20 +362,8 @@ export default function Header() {
             )}
           </div>
 
-          {/* Action Buttons: AI Chat, Hotline, Auth, Cart */}
+          {/* Action Buttons: Hotline, Auth, Cart */}
           <div className="flex items-center gap-2 sm:gap-3.5">
-
-            {/* 🤖 AI Auto Chat Trigger Button */}
-            <button
-              onClick={() => openAiChat()}
-              className="hidden sm:flex items-center gap-2 bg-gradient-to-r from-emerald-50 via-emerald-100/60 to-amber-50/60 dark:from-[#13291d] dark:via-[#163324] dark:to-[#1a2c20] text-brand-900 dark:text-emerald-300 hover:border-emerald-500 px-3 py-2 rounded-2xl border border-emerald-300/80 dark:border-[#274c36] text-xs font-bold transition-all shadow-sm hover:shadow-md transform active:scale-95"
-              title={isBangla ? 'পণ্য বা দাম জানতে AI-কে প্রশ্ন করুন' : 'Ask AI about products'}
-            >
-              <div className="w-6 h-6 rounded-lg bg-gradient-to-tr from-amber-400 to-yellow-400 text-brand-950 flex items-center justify-center flex-shrink-0 shadow-xs">
-                <Bot className="w-3.5 h-3.5 text-brand-950" />
-              </div>
-              <span className="tracking-tight">{isBangla ? 'AI চ্যাট' : 'AI Chat'}</span>
-            </button>
 
             {/* Quick Hotline Call */}
             <a
