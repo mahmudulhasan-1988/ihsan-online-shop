@@ -15,11 +15,21 @@ import AiChatWidget from '@/components/AiChatWidget';
 export const metadata = {
   title: 'ইহসান অনলাইন শপ (Ihsan Online Shop) - ১০০% খাঁটি ও নিরাপদ অর্গানিক খাদ্য',
   description: 'ইহসান অনলাইন শপ - বাংলাদেশের বিশ্বস্ত অর্গানিক ই-কমার্স শপ। সুন্দরবনের খাঁটি মধু, গাওয়া ঘি, ঘানি ভাঙা সরিষার তেল, প্রিমিয়াম খেজুর ও পুষ্টিকর খাবার ক্যাশ অন ডেলিভারিতে কিনুন।',
+  icons: {
+    icon: 'https://i.ibb.co.com/7dMKpCNL/Ihsan-Logo.png',
+    shortcut: 'https://i.ibb.co.com/7dMKpCNL/Ihsan-Logo.png',
+    apple: 'https://i.ibb.co.com/7dMKpCNL/Ihsan-Logo.png',
+  },
 };
 
 export default function RootLayout({ children }) {
   return (
     <html lang="bn" data-theme="ihsan" className="scroll-smooth">
+      <head>
+        <link rel="icon" href="/favicon.ico" sizes="any" />
+        <link rel="icon" type="image/png" href="https://i.ibb.co.com/7dMKpCNL/Ihsan-Logo.png" />
+        <link rel="apple-touch-icon" href="https://i.ibb.co.com/7dMKpCNL/Ihsan-Logo.png" />
+      </head>
       <body className="min-h-screen flex flex-col bg-[#fafbf7] dark:bg-[#0b1710] text-[#1c2920] dark:text-[#e4eee7] antialiased selection:bg-brand-800 selection:text-white transition-colors duration-300">
         <ThemeLanguageProvider>
           <CartProvider>
