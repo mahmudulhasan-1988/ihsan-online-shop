@@ -27,6 +27,32 @@ import {
 import { useCart } from '@/context/CartContext';
 import { useThemeLanguage } from '@/context/ThemeLanguageContext';
 import { sendAiChatMessage, getAiChatHistory, clearAiChatHistory } from '@/lib/api';
+// Formatter for AI replies (supports bold **text**, bullet points, emojis)
+function renderFormattedMessage(text) {
+  if (!text) return '';
+  return text.split('\n').map((line, lineIdx) => {
+    // Process **bold** within each line
+    const parts = line.split(/(\*\*[^*]+\*\*)/g);
+    const content = parts.map((part, pIdx) => {
+      if (part.startsWith('**') && part.endsWith('**')) {
+        return (
+          <strong key={pIdx} className="font-extrabold text-emerald-950 dark:text-emerald-300">
+            {part.slice(2, -2)}
+          </strong>
+        );
+      }
+      return part;
+    });
+
+    const isBullet = line.trim().startsWith('•') || line.trim().startsWith('-');
+
+    return (
+      <span key={lineIdx} className={`block ${isBullet ? 'pl-2 text-gray-800 dark:text-gray-200' : ''}`}>
+        {content}
+      </span>
+    );
+  });
+}
 
 export default function AiChatWidget() {
   const pathname = usePathname();
@@ -310,10 +336,10 @@ export default function AiChatWidget() {
 
   return (
     <>
-      {/* 🌟 FLOATING TRIGGER BUTTON - Positioned at bottom-right, slightly up from the bottom */}
+      {/* 🌟 FLOATING TRIGGER BUTTON - Positioned lower at bottom-right */}
       <aside
         aria-label="AI Auto Chat Assistant"
-        className="fixed bottom-20 right-4 sm:bottom-24 sm:right-6 z-40 print:hidden select-none"
+        className="fixed bottom-[64px] right-3 sm:bottom-7 sm:right-6 z-40 print:hidden select-none"
       >
         <button
           onClick={toggleAiChat}
@@ -355,7 +381,7 @@ export default function AiChatWidget() {
           role="dialog"
           aria-modal="true"
           data-lenis-prevent="true"
-          className="lenis-prevent fixed bottom-4 right-2 sm:bottom-6 sm:right-6 z-50 w-[95vw] sm:w-[430px] h-[600px] max-h-[85vh] flex flex-col bg-white/95 dark:bg-[#0c1a12]/95 backdrop-blur-2xl rounded-3xl shadow-2xl border-2 border-emerald-500/30 dark:border-emerald-500/20 overflow-hidden animate-in fade-in slide-in-from-bottom-6 duration-300"
+          className="lenis-prevent fixed bottom-2 right-2 sm:bottom-6 sm:right-6 z-50 w-[96vw] sm:w-[430px] h-[580px] max-h-[85vh] flex flex-col bg-white/95 dark:bg-[#0c1a12]/95 backdrop-blur-2xl rounded-3xl shadow-2xl border-2 border-emerald-500/30 dark:border-emerald-500/20 overflow-hidden animate-in fade-in slide-in-from-bottom-6 duration-300"
         >
           {/* Top Bar / Header */}
           <div className="flex-shrink-0 bg-gradient-to-r from-brand-950 via-brand-900 to-emerald-950 text-white p-3.5 sm:p-4 flex items-center justify-between shadow-md border-b border-emerald-800/40">
@@ -463,7 +489,7 @@ export default function AiChatWidget() {
                           : 'bg-gradient-to-r from-brand-900 to-emerald-800 text-white rounded-tr-sm shadow-md'
                       }`}
                     >
-                      {msg.text}
+                      {isAi ? renderFormattedMessage(msg.text) : msg.text}
                     </div>
 
                     {/* Interactive Product Suggestion Cards (MongoDB Products) */}
