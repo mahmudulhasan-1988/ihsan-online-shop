@@ -2,7 +2,13 @@
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
 
-import { sendHeartbeat, sendUserOffline } from '@/lib/api';
+import { 
+  sendHeartbeat, 
+  sendUserOffline,
+  getWishlist,
+  addToWishlist as apiAddToWishlist,
+  removeFromWishlist as apiRemoveFromWishlist
+} from '@/lib/api';
 import { trackIncompleteOrder } from '@/lib/incompleteTracker';
 
 const CartContext = createContext();
@@ -13,6 +19,10 @@ export function CartProvider({ children }) {
   const [fastOrderData, setFastOrderData] = useState({ isOpen: false, product: null, variant: null, source: '' });
   const [user, setUser] = useState(null);
   const [toast, setToast] = useState(null);
+
+  // 💖 Wishlist State
+  const [wishlist, setWishlist] = useState([]);
+  const [isWishlistLoading, setIsWishlistLoading] = useState(false);
 
   // 🤖 AI Chat State
   const [isAiChatOpen, setIsAiChatOpen] = useState(false);
@@ -29,7 +39,7 @@ export function CartProvider({ children }) {
     setIsAiChatOpen(prev => !prev);
   };
 
-  // Load cart and user from localStorage on initial render
+  // Load cart, user and wishlist from localStorage on client mount (avoids SSR hydration mismatch)
   useEffect(() => {
     try {
       const savedCart = localStorage.getItem('gb_cart');
@@ -40,10 +50,38 @@ export function CartProvider({ children }) {
       if (savedUser) {
         setUser(JSON.parse(savedUser));
       }
+      const savedWishlist = localStorage.getItem('gb_wishlist');
+      if (savedWishlist) {
+        setWishlist(JSON.parse(savedWishlist));
+      }
     } catch (e) {
-      console.error('Error loading cart from storage', e);
+      console.error('Error loading cart/user/wishlist from storage', e);
     }
   }, []);
+
+  // Fetch & Sync user Wishlist from MongoDB on login
+  useEffect(() => {
+    const fetchUserWishlist = async () => {
+      const userId = user?.id || user?._id || user?.email;
+      if (!userId) return;
+
+      setIsWishlistLoading(true);
+      try {
+        const res = await getWishlist(userId);
+        if (res && res.success && Array.isArray(res.data)) {
+          const items = res.data.map(item => item.product || item);
+          setWishlist(items);
+          localStorage.setItem('gb_wishlist', JSON.stringify(items));
+        }
+      } catch (err) {
+        console.error('Failed to load user wishlist from MongoDB', err);
+      } finally {
+        setIsWishlistLoading(false);
+      }
+    };
+
+    fetchUserWishlist();
+  }, [user]);
 
   // Real-time online heartbeat tracking
   useEffect(() => {
@@ -236,6 +274,66 @@ export function CartProvider({ children }) {
     setFastOrderData({ isOpen: false, product: null, variant: null, source: '' });
   };
 
+  // ==========================================
+  // 💖 Wishlist Actions (Synced with MongoDB & LocalStorage)
+  // ==========================================
+  const isInWishlist = (productId) => {
+    if (!productId) return false;
+    const s = String(productId);
+    return wishlist.some(p => String(p.id || p._id || p.productId || p.slug) === s);
+  };
+
+  const addToWishlist = async (product) => {
+    if (!product) return;
+    const prodId = String(product.id || product._id || product.slug);
+    if (isInWishlist(prodId)) {
+      showToast('পণ্যটি ইতিমধ্যে পছন্দের তালিকায় রয়েছে!', 'info');
+      return;
+    }
+
+    const updated = [product, ...wishlist];
+    setWishlist(updated);
+    localStorage.setItem('gb_wishlist', JSON.stringify(updated));
+    showToast('পছন্দের তালিকায় যুক্ত হয়েছে! ❤️');
+
+    const userId = user?.id || user?._id || user?.email;
+    if (userId) {
+      try {
+        await apiAddToWishlist(prodId, product, userId);
+      } catch (e) {
+        console.error('Wishlist server add error', e);
+      }
+    }
+  };
+
+  const removeFromWishlist = async (productId) => {
+    if (!productId) return;
+    const s = String(productId);
+    const updated = wishlist.filter(p => String(p.id || p._id || p.productId || p.slug) !== s);
+    setWishlist(updated);
+    localStorage.setItem('gb_wishlist', JSON.stringify(updated));
+    showToast('পছন্দের তালিকা থেকে সরানো হয়েছে 💔', 'info');
+
+    const userId = user?.id || user?._id || user?.email;
+    if (userId) {
+      try {
+        await apiRemoveFromWishlist(s, userId);
+      } catch (e) {
+        console.error('Wishlist server delete error', e);
+      }
+    }
+  };
+
+  const toggleWishlist = async (product) => {
+    if (!product) return;
+    const prodId = String(product.id || product._id || product.slug);
+    if (isInWishlist(prodId)) {
+      await removeFromWishlist(prodId);
+    } else {
+      await addToWishlist(product);
+    }
+  };
+
   // User Auth
   const login = (userData, token) => {
     setUser(userData);
@@ -290,6 +388,14 @@ export function CartProvider({ children }) {
         toggleAiChat,
         aiInitialPrompt,
         setAiInitialPrompt,
+        wishlist,
+        setWishlist,
+        addToWishlist,
+        removeFromWishlist,
+        toggleWishlist,
+        isInWishlist,
+        isWishlistLoading,
+        wishlistCount: wishlist.length,
       }}
     >
       {children}

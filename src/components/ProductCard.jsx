@@ -2,12 +2,12 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
-import { ShoppingBag, Zap, Star, ShieldCheck, Check, Sparkles, Store, AlertCircle } from 'lucide-react';
+import { ShoppingBag, Zap, Star, ShieldCheck, Check, Sparkles, Store, AlertCircle, Heart } from 'lucide-react';
 import { useCart } from '@/context/CartContext';
 import { useThemeLanguage } from '@/context/ThemeLanguageContext';
 
 export default function ProductCard({ product }) {
-  const { addToCart, openFastOrder } = useCart();
+  const { addToCart, openFastOrder, toggleWishlist, isInWishlist } = useCart();
   const { isBangla, t } = useThemeLanguage();
   
   const hasVariants = product.variants && product.variants.length > 0;
@@ -49,49 +49,76 @@ export default function ProductCard({ product }) {
     <div className="bg-white dark:bg-[#112318] rounded-3xl border border-[#e4ede5] dark:border-[#1d3b28] hover:border-emerald-500/50 dark:hover:border-emerald-500/50 shadow-sm hover:shadow-xl hover:shadow-emerald-950/5 dark:hover:shadow-black/40 transition-all duration-300 flex flex-col justify-between overflow-hidden group">
       
       {/* Top Media Thumbnail & Badges */}
-      <Link 
-        href={`/product/${product.slug || product.id || product._id}`} 
-        className="block relative overflow-hidden bg-[#f4f7f4] dark:bg-[#0c1a12] aspect-square"
-      >
-        <img
-          src={product.images?.[0] || product.thumbnail || product.image || 'https://images.unsplash.com/photo-1587049352846-4a222e784d38?auto=format&fit=crop&w=600&q=80'}
-          alt={displayName}
-          className={`w-full h-full object-cover transition-transform duration-700 ease-out ${isOutOfStock ? 'opacity-60 grayscale-[40%]' : 'group-hover:scale-105'}`}
-        />
+      <div className="relative overflow-hidden bg-[#f4f7f4] dark:bg-[#0c1a12] aspect-square">
+        <Link 
+          href={`/product/${product.slug || product.id || product._id}`} 
+          className="block w-full h-full relative"
+        >
+          <img
+            src={product.images?.[0] || product.thumbnail || product.image || 'https://images.unsplash.com/photo-1587049352846-4a222e784d38?auto=format&fit=crop&w=600&q=80'}
+            alt={displayName}
+            className={`w-full h-full object-cover transition-transform duration-700 ease-out ${isOutOfStock ? 'opacity-60 grayscale-[40%]' : 'group-hover:scale-105'}`}
+          />
 
-        {/* Ambient Hover Shimmer */}
-        <div className="absolute inset-0 opacity-0 group-hover:opacity-100 bg-gradient-to-t from-black/40 via-transparent to-transparent transition-opacity duration-300 pointer-events-none" />
+          {/* Ambient Hover Shimmer */}
+          <div className="absolute inset-0 opacity-0 group-hover:opacity-100 bg-gradient-to-t from-black/40 via-transparent to-transparent transition-opacity duration-300 pointer-events-none" />
 
-        {/* Top Badges (Discount, Best Seller, Out of Stock) */}
-        <div className="absolute top-3 left-3 flex flex-col gap-1.5 z-10">
-          {isOutOfStock ? (
-            <span className="inline-flex items-center gap-1 bg-red-600 text-white text-[11px] font-black px-2.5 py-1 rounded-full shadow-lg animate-pulse">
-              <AlertCircle className="w-3 h-3" />
-              <span>{isBangla ? 'স্টক আউট' : 'Out Of Stock'}</span>
-            </span>
-          ) : (
-            <>
-              {discountPercent > 0 && (
-                <span className="inline-flex items-center gap-1 bg-gradient-to-r from-red-600 to-amber-600 text-white text-[11px] font-black px-2.5 py-0.5 rounded-full shadow-md">
-                  <Sparkles className="w-3 h-3 fill-current" />
-                  <span>-{discountPercent}% {isBangla ? 'ছাড়' : 'OFF'}</span>
-                </span>
-              )}
-              {product.isBestSeller && (
-                <span className="bg-gradient-to-r from-amber-500 to-yellow-500 text-brand-950 text-[10px] font-black px-2.5 py-0.5 rounded-full shadow-sm">
-                  {isBangla ? 'বেস্ট সেলার' : 'Best Seller'}
-                </span>
-              )}
-            </>
-          )}
-        </div>
+          {/* Top Badges (Discount, Best Seller, Out of Stock) */}
+          <div className="absolute top-3 left-3 flex flex-col gap-1.5 z-10">
+            {isOutOfStock ? (
+              <span className="inline-flex items-center gap-1 bg-red-600 text-white text-[11px] font-black px-2.5 py-1 rounded-full shadow-lg animate-pulse">
+                <AlertCircle className="w-3 h-3" />
+                <span>{isBangla ? 'স্টক আউট' : 'Out Of Stock'}</span>
+              </span>
+            ) : (
+              <>
+                {discountPercent > 0 && (
+                  <span className="inline-flex items-center gap-1 bg-gradient-to-r from-red-600 to-amber-600 text-white text-[11px] font-black px-2.5 py-0.5 rounded-full shadow-md">
+                    <Sparkles className="w-3 h-3 fill-current" />
+                    <span>-{discountPercent}% {isBangla ? 'ছাড়' : 'OFF'}</span>
+                  </span>
+                )}
+                {product.isBestSeller && (
+                  <span className="bg-gradient-to-r from-amber-500 to-yellow-500 text-brand-950 text-[10px] font-black px-2.5 py-0.5 rounded-full shadow-sm">
+                    {isBangla ? 'বেস্ট সেলার' : 'Best Seller'}
+                  </span>
+                )}
+              </>
+            )}
+          </div>
 
-        {/* 100% Pure Organic Floating Status Pill */}
-        <div className="absolute bottom-3 left-3 bg-white/95 dark:bg-[#0e2115]/95 backdrop-blur-md text-brand-900 dark:text-emerald-300 text-[10px] font-bold px-2.5 py-1 rounded-xl flex items-center gap-1 shadow-sm border border-emerald-100 dark:border-[#22442e]">
-          <Check className="w-3 h-3 text-emerald-600 dark:text-emerald-400" />
-          <span>{isBangla ? '১০০% খাঁটি ও নির্ভেজাল' : '100% Pure Organic'}</span>
-        </div>
-      </Link>
+          {/* 100% Pure Organic Floating Status Pill */}
+          <div className="absolute bottom-3 left-3 bg-white/95 dark:bg-[#0e2115]/95 backdrop-blur-md text-brand-900 dark:text-emerald-300 text-[10px] font-bold px-2.5 py-1 rounded-xl flex items-center gap-1 shadow-sm border border-emerald-100 dark:border-[#22442e]">
+            <Check className="w-3 h-3 text-emerald-600 dark:text-emerald-400" />
+            <span>{isBangla ? '১০০% খাঁটি ও নির্ভেজাল' : '100% Pure Organic'}</span>
+          </div>
+        </Link>
+
+        {/* 💖 Floating Wishlist Heart Button */}
+        <button
+          type="button"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            toggleWishlist(product);
+          }}
+          aria-label={isInWishlist(product.id || product._id || product.slug) ? 'Remove from wishlist' : 'Add to wishlist'}
+          className={`absolute top-3 right-3 z-20 w-8 h-8 sm:w-9 sm:h-9 rounded-full flex items-center justify-center transition-all duration-200 shadow-md ${
+            isInWishlist(product.id || product._id || product.slug)
+              ? 'bg-rose-500 text-white hover:bg-rose-600 scale-105 ring-2 ring-white/80 dark:ring-black/50'
+              : 'bg-white/90 dark:bg-[#0e2115]/90 backdrop-blur-md text-gray-500 dark:text-gray-300 hover:text-rose-500 hover:bg-white dark:hover:bg-black/80'
+          }`}
+          title={isInWishlist(product.id || product._id || product.slug) ? (isBangla ? 'পছন্দের তালিকা থেকে সরান' : 'Remove from Wishlist') : (isBangla ? 'পছন্দের তালিকায় রাখুন' : 'Add to Wishlist')}
+        >
+          <Heart
+            className={`w-4 h-4 transition-transform duration-200 ${
+              isInWishlist(product.id || product._id || product.slug)
+                ? 'fill-current text-white scale-110'
+                : 'hover:scale-110'
+            }`}
+          />
+        </button>
+      </div>
 
       {/* Product Content Details */}
       <div className="p-4 sm:p-5 flex flex-col flex-1 justify-between">

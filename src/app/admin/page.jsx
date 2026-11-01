@@ -131,6 +131,7 @@ import {
 import { uploadToImgBB } from '@/lib/imgbb';
 import { useCart } from '@/context/CartContext';
 import { useThemeLanguage } from '@/context/ThemeLanguageContext';
+import { DashboardStatsSkeleton, TableSkeleton, GlobalSpinner } from '@/components/SkeletonLoaders';
 
 export default function AdminDashboardPage() {
   const router = useRouter();
@@ -1449,55 +1450,6 @@ export default function AdminDashboardPage() {
     })).sort((a, b) => b.count - a.count).slice(0, 4);
   }, [productsList]);
 
-  // Strict Role Guard: Only Admin can access /admin
-  if (!user || user.role !== 'admin') {
-    return (
-      <div className="min-h-screen bg-slate-900 text-white flex items-center justify-center p-4">
-        <div className="max-w-md w-full bg-slate-800/90 border border-slate-700 rounded-3xl p-8 text-center shadow-2xl backdrop-blur-xl">
-          <div className="w-16 h-16 rounded-2xl bg-rose-500/20 text-rose-400 flex items-center justify-center text-3xl mx-auto mb-4 border border-rose-500/30">
-            🚫
-          </div>
-          <h2 className="text-2xl font-black mb-2">{isBangla ? 'প্রবেশাধিকার সংরক্ষিত' : 'Access Restricted'}</h2>
-          <p className="text-slate-400 text-sm mb-6">
-            {isBangla
-              ? 'এডমিন ড্যাশবোর্ডে শুধুমাত্র অনুমোদিত এডমিন একাউন্ট প্রবেশ করতে পারবে। আপনার একাউন্টের জন্য প্রযোজ্য ড্যাশবোর্ডে যান।'
-              : 'Only authorized Admin accounts can access the Admin Dashboard. Please proceed to your designated dashboard.'}
-          </p>
-          <div className="flex flex-col gap-3">
-            {user?.role === 'seller' ? (
-              <Link
-                href="/seller"
-                className="w-full py-3.5 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-black rounded-2xl shadow-lg transition-all text-center text-sm"
-              >
-                🏪 {isBangla ? 'সেলার ড্যাশবোর্ডে যান' : 'Go to Seller Dashboard'}
-              </Link>
-            ) : user ? (
-              <Link
-                href="/dashboard"
-                className="w-full py-3.5 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-white font-black rounded-2xl shadow-lg transition-all text-center text-sm"
-              >
-                🛍️ {isBangla ? 'কাস্টমার ড্যাশবোর্ডে যান' : 'Go to Customer Dashboard'}
-              </Link>
-            ) : (
-              <Link
-                href="/auth"
-                className="w-full py-3.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-black rounded-2xl shadow-lg transition-all text-center text-sm"
-              >
-                🔐 {isBangla ? 'এডমিন হিসেবে লগইন করুন' : 'Login as Admin'}
-              </Link>
-            )}
-            <Link
-              href="/"
-              className="w-full py-3 bg-slate-700 hover:bg-slate-600 text-slate-300 font-bold rounded-2xl transition-all text-center text-sm"
-            >
-              🏠 {isBangla ? 'হোমপেজে ফিরে যান' : 'Back to Home'}
-            </Link>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen bg-[#f4f7f4] dark:bg-[#0a150e] text-gray-900 dark:text-emerald-50 flex transition-colors">
       
@@ -1578,7 +1530,7 @@ export default function AdminDashboardPage() {
           {/* User Avatar Card */}
           <div className="flex items-center gap-2.5 p-2 rounded-2xl bg-gray-50 dark:bg-black/30 border border-gray-100 dark:border-emerald-950">
             {user?.avatar ? (
-              <img src={user.avatar} alt={user.name} className="w-9 h-9 rounded-xl object-cover flex-shrink-0 border border-emerald-500/30" />
+              <img src={user.avatar} alt={user?.name || 'Admin'} className="w-9 h-9 rounded-xl object-cover flex-shrink-0 border border-emerald-500/30" />
             ) : (
               <div className="w-9 h-9 rounded-xl bg-brand-800 text-white flex items-center justify-center font-bold text-xs flex-shrink-0">
                 {user?.name?.charAt(0) || 'A'}
@@ -1754,7 +1706,9 @@ export default function AdminDashboardPage() {
               )}
 
               {/* Stat Cards */}
-              {stats && (
+              {loading ? (
+                <DashboardStatsSkeleton />
+              ) : stats ? (
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                   <div className="bg-white dark:bg-[#112318] p-5 rounded-3xl border border-[#e0ebe2] dark:border-[#1d3b28] shadow-sm flex items-center gap-4">
                     <div className="p-3 bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 rounded-2xl">
@@ -1796,7 +1750,7 @@ export default function AdminDashboardPage() {
                     </div>
                   </div>
                 </div>
-              )}
+              ) : null}
 
               {/* ======================================================== */}
               {/* 📈 3 INTERACTIVE CHARTS & QUICK DATA VISUALIZATION         */}

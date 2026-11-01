@@ -2,18 +2,18 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { 
-  X, 
-  Phone, 
-  User, 
-  MapPin, 
-  Truck, 
-  CheckCircle2, 
-  ShieldCheck, 
-  Zap, 
-  Star, 
-  Check, 
-  Info, 
+import {
+  X,
+  Phone,
+  User,
+  MapPin,
+  Truck,
+  CheckCircle2,
+  ShieldCheck,
+  Zap,
+  Star,
+  Check,
+  Info,
   Sparkles,
   ChevronDown,
   ChevronUp,
@@ -216,23 +216,23 @@ export default function FastOrderModal() {
   };
 
   const displayName = isBangla ? (product.name_bn || product.name) : (product.name_en || product.name);
-  const productDescription = isBangla 
+  const productDescription = isBangla
     ? (product.description || product.shortDescription || '১০০% প্রাকৃতিক ও নির্ভেজাল স্বাস্থ্যকর খাদ্য উপাদান। সরাসরি নিজস্ব তত্ত্বাবধানে সংগৃহীত এবং কোনো প্রকার কেমিক্যাল বা প্রিজারভেটিভ মুক্ত।')
     : (product.descriptionEn || product.description || '100% natural, pure and organic food product. Collected directly from source with zero preservatives or artificial colors.');
 
   return (
-    <div 
+    <div
       data-lenis-prevent="true"
       className="fixed inset-0 z-50 overflow-y-auto overscroll-contain bg-black/70 backdrop-blur-md flex items-center justify-center p-2 sm:p-4 animate-in fade-in duration-200 lenis-prevent"
       onClick={(e) => {
         if (e.target === e.currentTarget) closeFastOrder();
       }}
     >
-      <div 
+      <div
         data-lenis-prevent="true"
         className="bg-white dark:bg-[#112318] rounded-3xl max-w-xl w-full max-h-[92vh] flex flex-col shadow-2xl border border-emerald-200 dark:border-[#1d3b28] animate-in zoom-in-95 duration-200 transition-colors lenis-prevent"
       >
-        
+
         {/* Sticky Modal Header */}
         <div className="bg-gradient-to-r from-brand-900 via-emerald-900 to-brand-950 text-white p-4 sm:p-5 flex items-center justify-between flex-shrink-0 rounded-t-3xl shadow-md z-10">
           <div className="flex items-center gap-3">
@@ -258,12 +258,12 @@ export default function FastOrderModal() {
         </div>
 
         {/* Scrollable Modal Body & Form */}
-        <form 
-          onSubmit={handleSubmitOrder} 
+        <form
+          onSubmit={handleSubmitOrder}
           data-lenis-prevent="true"
           className="p-4 sm:p-6 space-y-5 overflow-y-auto overscroll-contain flex-1 lenis-prevent custom-scrollbar"
         >
-          
+
           {/* Selected Product Summary Card */}
           <div className="bg-emerald-50/80 dark:bg-emerald-950/40 p-4 rounded-3xl border border-emerald-200 dark:border-emerald-800/70 space-y-3.5">
             <div className="flex items-start gap-3 sm:gap-4">
@@ -295,7 +295,7 @@ export default function FastOrderModal() {
                 <h4 className="font-bold text-gray-900 dark:text-emerald-100 text-sm sm:text-base line-clamp-2 leading-snug">
                   {displayName}
                 </h4>
-                
+
                 {/* Variant Selector inside Modal */}
                 {product.variants && product.variants.length > 0 && (
                   <div className="mt-2 flex flex-wrap items-center gap-1.5">
@@ -307,11 +307,10 @@ export default function FastOrderModal() {
                         key={i}
                         type="button"
                         onClick={() => setSelectedVariant(v)}
-                        className={`text-xs px-2.5 py-1 rounded-xl font-bold border transition-all ${
-                          selectedVariant?.weight === v.weight
+                        className={`text-xs px-2.5 py-1 rounded-xl font-bold border transition-all ${selectedVariant?.weight === v.weight
                             ? 'bg-brand-900 text-white border-brand-900 dark:bg-emerald-600 dark:border-emerald-500 shadow-sm scale-105'
                             : 'bg-white dark:bg-black/30 text-gray-700 dark:text-emerald-300 border-gray-300 dark:border-emerald-800 hover:border-brand-900'
-                        }`}
+                          }`}
                       >
                         {v.weight}
                       </button>
@@ -373,7 +372,7 @@ export default function FastOrderModal() {
                   <p className="leading-relaxed">
                     {productDescription}
                   </p>
-                  
+
                   {/* Organic Key Feature Badges */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 pt-1.5 text-[11px] font-medium text-emerald-900 dark:text-emerald-300">
                     <div className="flex items-center gap-1">
@@ -461,11 +460,10 @@ export default function FastOrderModal() {
                 <button
                   type="button"
                   onClick={() => setDeliveryZone('inside_dhaka')}
-                  className={`p-3 rounded-2xl border text-left flex flex-col justify-between transition-all ${
-                    deliveryZone === 'inside_dhaka'
+                  className={`p-3 rounded-2xl border text-left flex flex-col justify-between transition-all ${deliveryZone === 'inside_dhaka'
                       ? 'bg-emerald-50 dark:bg-emerald-950/60 border-brand-900 dark:border-emerald-500 text-brand-950 dark:text-emerald-100 font-bold ring-2 ring-brand-900/20 shadow-sm'
                       : 'bg-white dark:bg-black/20 border-gray-200 dark:border-emerald-900/40 text-gray-700 dark:text-gray-300'
-                  }`}
+                    }`}
                 >
                   <span className="text-xs">{isBangla ? 'ঢাকার ভেতরে' : 'Inside Dhaka'}</span>
                   <span className="text-xs font-black text-brand-900 dark:text-secondary mt-0.5">৳ ৭০</span>
@@ -473,11 +471,10 @@ export default function FastOrderModal() {
                 <button
                   type="button"
                   onClick={() => setDeliveryZone('outside_dhaka')}
-                  className={`p-3 rounded-2xl border text-left flex flex-col justify-between transition-all ${
-                    deliveryZone === 'outside_dhaka'
+                  className={`p-3 rounded-2xl border text-left flex flex-col justify-between transition-all ${deliveryZone === 'outside_dhaka'
                       ? 'bg-emerald-50 dark:bg-emerald-950/60 border-brand-900 dark:border-emerald-500 text-brand-950 dark:text-emerald-100 font-bold ring-2 ring-brand-900/20 shadow-sm'
                       : 'bg-white dark:bg-black/20 border-gray-200 dark:border-emerald-900/40 text-gray-700 dark:text-gray-300'
-                  }`}
+                    }`}
                 >
                   <span className="text-xs">{isBangla ? 'ঢাকার বাইরে (সারাদেশ)' : 'Outside Dhaka (Nationwide)'}</span>
                   <span className="text-xs font-black text-brand-900 dark:text-secondary mt-0.5">৳ ১২০</span>
@@ -492,11 +489,10 @@ export default function FastOrderModal() {
               </label>
               <div className="grid grid-cols-2 gap-2.5">
                 <label
-                  className={`p-3 rounded-2xl border flex items-center gap-2 cursor-pointer transition-all ${
-                    paymentMethod === 'cod'
+                  className={`p-3 rounded-2xl border flex items-center gap-2 cursor-pointer transition-all ${paymentMethod === 'cod'
                       ? 'bg-emerald-50 dark:bg-emerald-950/60 border-brand-900 dark:border-emerald-500 text-brand-900 dark:text-emerald-200 font-bold ring-1 ring-brand-900/20'
                       : 'bg-white dark:bg-black/20 border-gray-200 dark:border-emerald-900/40 text-gray-700 dark:text-gray-300'
-                  }`}
+                    }`}
                 >
                   <input
                     type="radio"
@@ -509,11 +505,10 @@ export default function FastOrderModal() {
                   <span className="text-xs">{isBangla ? '💵 ক্যাশ অন ডেলিভারি' : '💵 Cash on Delivery'}</span>
                 </label>
                 <label
-                  className={`p-3 rounded-2xl border flex items-center gap-2 cursor-pointer transition-all ${
-                    paymentMethod === 'bkash'
+                  className={`p-3 rounded-2xl border flex items-center gap-2 cursor-pointer transition-all ${paymentMethod === 'bkash'
                       ? 'bg-pink-50 dark:bg-pink-950/40 border-pink-600 dark:border-pink-500 text-pink-900 dark:text-pink-300 font-bold ring-1 ring-pink-500/20'
                       : 'bg-white dark:bg-black/20 border-gray-200 dark:border-emerald-900/40 text-gray-700 dark:text-gray-300'
-                  }`}
+                    }`}
                 >
                   <input
                     type="radio"

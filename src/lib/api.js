@@ -1369,6 +1369,49 @@ export const clearAiChatHistory = async (sessionId) => {
   }
 };
 
+// ==========================================
+// 💖 Wishlist API (MongoDB Connected)
+// ==========================================
+export const getWishlist = async (userId) => {
+  try {
+    const res = await apiClient.get('/wishlist', { params: { userId } });
+    return res.data;
+  } catch (error) {
+    console.error('getWishlist error:', error.message);
+    return { success: false, data: [], count: 0 };
+  }
+};
+
+export const addToWishlist = async (productId, product, userId) => {
+  try {
+    const res = await apiClient.post('/wishlist', { productId, product, userId });
+    return res.data;
+  } catch (error) {
+    console.error('addToWishlist error:', error.message);
+    return { success: false, message: 'Failed to add to wishlist' };
+  }
+};
+
+export const removeFromWishlist = async (id, userId) => {
+  try {
+    const res = await apiClient.delete(`/wishlist/${id}`, { params: { userId } });
+    return res.data;
+  } catch (error) {
+    console.error('removeFromWishlist error:', error.message);
+    return { success: false, message: 'Failed to remove from wishlist' };
+  }
+};
+
+export const toggleWishlistApi = async (productId, product, userId) => {
+  try {
+    const res = await apiClient.post('/wishlist/toggle', { productId, product, userId });
+    return res.data;
+  } catch (error) {
+    console.error('toggleWishlistApi error:', error.message);
+    return { success: false, message: 'Failed to toggle wishlist' };
+  }
+};
+
 export default apiClient;
 
 

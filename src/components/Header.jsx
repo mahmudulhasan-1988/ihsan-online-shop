@@ -19,7 +19,8 @@ import {
   ShieldCheck,
   Bell,
   CheckCheck,
-  Trash2
+  Trash2,
+  Heart
 } from 'lucide-react';
 import { useCart } from '@/context/CartContext';
 import { useThemeLanguage } from '@/context/ThemeLanguageContext';
@@ -36,7 +37,7 @@ import Image from 'next/image';
 export default function Header() {
   const router = useRouter();
   const pathname = usePathname();
-  const { cart, totalItems, subtotal, openCartDrawer, user, logout } = useCart();
+  const { cart, totalItems, subtotal, openCartDrawer, user, logout, wishlistCount } = useCart();
   const { isDark, toggleTheme, isBangla, toggleLanguage, t, lang } = useThemeLanguage();
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -436,9 +437,22 @@ export default function Header() {
                     )}
 
                     {user.role !== 'admin' && user.role !== 'seller' && (
-                      <Link href="/dashboard" className="block px-4 py-2 text-xs font-bold text-emerald-700 dark:text-emerald-300 hover:bg-emerald-50 dark:hover:bg-[#1a3827]">
-                        👤 {isBangla ? 'কাস্টমার ড্যাশবোর্ড' : 'Customer Dashboard'}
-                      </Link>
+                      <>
+                        <Link href="/dashboard" className="block px-4 py-2 text-xs font-bold text-emerald-700 dark:text-emerald-300 hover:bg-emerald-50 dark:hover:bg-[#1a3827]">
+                          👤 {isBangla ? 'কাস্টমার ড্যাশবোর্ড' : 'Customer Dashboard'}
+                        </Link>
+                        <Link href="/dashboard" className="flex items-center justify-between px-4 py-2 text-xs font-semibold text-gray-700 dark:text-gray-200 hover:bg-rose-50 dark:hover:bg-rose-950/30 hover:text-rose-600 transition-colors">
+                          <span className="flex items-center gap-1.5">
+                            <Heart className="w-3.5 h-3.5 text-rose-500 fill-rose-500/20" />
+                            <span>{isBangla ? 'পছন্দের তালিকা' : 'My Wishlist'}</span>
+                          </span>
+                          {wishlistCount > 0 && (
+                            <span className="bg-rose-100 text-rose-600 dark:bg-rose-950/80 dark:text-rose-300 text-[10px] font-black px-1.5 py-0.2 rounded-full">
+                              {wishlistCount}
+                            </span>
+                          )}
+                        </Link>
+                      </>
                     )}
 
                     <Link href="/track-order" className="block px-4 py-2 text-xs font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-[#1a3827]">
@@ -464,6 +478,21 @@ export default function Header() {
                 </Link>
               )}
             </div>
+
+            {/* ❤️ Wishlist Quick Link */}
+            <Link
+              href="/dashboard"
+              className="relative flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl bg-white dark:bg-[#14291d] text-gray-700 dark:text-emerald-300 border border-gray-200 dark:border-[#254933] hover:bg-rose-50 dark:hover:bg-rose-950/40 hover:text-rose-600 dark:hover:text-rose-400 hover:border-rose-300 dark:hover:border-rose-800 transition-all duration-200 active:scale-95 flex-shrink-0 shadow-sm"
+              title={isBangla ? 'পছন্দের তালিকা (Wishlist)' : 'Wishlist'}
+              aria-label="Wishlist"
+            >
+              <Heart className={`w-4.5 h-4.5 sm:w-5 sm:h-5 transition-transform ${wishlistCount > 0 ? 'text-rose-500 fill-rose-500/20' : 'text-gray-700 dark:text-emerald-300'}`} />
+              {wishlistCount > 0 && (
+                <span className="absolute -top-1 -right-1 flex h-4.5 min-w-4.5 sm:h-5 sm:min-w-5 items-center justify-center rounded-full bg-rose-600 px-1 text-[9px] sm:text-[10px] font-black text-white shadow-md ring-2 ring-white dark:ring-[#14291d] leading-none animate-in zoom-in-50">
+                  {wishlistCount > 9 ? '9+' : wishlistCount}
+                </span>
+              )}
+            </Link>
 
             {/* 🔔 Role-Aware Interactive Notification Bell */}
             <div className="relative flex-shrink-0" ref={notifRef}>

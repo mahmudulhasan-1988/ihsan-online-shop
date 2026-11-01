@@ -3,6 +3,7 @@
 import React, { useState, useEffect, Suspense, useMemo } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import ProductCard from '@/components/ProductCard';
+import { ProductGridSkeleton } from '@/components/SkeletonLoaders';
 import { getProducts, getCategories, getSellers } from '@/lib/api';
 import { useThemeLanguage } from '@/context/ThemeLanguageContext';
 import { 
@@ -643,16 +644,7 @@ function ProductsContent() {
 
             {/* 📦 PRODUCTS GRID OR EMPTY STATE */}
             {loading ? (
-              <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-3 gap-4 sm:gap-6">
-                {[...Array(6)].map((_, i) => (
-                  <div key={i} className="bg-white dark:bg-[#112318] rounded-3xl p-4 border border-gray-100 dark:border-emerald-900 shadow-sm animate-pulse space-y-3">
-                    <div className="bg-gray-200 dark:bg-gray-800 aspect-square rounded-2xl"></div>
-                    <div className="h-4 bg-gray-200 dark:bg-gray-800 rounded w-3/4"></div>
-                    <div className="h-4 bg-gray-200 dark:bg-gray-800 rounded w-1/2"></div>
-                    <div className="h-10 bg-gray-200 dark:bg-gray-800 rounded-2xl"></div>
-                  </div>
-                ))}
-              </div>
+              <ProductGridSkeleton count={6} className="grid-cols-2 md:grid-cols-3 xl:grid-cols-3 gap-4 sm:gap-6" />
             ) : products.length > 0 ? (
               <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-3 gap-4 sm:gap-6">
                 {products.map((product) => (

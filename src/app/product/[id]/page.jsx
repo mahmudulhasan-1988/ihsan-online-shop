@@ -13,6 +13,7 @@ import {
 import { useCart } from '@/context/CartContext';
 import { useThemeLanguage } from '@/context/ThemeLanguageContext';
 import ProductCard from '@/components/ProductCard';
+import { ProductDetailSkeleton } from '@/components/SkeletonLoaders';
 import { 
   Star, 
   ShoppingBag, 
@@ -31,13 +32,14 @@ import {
   ChevronRight,
   Maximize2,
   X,
-  Image as ImageIcon
+  Image as ImageIcon,
+  Heart
 } from 'lucide-react';
 
 export default function ProductDetailPage() {
   const params = useParams();
   const { id } = params;
-  const { user, addToCart, openFastOrder, showToast } = useCart();
+  const { user, addToCart, openFastOrder, showToast, toggleWishlist, isInWishlist } = useCart();
   const { isBangla } = useThemeLanguage();
 
   const [product, setProduct] = useState(null);
@@ -139,19 +141,7 @@ export default function ProductDetailPage() {
   }, [id, user]);
 
   if (loading) {
-    return (
-      <div className="max-w-7xl mx-auto px-4 py-12">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 animate-pulse">
-          <div className="aspect-square bg-gray-200 dark:bg-gray-800 rounded-3xl"></div>
-          <div className="space-y-4">
-            <div className="h-8 bg-gray-200 dark:bg-gray-800 rounded w-3/4"></div>
-            <div className="h-4 bg-gray-200 dark:bg-gray-800 rounded w-1/2"></div>
-            <div className="h-10 bg-gray-200 dark:bg-gray-800 rounded w-1/3"></div>
-            <div className="h-32 bg-gray-200 dark:bg-gray-800 rounded-2xl"></div>
-          </div>
-        </div>
-      </div>
-    );
+    return <ProductDetailSkeleton />;
   }
 
   if (!product) {
@@ -333,6 +323,26 @@ export default function ProductDetailPage() {
                 </div>
               )}
 
+              {/* ❤️ Wishlist Button on Showcase Image */}
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  toggleWishlist(product);
+                }}
+                className={`absolute top-3 right-3 p-2.5 rounded-2xl backdrop-blur-md transition-all shadow-md z-10 ${
+                  isInWishlist(product.id || product._id || product.slug)
+                    ? 'bg-rose-500 text-white shadow-rose-500/30 ring-2 ring-rose-300'
+                    : 'bg-white/90 dark:bg-black/70 text-gray-600 dark:text-gray-300 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-white dark:hover:bg-black'
+                }`}
+                title={isInWishlist(product.id || product._id || product.slug) ? (isBangla ? 'পছন্দের তালিকা থেকে সরান' : 'Remove from Wishlist') : (isBangla ? 'পছন্দের তালিকায় রাখুন' : 'Add to Wishlist')}
+                aria-label="Wishlist"
+              >
+                <Heart className={`w-4.5 h-4.5 transition-transform active:scale-125 ${
+                  isInWishlist(product.id || product._id || product.slug) ? 'fill-white text-white' : ''
+                }`} />
+              </button>
+
               {/* Zoom Button */}
               <button
                 type="button"
@@ -340,7 +350,7 @@ export default function ProductDetailPage() {
                   e.stopPropagation();
                   setIsLightboxOpen(true);
                 }}
-                className="absolute top-3 right-3 p-2 rounded-2xl bg-white/80 dark:bg-black/60 backdrop-blur-md text-gray-700 dark:text-emerald-300 opacity-0 group-hover:opacity-100 hover:bg-white dark:hover:bg-black transition-all shadow-md z-10"
+                className="absolute top-3 right-14 p-2 rounded-2xl bg-white/80 dark:bg-black/60 backdrop-blur-md text-gray-700 dark:text-emerald-300 opacity-0 group-hover:opacity-100 hover:bg-white dark:hover:bg-black transition-all shadow-md z-10"
                 title={isBangla ? 'বড় করে দেখুন' : 'Full Preview'}
               >
                 <Maximize2 className="w-4 h-4" />
@@ -558,6 +568,26 @@ export default function ProductDetailPage() {
               </>
             )}
           </div>
+
+          {/* ❤️ Wishlist Button */}
+          <button
+            type="button"
+            onClick={() => toggleWishlist(product)}
+            className={`w-full py-3 px-4 rounded-2xl font-bold flex items-center justify-center gap-2 border transition-all text-sm shadow-sm ${
+              isInWishlist(product.id || product._id || product.slug)
+                ? 'bg-rose-50 border-rose-300 text-rose-600 hover:bg-rose-100 dark:bg-rose-950/40 dark:border-rose-900 dark:text-rose-400'
+                : 'bg-white dark:bg-black/20 border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:border-rose-400 hover:text-rose-600 hover:bg-rose-50/50'
+            }`}
+          >
+            <Heart className={`w-4.5 h-4.5 transition-transform ${
+              isInWishlist(product.id || product._id || product.slug) ? 'fill-rose-600 text-rose-600 scale-110' : ''
+            }`} />
+            <span>
+              {isInWishlist(product.id || product._id || product.slug)
+                ? (isBangla ? 'পছন্দের তালিকায় সংরক্ষিত আছে (Wishlist)' : 'Saved in Your Wishlist')
+                : (isBangla ? 'পছন্দের তালিকায় রাখুন (Add to Wishlist)' : 'Add to Wishlist')}
+            </span>
+          </button>
 
           {/* Hotline Quick Link */}
           <a

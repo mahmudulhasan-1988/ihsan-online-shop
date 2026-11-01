@@ -73,6 +73,7 @@ import {
 import { uploadToImgBB } from '@/lib/imgbb';
 import { useCart } from '@/context/CartContext';
 import { useThemeLanguage } from '@/context/ThemeLanguageContext';
+import { DashboardStatsSkeleton } from '@/components/SkeletonLoaders';
 
 export default function SellerDashboardPage() {
   const { user, logout, showToast } = useCart();
@@ -867,48 +868,6 @@ export default function SellerDashboardPage() {
     };
   }, [sellerInfo]);
 
-  // Strict Role Guard: Only Seller or Admin can access /seller
-  if (!user || (user.role !== 'seller' && user.role !== 'admin')) {
-    return (
-      <div className="min-h-screen bg-slate-900 text-white flex items-center justify-center p-4">
-        <div className="max-w-md w-full bg-slate-800/90 border border-slate-700 rounded-3xl p-8 text-center shadow-2xl backdrop-blur-xl">
-          <div className="w-16 h-16 rounded-2xl bg-amber-500/20 text-amber-400 flex items-center justify-center text-3xl mx-auto mb-4 border border-amber-500/30">
-            🚫
-          </div>
-          <h2 className="text-2xl font-black mb-2">{isBangla ? 'প্রবেশাধিকার সংরক্ষিত' : 'Access Restricted'}</h2>
-          <p className="text-slate-400 text-sm mb-6">
-            {isBangla
-              ? 'সেলার ড্যাশবোর্ডে শুধুমাত্র অনুমোদিত সেলার ও এডমিন প্রবেশ করতে পারবে। আপনার একাউন্টের ড্যাশবোর্ডে যান।'
-              : 'Only authorized Sellers and Admin can access the Seller Dashboard. Please proceed to your designated dashboard.'}
-          </p>
-          <div className="flex flex-col gap-3">
-            {user?.role === 'customer' ? (
-              <Link
-                href="/dashboard"
-                className="w-full py-3.5 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-white font-black rounded-2xl shadow-lg transition-all text-center text-sm"
-              >
-                🛍️ {isBangla ? 'কাস্টমার ড্যাশবোর্ডে যান' : 'Go to Customer Dashboard'}
-              </Link>
-            ) : (
-              <Link
-                href="/auth"
-                className="w-full py-3.5 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-black rounded-2xl shadow-lg transition-all text-center text-sm"
-              >
-                🔐 {isBangla ? 'সেলার একাউন্টে লগইন করুন' : 'Login with Seller Account'}
-              </Link>
-            )}
-            <Link
-              href="/"
-              className="w-full py-3 bg-slate-700 hover:bg-slate-600 text-slate-300 font-bold rounded-2xl transition-all text-center text-sm"
-            >
-              🏠 {isBangla ? 'হোমপেজে ফিরে যান' : 'Back to Home'}
-            </Link>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   const navMenuItems = [
     { id: 'dashboard', label: isBangla ? 'ড্যাশবোর্ড ওভারভিউ' : 'Dashboard', icon: BarChart3 },
     { id: 'products', label: isBangla ? 'পণ্য ব্যবস্থাপনা' : 'Products & Stock', icon: Package, count: myProducts.length },
@@ -1128,47 +1087,51 @@ export default function SellerDashboardPage() {
           {activeMenu === 'dashboard' && (
             <div className="space-y-6">
               {/* Stat Cards */}
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                <div className="bg-white dark:bg-[#112318] p-5 rounded-3xl border border-[#e0ebe2] dark:border-[#1d3b28] shadow-sm flex items-center gap-4">
-                  <div className="p-3 bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300 rounded-2xl">
-                    <DollarSign className="w-6 h-6" />
+              {loading ? (
+                <DashboardStatsSkeleton />
+              ) : (
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                  <div className="bg-white dark:bg-[#112318] p-5 rounded-3xl border border-[#e0ebe2] dark:border-[#1d3b28] shadow-sm flex items-center gap-4">
+                    <div className="p-3 bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300 rounded-2xl">
+                      <DollarSign className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500">{isBangla ? 'উইথড্র যোগ্য ব্যালেন্স' : 'Available Balance'}</p>
+                      <h3 className="text-xl sm:text-2xl font-black text-emerald-600">৳ {sellerInfo.balance}</h3>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-xs text-gray-500">{isBangla ? 'উইথড্র যোগ্য ব্যালেন্স' : 'Available Balance'}</p>
-                    <h3 className="text-xl sm:text-2xl font-black text-emerald-600">৳ {sellerInfo.balance}</h3>
-                  </div>
-                </div>
 
-                <div className="bg-white dark:bg-[#112318] p-5 rounded-3xl border border-[#e0ebe2] dark:border-[#1d3b28] shadow-sm flex items-center gap-4">
-                  <div className="p-3 bg-emerald-100 dark:bg-emerald-950 text-brand-900 dark:text-emerald-300 rounded-2xl">
-                    <ShoppingCart className="w-6 h-6" />
+                  <div className="bg-white dark:bg-[#112318] p-5 rounded-3xl border border-[#e0ebe2] dark:border-[#1d3b28] shadow-sm flex items-center gap-4">
+                    <div className="p-3 bg-emerald-100 dark:bg-emerald-950 text-brand-900 dark:text-emerald-300 rounded-2xl">
+                      <ShoppingCart className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500">{isBangla ? 'মোট সেলস রেভিনিউ' : 'Total Sales'}</p>
+                      <h3 className="text-xl sm:text-2xl font-black text-gray-900 dark:text-emerald-100">৳ {sellerInfo.total_sales}</h3>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-xs text-gray-500">{isBangla ? 'মোট সেলস রেভিনিউ' : 'Total Sales'}</p>
-                    <h3 className="text-xl sm:text-2xl font-black text-gray-900 dark:text-emerald-100">৳ {sellerInfo.total_sales}</h3>
-                  </div>
-                </div>
 
-                <div className="bg-white dark:bg-[#112318] p-5 rounded-3xl border border-[#e0ebe2] dark:border-[#1d3b28] shadow-sm flex items-center gap-4">
-                  <div className="p-3 bg-blue-100 dark:bg-blue-950 text-blue-800 dark:text-blue-300 rounded-2xl">
-                    <Package className="w-6 h-6" />
+                  <div className="bg-white dark:bg-[#112318] p-5 rounded-3xl border border-[#e0ebe2] dark:border-[#1d3b28] shadow-sm flex items-center gap-4">
+                    <div className="p-3 bg-blue-100 dark:bg-blue-950 text-blue-800 dark:text-blue-300 rounded-2xl">
+                      <Package className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500">{isBangla ? 'লিস্টেড পণ্য' : 'Listed Products'}</p>
+                      <h3 className="text-xl sm:text-2xl font-black text-gray-900 dark:text-emerald-100">{myProducts.length}</h3>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-xs text-gray-500">{isBangla ? 'লিস্টেড পণ্য' : 'Listed Products'}</p>
-                    <h3 className="text-xl sm:text-2xl font-black text-gray-900 dark:text-emerald-100">{myProducts.length}</h3>
-                  </div>
-                </div>
 
-                <div className="bg-white dark:bg-[#112318] p-5 rounded-3xl border border-[#e0ebe2] dark:border-[#1d3b28] shadow-sm flex items-center gap-4">
-                  <div className="p-3 bg-yellow-100 dark:bg-yellow-950 text-yellow-800 dark:text-yellow-300 rounded-2xl">
-                    <Star className="w-6 h-6" />
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-500">{isBangla ? 'শপ রেটিং' : 'Shop Rating'}</p>
-                    <h3 className="text-xl sm:text-2xl font-black text-gray-900 dark:text-emerald-100">⭐ {sellerInfo.rating}</h3>
+                  <div className="bg-white dark:bg-[#112318] p-5 rounded-3xl border border-[#e0ebe2] dark:border-[#1d3b28] shadow-sm flex items-center gap-4">
+                    <div className="p-3 bg-yellow-100 dark:bg-yellow-950 text-yellow-800 dark:text-yellow-300 rounded-2xl">
+                      <Star className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500">{isBangla ? 'শপ রেটিং' : 'Shop Rating'}</p>
+                      <h3 className="text-xl sm:text-2xl font-black text-gray-900 dark:text-emerald-100">⭐ {sellerInfo.rating}</h3>
+                    </div>
                   </div>
                 </div>
-              </div>
+              )}
 
               {/* ======================================================== */}
               {/* 📈 3 INTERACTIVE SELLER CHARTS & VISUALIZATIONS            */}

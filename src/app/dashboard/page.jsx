@@ -53,9 +53,23 @@ import {
 import ImageUploader from '@/components/ImageUploader';
 import { useCart } from '@/context/CartContext';
 import { useThemeLanguage } from '@/context/ThemeLanguageContext';
+import { DashboardStatsSkeleton } from '@/components/SkeletonLoaders';
 
 export default function CustomerDashboardPage() {
-  const { user, logout, cart, showToast, addToCart, updateQuantity, removeFromCart, clearCart, subtotal } = useCart();
+  const { 
+    user, 
+    logout, 
+    cart, 
+    showToast, 
+    addToCart, 
+    updateQuantity, 
+    removeFromCart, 
+    clearCart, 
+    subtotal,
+    wishlist,
+    removeFromWishlist,
+    isWishlistLoading
+  } = useCart();
   const { isBangla, theme, toggleTheme } = useThemeLanguage();
 
   const [activeMenu, setActiveMenu] = useState('dashboard'); // 'dashboard' | 'profile' | 'orders' | 'addresses' | 'wishlist' | 'cart' | 'notifications' | 'support'
@@ -66,7 +80,6 @@ export default function CustomerDashboardPage() {
   const [myOrders, setMyOrders] = useState([]);
   const [addresses, setAddresses] = useState([]);
   const [notifications, setNotifications] = useState([]);
-  const [wishlistProducts, setWishlistProducts] = useState([]);
   const [selectedOrderForInvoice, setSelectedOrderForInvoice] = useState(null);
   const [expandedOrderLogs, setExpandedOrderLogs] = useState({});
 
@@ -140,7 +153,6 @@ export default function CustomerDashboardPage() {
       setMyOrders(ordRes?.data || []);
       setAddresses(addrRes?.data || []);
       setNotifications(notifRes?.data || []);
-      setWishlistProducts((prodRes?.data || []).slice(0, 3));
       setMyTickets(tickRes?.data || []);
 
       if (isManual) {
@@ -360,78 +372,13 @@ export default function CustomerDashboardPage() {
     };
   }, [myOrders]);
 
-  if (!user) {
-    return (
-      <div className="min-h-screen bg-slate-900 text-white flex items-center justify-center p-4">
-        <div className="max-w-md w-full bg-slate-800/90 border border-slate-700 rounded-3xl p-8 text-center shadow-2xl backdrop-blur-xl">
-          <div className="w-16 h-16 rounded-2xl bg-amber-500/20 text-amber-400 flex items-center justify-center text-3xl mx-auto mb-4 border border-amber-500/30">
-            🔒
-          </div>
-          <h2 className="text-2xl font-black mb-2">{isBangla ? 'লগইন প্রয়োজন' : 'Login Required'}</h2>
-          <p className="text-slate-400 text-sm mb-6">
-            {isBangla
-              ? 'ড্যাশবোর্ডে প্রবেশ করতে অনুগ্রহ করে আপনার একাউন্টে লগইন অথবা রেজিস্ট্রেশন করুন।'
-              : 'Please login or register with your account to access your customer dashboard.'}
-          </p>
-          <div className="flex flex-col gap-3">
-            <Link
-              href="/auth"
-              className="w-full py-3.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold rounded-2xl shadow-lg transition-all text-center text-sm"
-            >
-              🔐 {isBangla ? 'লগইন / রেজিস্ট্রেশন করুন' : 'Login / Register Now'}
-            </Link>
-            <Link
-              href="/"
-              className="w-full py-3 bg-slate-700 hover:bg-slate-600 text-slate-300 font-bold rounded-2xl transition-all text-center text-sm"
-            >
-              🏠 {isBangla ? 'হোমপেজে ফিরে যান' : 'Back to Home'}
-            </Link>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // Strict Role Guard: Sellers cannot view Customer Dashboard
-  if (user && user.role === 'seller') {
-    return (
-      <div className="min-h-screen bg-slate-900 text-white flex items-center justify-center p-4">
-        <div className="max-w-md w-full bg-slate-800/90 border border-slate-700 rounded-3xl p-8 text-center shadow-2xl backdrop-blur-xl">
-          <div className="w-16 h-16 rounded-2xl bg-amber-500/20 text-amber-400 flex items-center justify-center text-3xl mx-auto mb-4 border border-amber-500/30">
-            🏪
-          </div>
-          <h2 className="text-2xl font-black mb-2">{isBangla ? 'সেলার একাউন্ট সনাক্ত হয়েছে' : 'Seller Account Detected'}</h2>
-          <p className="text-slate-400 text-sm mb-6">
-            {isBangla
-              ? 'কাস্টমার ড্যাশবোর্ড শুধুমাত্র ক্রেতা ও এডমিনের জন্য। সেলারদের জন্য আলাদা সেলার ড্যাশবোর্ড রয়েছে।'
-              : 'Customer Dashboard is reserved for customers and admin. Please use your designated Seller Dashboard.'}
-          </p>
-          <div className="flex flex-col gap-3">
-            <Link
-              href="/seller"
-              className="w-full py-3.5 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-black rounded-2xl shadow-lg transition-all text-center text-sm"
-            >
-              🏪 {isBangla ? 'সেলার ড্যাশবোর্ডে প্রবেশ করুন' : 'Go to Seller Dashboard'}
-            </Link>
-            <Link
-              href="/"
-              className="w-full py-3 bg-slate-700 hover:bg-slate-600 text-slate-300 font-bold rounded-2xl transition-all text-center text-sm"
-            >
-              🏠 {isBangla ? 'হোমপেজে ফিরে যান' : 'Back to Home'}
-            </Link>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   const navMenuItems = [
     { id: 'dashboard', label: isBangla ? 'ড্যাশবোর্ড ওভারভিউ' : 'Overview', icon: LayoutDashboard },
     { id: 'orders', label: isBangla ? 'আমার অর্ডারসমূহ' : 'My Orders', icon: ShoppingBag, count: myOrders.length },
     { id: 'cart', label: isBangla ? 'আমার কার্ট (Cart)' : 'My Cart', icon: ShoppingCart, count: cart?.length || 0, countColor: 'bg-emerald-600 text-white' },
     { id: 'profile', label: isBangla ? 'প্রোফাইল সেটিংস' : 'My Profile', icon: User },
     { id: 'addresses', label: isBangla ? 'ঠিকানা বই (Address)' : 'Address Book', icon: MapPin, count: addresses.length },
-    { id: 'wishlist', label: isBangla ? 'পছন্দের তালিকা' : 'Wishlist', icon: Heart, count: wishlistProducts.length },
+    { id: 'wishlist', label: isBangla ? 'পছন্দের তালিকা' : 'Wishlist', icon: Heart, count: wishlist?.length || null, countColor: 'bg-rose-500 text-white' },
     { id: 'notifications', label: isBangla ? 'বিজ্ঞপ্তি' : 'Notifications', icon: Bell, count: notifications.filter(n => !n.is_read).length || null },
     { id: 'support', label: isBangla ? 'সাহায্য ও টিকিট' : 'Support & Help', icon: Headphones, count: myTickets.length || null, countColor: 'bg-emerald-600 text-white' },
   ];
@@ -643,59 +590,63 @@ export default function CustomerDashboardPage() {
           {/* ======================================================== */}
           {activeMenu === 'dashboard' && (
             <div className="space-y-6">
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                <div 
-                  onClick={() => setActiveMenu('orders')}
-                  className="bg-white dark:bg-[#112318] p-5 rounded-3xl border border-[#e0ebe2] dark:border-[#1d3b28] shadow-sm flex items-center gap-4 cursor-pointer hover:border-emerald-500/50 transition-all"
-                >
-                  <div className="p-3 bg-emerald-100 dark:bg-emerald-950 text-brand-900 dark:text-emerald-300 rounded-2xl">
-                    <ShoppingBag className="w-6 h-6" />
+              {loading ? (
+                <DashboardStatsSkeleton />
+              ) : (
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                  <div 
+                    onClick={() => setActiveMenu('orders')}
+                    className="bg-white dark:bg-[#112318] p-5 rounded-3xl border border-[#e0ebe2] dark:border-[#1d3b28] shadow-sm flex items-center gap-4 cursor-pointer hover:border-emerald-500/50 transition-all"
+                  >
+                    <div className="p-3 bg-emerald-100 dark:bg-emerald-950 text-brand-900 dark:text-emerald-300 rounded-2xl">
+                      <ShoppingBag className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500">{isBangla ? 'মোট অর্ডার' : 'Total Orders'}</p>
+                      <h3 className="text-xl sm:text-2xl font-black">{myOrders.length}</h3>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-xs text-gray-500">{isBangla ? 'মোট অর্ডার' : 'Total Orders'}</p>
-                    <h3 className="text-xl sm:text-2xl font-black">{myOrders.length}</h3>
-                  </div>
-                </div>
 
-                <div 
-                  onClick={() => setActiveMenu('cart')}
-                  className="bg-white dark:bg-[#112318] p-5 rounded-3xl border border-[#e0ebe2] dark:border-[#1d3b28] shadow-sm flex items-center gap-4 cursor-pointer hover:border-emerald-500/50 transition-all"
-                >
-                  <div className="p-3 bg-teal-100 dark:bg-teal-950 text-teal-800 dark:text-teal-300 rounded-2xl">
-                    <ShoppingCart className="w-6 h-6" />
+                  <div 
+                    onClick={() => setActiveMenu('cart')}
+                    className="bg-white dark:bg-[#112318] p-5 rounded-3xl border border-[#e0ebe2] dark:border-[#1d3b28] shadow-sm flex items-center gap-4 cursor-pointer hover:border-emerald-500/50 transition-all"
+                  >
+                    <div className="p-3 bg-teal-100 dark:bg-teal-950 text-teal-800 dark:text-teal-300 rounded-2xl">
+                      <ShoppingCart className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500">{isBangla ? 'কার্ট আইটেম' : 'Cart Items'}</p>
+                      <h3 className="text-xl sm:text-2xl font-black">{cart.length}</h3>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-xs text-gray-500">{isBangla ? 'কার্ট আইটেম' : 'Cart Items'}</p>
-                    <h3 className="text-xl sm:text-2xl font-black">{cart.length}</h3>
-                  </div>
-                </div>
 
-                <div 
-                  onClick={() => setActiveMenu('wishlist')}
-                  className="bg-white dark:bg-[#112318] p-5 rounded-3xl border border-[#e0ebe2] dark:border-[#1d3b28] shadow-sm flex items-center gap-4 cursor-pointer hover:border-emerald-500/50 transition-all"
-                >
-                  <div className="p-3 bg-blue-100 dark:bg-blue-950 text-blue-800 dark:text-blue-300 rounded-2xl">
-                    <Heart className="w-6 h-6" />
+                  <div 
+                    onClick={() => setActiveMenu('wishlist')}
+                    className="bg-white dark:bg-[#112318] p-5 rounded-3xl border border-[#e0ebe2] dark:border-[#1d3b28] shadow-sm flex items-center gap-4 cursor-pointer hover:border-rose-400/60 dark:hover:border-rose-500/40 transition-all group"
+                  >
+                    <div className="p-3 bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 rounded-2xl group-hover:scale-110 transition-transform">
+                      <Heart className="w-6 h-6 fill-rose-500/20" />
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">{isBangla ? 'পছন্দের তালিকা' : 'Wishlist Items'}</p>
+                      <h3 className="text-xl sm:text-2xl font-black text-gray-900 dark:text-white">{wishlist?.length || 0}</h3>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-xs text-gray-500">{isBangla ? 'উইশলিস্ট পণ্য' : 'Wishlist Items'}</p>
-                    <h3 className="text-xl sm:text-2xl font-black">{wishlistProducts.length}</h3>
-                  </div>
-                </div>
 
-                <div 
-                  onClick={() => setActiveMenu('addresses')}
-                  className="bg-white dark:bg-[#112318] p-5 rounded-3xl border border-[#e0ebe2] dark:border-[#1d3b28] shadow-sm flex items-center gap-4 cursor-pointer hover:border-emerald-500/50 transition-all"
-                >
-                  <div className="p-3 bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300 rounded-2xl">
-                    <MapPin className="w-6 h-6" />
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-500">{isBangla ? 'সেভ করা ঠিকানা' : 'Saved Addresses'}</p>
-                    <h3 className="text-xl sm:text-2xl font-black">{addresses.length}</h3>
+                  <div 
+                    onClick={() => setActiveMenu('addresses')}
+                    className="bg-white dark:bg-[#112318] p-5 rounded-3xl border border-[#e0ebe2] dark:border-[#1d3b28] shadow-sm flex items-center gap-4 cursor-pointer hover:border-emerald-500/50 transition-all"
+                  >
+                    <div className="p-3 bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300 rounded-2xl">
+                      <MapPin className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500">{isBangla ? 'সেভ করা ঠিকানা' : 'Saved Addresses'}</p>
+                      <h3 className="text-xl sm:text-2xl font-black">{addresses.length}</h3>
+                    </div>
                   </div>
                 </div>
-              </div>
+              )}
 
               {/* ======================================================== */}
               {/* 📈 3 INTERACTIVE CUSTOMER CHARTS & VISUALIZATIONS        */}
@@ -1730,29 +1681,203 @@ export default function CustomerDashboardPage() {
           )}
 
           {/* ======================================================== */}
-          {/* ❤️ 6. WISHLIST                                           */}
+          {/* ❤️ 6. WISHLIST (Synced with MongoDB Database)            */}
           {/* ======================================================== */}
           {activeMenu === 'wishlist' && (
-            <div className="bg-white dark:bg-[#112318] rounded-3xl p-6 border border-[#e0ebe2] dark:border-[#1d3b28] shadow-sm space-y-6">
-              <h3 className="text-lg font-black border-b pb-4">{isBangla ? 'আমার পছন্দের তালিকা (Wishlist)' : 'My Wishlist'}</h3>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                {wishlistProducts.map((p) => (
-                  <div key={p.id} className="p-4 rounded-2xl border bg-gray-50 dark:bg-black/20 flex flex-col justify-between">
-                    <img src={p.thumbnail} alt={p.name} className="w-full h-36 object-cover rounded-xl mb-2" />
-                    <h4 className="font-bold text-xs line-clamp-2">{p.name}</h4>
-                    <p className="text-sm font-black text-brand-900 dark:text-secondary mt-1">৳ {p.price}</p>
+            <div className="bg-white dark:bg-[#112318] rounded-3xl p-6 sm:p-8 border border-[#e0ebe2] dark:border-[#1d3b28] shadow-sm space-y-6">
+              
+              {/* Header Bar */}
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-[#e0ebe2] dark:border-[#1d3b28] pb-5">
+                <div>
+                  <h3 className="text-lg sm:text-xl font-black text-gray-900 dark:text-white flex items-center gap-2.5">
+                    <span className="p-2 rounded-xl bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 inline-flex">
+                      <Heart className="w-5 h-5 fill-rose-500/30" />
+                    </span>
+                    <span>{isBangla ? 'আমার পছন্দের তালিকা (Wishlist)' : 'My Saved Wishlist'}</span>
+                  </h3>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    {isBangla 
+                      ? 'আপনার সংরক্ষিত পছন্দের বই ও পণ্যসমূহ এখানে দেখতে এবং সরাসরি অর্ডার করতে পারবেন।' 
+                      : 'Manage your saved wishlist products and easily add them to your cart.'}
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2.5 flex-wrap">
+                  <span className="px-3 py-1 rounded-full bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 text-xs font-black border border-rose-200 dark:border-rose-900/60">
+                    {wishlist?.length || 0} {isBangla ? 'টি পণ্য সংরক্ষিত' : 'items saved'}
+                  </span>
+
+                  {wishlist && wishlist.length > 0 && (
                     <button
+                      type="button"
                       onClick={() => {
-                        addToCart(p, null, 1, true);
-                        showToast(isBangla ? 'কার্টে যোগ করা হয়েছে!' : 'Added to cart!');
+                        let count = 0;
+                        wishlist.forEach(item => {
+                          if (item.stock !== 0) {
+                            addToCart(item, null, 1, false);
+                            count++;
+                          }
+                        });
+                        showToast(isBangla ? `${count}টি পণ্য কার্টে যোগ করা হয়েছে!` : `${count} items added to cart!`);
                       }}
-                      className="mt-3 w-full bg-brand-900 text-white font-bold py-2 rounded-xl text-xs shadow"
+                      className="px-4 py-2 rounded-xl bg-brand-900 hover:bg-brand-800 text-white text-xs font-bold shadow flex items-center gap-1.5 transition-all active:scale-95 dark:bg-emerald-600"
                     >
-                      Add to Cart
+                      <ShoppingCart className="w-3.5 h-3.5" />
+                      <span>{isBangla ? 'সব কার্টে যোগ করুন' : 'Add All to Cart'}</span>
                     </button>
-                  </div>
-                ))}
+                  )}
+                </div>
               </div>
+
+              {/* Wishlist Content */}
+              {isWishlistLoading ? (
+                <div className="py-16 text-center space-y-3">
+                  <RefreshCw className="w-8 h-8 animate-spin mx-auto text-rose-500" />
+                  <p className="text-xs text-gray-500">{isBangla ? 'পছন্দের তালিকা লোড হচ্ছে...' : 'Loading wishlist...'}</p>
+                </div>
+              ) : !wishlist || wishlist.length === 0 ? (
+                /* Empty State */
+                <div className="py-14 px-4 text-center rounded-2xl border-2 border-dashed border-gray-200 dark:border-emerald-950/60 bg-gray-50/50 dark:bg-black/20 space-y-4">
+                  <div className="w-16 h-16 mx-auto rounded-3xl bg-rose-50 dark:bg-rose-950/40 text-rose-500 flex items-center justify-center border border-rose-200 dark:border-rose-900/40 shadow-inner">
+                    <Heart className="w-8 h-8 stroke-[1.5]" />
+                  </div>
+                  <div className="max-w-md mx-auto space-y-1.5">
+                    <h4 className="text-base sm:text-lg font-bold text-gray-900 dark:text-emerald-100">
+                      {isBangla ? 'আপনার পছন্দের তালিকা বর্তমানে সম্পূর্ণ ফাঁকা!' : 'Your Wishlist is Empty!'}
+                    </h4>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
+                      {isBangla
+                        ? 'আপনার পছন্দের বই বা যে কোন পণ্যের ছবির উপরে থাকা হার্ট (❤️) আইকনে ক্লিক করে পছন্দের তালিকায় যুক্ত করে রাখুন।'
+                        : 'Explore products and click the heart icon to save your favorite items here for easy checkout later.'}
+                    </p>
+                  </div>
+                  <Link
+                    href="/products"
+                    className="inline-flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-brand-900 hover:bg-brand-800 text-white font-bold text-xs sm:text-sm shadow-md transition-all active:scale-95 dark:bg-emerald-600"
+                  >
+                    <span>{isBangla ? 'পণ্যসমূহ ব্রাউজ করুন' : 'Browse Products'}</span>
+                    <ArrowRight className="w-4 h-4" />
+                  </Link>
+                </div>
+              ) : (
+                /* Wishlist Cards Grid */
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                  {wishlist.map((p, idx) => {
+                    const itemId = p.id || p._id || p.productId || p.slug;
+                    const prodUrl = `/product/${p.slug || p.id || p._id || p.productId}`;
+                    const isOutOfStock = p.stock === 0 || p.stock_status === 'out_of_stock';
+                    const hasDiscount = p.regularPrice && Number(p.regularPrice) > Number(p.price);
+
+                    return (
+                      <div
+                        key={itemId || idx}
+                        className="group relative rounded-3xl border border-[#e0ebe2] dark:border-[#1d3b28] bg-white dark:bg-[#0d1a12] p-4 flex flex-col justify-between shadow-sm hover:shadow-md hover:border-rose-300 dark:hover:border-rose-900/60 transition-all duration-200"
+                      >
+                        {/* Image Container with Badges & Remove Button */}
+                        <div className="relative w-full h-44 bg-gray-100 dark:bg-black/40 rounded-2xl overflow-hidden mb-3.5">
+                          <Link href={prodUrl} className="block w-full h-full">
+                            <img
+                              src={p.thumbnail || (Array.isArray(p.images) && p.images[0]) || '/placeholder.png'}
+                              alt={p.name}
+                              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                            />
+                          </Link>
+
+                          {/* Stock Badge */}
+                          <div className="absolute top-2.5 left-2.5 flex flex-col gap-1 z-10">
+                            {isOutOfStock ? (
+                              <span className="bg-red-600 text-white text-[10px] font-black px-2 py-0.5 rounded-full shadow">
+                                {isBangla ? 'স্টক শেষ' : 'Out of Stock'}
+                              </span>
+                            ) : (
+                              <span className="bg-emerald-600 text-white text-[10px] font-black px-2 py-0.5 rounded-full shadow">
+                                {isBangla ? 'স্টকে আছে' : 'In Stock'}
+                              </span>
+                            )}
+                            {hasDiscount && (
+                              <span className="bg-rose-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full shadow">
+                                -{Math.round(((p.regularPrice - p.price) / p.regularPrice) * 100)}% {isBangla ? 'ছাড়' : 'OFF'}
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Remove from Wishlist Button */}
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              removeFromWishlist(itemId);
+                            }}
+                            className="absolute top-2.5 right-2.5 p-2 rounded-xl bg-white/90 dark:bg-black/70 backdrop-blur-md text-gray-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-white dark:hover:bg-black transition-all shadow-md z-10"
+                            title={isBangla ? 'পছন্দের তালিকা থেকে সরান' : 'Remove from Wishlist'}
+                            aria-label="Remove from Wishlist"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+
+                        {/* Details */}
+                        <div className="space-y-2 flex-1 flex flex-col justify-between">
+                          <div>
+                            {p.category && (
+                              <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-400">
+                                {p.category}
+                              </span>
+                            )}
+                            <Link href={prodUrl}>
+                              <h4 className="font-bold text-xs sm:text-sm text-gray-900 dark:text-emerald-100 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors line-clamp-2 mt-0.5 leading-snug">
+                                {p.name}
+                              </h4>
+                            </Link>
+                          </div>
+
+                          {/* Price */}
+                          <div className="flex items-baseline gap-2 pt-1 border-t border-gray-100 dark:border-emerald-950/60">
+                            <span className="text-base sm:text-lg font-black text-brand-900 dark:text-emerald-300">
+                              ৳ {p.price}
+                            </span>
+                            {hasDiscount && (
+                              <span className="text-xs text-gray-400 line-through">
+                                ৳ {p.regularPrice}
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Actions */}
+                          <div className="space-y-1.5 pt-2">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                addToCart(p, null, 1, true);
+                                showToast(isBangla ? 'পণ্যটি কার্টে যোগ করা হয়েছে!' : 'Added to cart!');
+                              }}
+                              disabled={isOutOfStock}
+                              className={`w-full py-2.5 px-3 rounded-xl font-bold text-xs shadow flex items-center justify-center gap-1.5 transition-all active:scale-95 ${
+                                isOutOfStock
+                                  ? 'bg-gray-200 dark:bg-gray-800 text-gray-400 cursor-not-allowed'
+                                  : 'bg-brand-900 hover:bg-brand-800 text-white dark:bg-emerald-600'
+                              }`}
+                            >
+                              <ShoppingCart className="w-3.5 h-3.5" />
+                              <span>{isOutOfStock ? (isBangla ? 'স্টক শেষ' : 'Out of Stock') : (isBangla ? 'কার্টে যোগ করুন' : 'Add to Cart')}</span>
+                            </button>
+
+                            <Link
+                              href={prodUrl}
+                              className="w-full text-center block text-[11px] font-bold text-emerald-700 dark:text-emerald-400 hover:underline py-1"
+                            >
+                              {isBangla ? 'বিস্তারিত বিবরণ দেখুন →' : 'View Product Details →'}
+                            </Link>
+                          </div>
+                        </div>
+
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
             </div>
           )}
 
