@@ -67,6 +67,7 @@ import {
   getSellers,
   getSellerProfile,
   updateSellerProfile,
+  updateUserProfile,
   getSupportTickets,
   resolveSupportTicket
 } from '@/lib/api';
@@ -76,7 +77,7 @@ import { useThemeLanguage } from '@/context/ThemeLanguageContext';
 import { DashboardStatsSkeleton } from '@/components/SkeletonLoaders';
 
 export default function SellerDashboardPage() {
-  const { user, logout, showToast } = useCart();
+  const { user, login, logout, showToast } = useCart();
   const { isBangla, theme, toggleTheme } = useThemeLanguage();
 
   const [activeMenu, setActiveMenu] = useState('dashboard'); // Default to 'dashboard'
@@ -461,12 +462,16 @@ export default function SellerDashboardPage() {
 
     setIsSavingSellerProfile(true);
     try {
+      const cleanAvatar = typeof sellerProfileData.avatar === 'string'
+        ? sellerProfileData.avatar.trim()
+        : (sellerProfileData.avatar?.url || sellerProfileData.avatar?.display_url || '');
+
       const userRes = await updateUserProfile({
         userId: user?.id || user?._id,
         name: sellerProfileData.name.trim(),
         email: sellerProfileData.email.trim(),
         phone: sellerProfileData.phone.trim(),
-        avatar: sellerProfileData.avatar,
+        avatar: cleanAvatar,
         address: sellerProfileData.address,
         city: sellerProfileData.city,
         currentPassword: sellerProfileData.currentPassword,
@@ -474,22 +479,34 @@ export default function SellerDashboardPage() {
       });
 
       // Also sync seller name and shop logo in MongoDB
-      await updateSellerProfile({
+      const sellerRes = await updateSellerProfile({
         userId: user?.id || user?._id,
         email: sellerProfileData.email.trim(),
         phone: sellerProfileData.phone.trim(),
         seller_name: sellerProfileData.name.trim(),
         shop_name: sellerProfileData.shop_name || sellerFormData.shop_name,
-        shop_logo: sellerProfileData.avatar || sellerFormData.shop_logo,
+        shop_logo: cleanAvatar || sellerFormData.shop_logo,
+        avatar: cleanAvatar,
       });
 
-      if (userRes?.success !== false) {
-        showToast(isBangla ? '🎉 সেলার প্রোফাইল ও সিকিউরিটি তথ্য সফলভাবে সংরক্ষিত হয়েছে!' : 'Seller profile & security saved successfully to MongoDB!');
-        if (typeof window !== 'undefined' && userRes.user) {
-          localStorage.setItem('gb_user', JSON.stringify(userRes.user));
+      if (userRes?.success !== false || sellerRes?.success) {
+        showToast(isBangla ? '🎉 সেলার প্রোফাইল ও ছবি সফলভাবে MongoDB তে সংরক্ষিত হয়েছে!' : 'Seller profile & photo saved successfully to MongoDB!');
+        const updatedUser = {
+          ...(user || {}),
+          ...(userRes?.user || {}),
+          name: sellerProfileData.name.trim(),
+          phone: sellerProfileData.phone.trim(),
+          avatar: cleanAvatar || userRes?.user?.avatar || user?.avatar,
+        };
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('gb_user', JSON.stringify(updatedUser));
+        }
+        if (login) {
+          login(updatedUser, typeof window !== 'undefined' ? localStorage.getItem('gb_token') : null);
         }
         setSellerProfileData(prev => ({
           ...prev,
+          avatar: cleanAvatar,
           currentPassword: '',
           newPassword: '',
           confirmPassword: '',
@@ -1575,7 +1592,7 @@ export default function SellerDashboardPage() {
                         <input
                           type="url"
                           placeholder="https://i.ibb.co/..."
-                          value={sellerFormData.shop_logo}
+                          value={typeof sellerFormData.shop_logo === 'string' ? sellerFormData.shop_logo : (sellerFormData.shop_logo?.url || '')}
                           onChange={(e) => setSellerFormData({ ...sellerFormData, shop_logo: e.target.value })}
                           className="flex-1 px-4 py-2 bg-white dark:bg-black/40 border border-gray-300 dark:border-emerald-900/70 rounded-2xl text-xs font-semibold focus:outline-none focus:border-brand-900"
                         />
@@ -1585,20 +1602,26 @@ export default function SellerDashboardPage() {
                             type="file"
                             accept="image/*"
                             className="hidden"
+                            disabled={isUploadingLogo}
                             onChange={async (e) => {
                               const file = e.target.files?.[0];
                               if (!file) return;
                               setIsUploadingLogo(true);
                               try {
-                                const url = await uploadToImgBB(file);
-                                if (url) {
-                                  setSellerFormData(prev => ({ ...prev, shop_logo: url }));
+                                const res = await uploadToImgBB(file, `seller_logo_${Date.now()}`);
+                                const directUrl = typeof res === 'string' ? res : (res?.url || res?.display_url || '');
+                                if (res?.success !== false && directUrl) {
+                                  setSellerFormData(prev => ({ ...prev, shop_logo: directUrl }));
+                                  setSellerProfileData(prev => ({ ...prev, avatar: directUrl }));
                                   showToast(isBangla ? 'লোগো ImgBB তে আপলোড সফল!' : 'Logo uploaded to ImgBB!');
+                                } else {
+                                  showToast(res?.message || (isBangla ? 'লোগো আপলোড ব্যর্থ হয়েছে' : 'Logo upload failed'), 'error');
                                 }
                               } catch (err) {
-                                showToast(isBangla ? 'আপলোড ব্যর্থ হয়েছে' : 'Upload failed', 'error');
+                                showToast(err?.message || (isBangla ? 'আপলোড ব্যর্থ হয়েছে' : 'Upload failed'), 'error');
                               } finally {
                                 setIsUploadingLogo(false);
+                                e.target.value = '';
                               }
                             }}
                           />
@@ -1615,7 +1638,7 @@ export default function SellerDashboardPage() {
                         <input
                           type="url"
                           placeholder="https://i.ibb.co/..."
-                          value={sellerFormData.shop_banner}
+                          value={typeof sellerFormData.shop_banner === 'string' ? sellerFormData.shop_banner : (sellerFormData.shop_banner?.url || '')}
                           onChange={(e) => setSellerFormData({ ...sellerFormData, shop_banner: e.target.value })}
                           className="flex-1 px-4 py-2 bg-white dark:bg-black/40 border border-gray-300 dark:border-emerald-900/70 rounded-2xl text-xs font-semibold focus:outline-none focus:border-brand-900"
                         />
@@ -1625,20 +1648,25 @@ export default function SellerDashboardPage() {
                             type="file"
                             accept="image/*"
                             className="hidden"
+                            disabled={isUploadingBanner}
                             onChange={async (e) => {
                               const file = e.target.files?.[0];
                               if (!file) return;
                               setIsUploadingBanner(true);
                               try {
-                                const url = await uploadToImgBB(file);
-                                if (url) {
-                                  setSellerFormData(prev => ({ ...prev, shop_banner: url }));
+                                const res = await uploadToImgBB(file, `seller_banner_${Date.now()}`);
+                                const directUrl = typeof res === 'string' ? res : (res?.url || res?.display_url || '');
+                                if (res?.success !== false && directUrl) {
+                                  setSellerFormData(prev => ({ ...prev, shop_banner: directUrl }));
                                   showToast(isBangla ? 'ব্যানার ImgBB তে আপলোড সফল!' : 'Banner uploaded to ImgBB!');
+                                } else {
+                                  showToast(res?.message || (isBangla ? 'ব্যানার আপলোড ব্যর্থ হয়েছে' : 'Banner upload failed'), 'error');
                                 }
                               } catch (err) {
-                                showToast(isBangla ? 'আপলোড ব্যর্থ হয়েছে' : 'Upload failed', 'error');
+                                showToast(err?.message || (isBangla ? 'আপলোড ব্যর্থ হয়েছে' : 'Upload failed'), 'error');
                               } finally {
                                 setIsUploadingBanner(false);
+                                e.target.value = '';
                               }
                             }}
                           />
@@ -1725,7 +1753,7 @@ export default function SellerDashboardPage() {
                     <div className="relative group">
                       {sellerProfileData.avatar ? (
                         <img
-                          src={sellerProfileData.avatar}
+                          src={typeof sellerProfileData.avatar === 'string' ? sellerProfileData.avatar : (sellerProfileData.avatar?.url || sellerProfileData.avatar?.display_url || '')}
                           alt="Seller Avatar Preview"
                           className="w-24 h-24 rounded-3xl object-cover border-2 border-amber-500 shadow-lg group-hover:brightness-90 transition-all"
                         />
@@ -1747,7 +1775,7 @@ export default function SellerDashboardPage() {
                         <input
                           type="url"
                           placeholder="https://i.ibb.co/..."
-                          value={sellerProfileData.avatar}
+                          value={typeof sellerProfileData.avatar === 'string' ? sellerProfileData.avatar : (sellerProfileData.avatar?.url || '')}
                           onChange={(e) => setSellerProfileData({ ...sellerProfileData, avatar: e.target.value })}
                           className="flex-1 px-4 py-2.5 bg-gray-50 dark:bg-black/40 border border-gray-300 dark:border-emerald-900/70 rounded-2xl text-xs sm:text-sm font-medium focus:outline-none focus:border-amber-500"
                         />
@@ -1764,15 +1792,20 @@ export default function SellerDashboardPage() {
                               if (!file) return;
                               setIsUploadingSellerAvatar(true);
                               try {
-                                const url = await uploadToImgBB(file);
-                                if (url) {
-                                  setSellerProfileData(prev => ({ ...prev, avatar: url }));
+                                const res = await uploadToImgBB(file, `seller_avatar_${Date.now()}`);
+                                const directUrl = typeof res === 'string' ? res : (res?.url || res?.display_url || '');
+                                if (res?.success !== false && directUrl) {
+                                  setSellerProfileData(prev => ({ ...prev, avatar: directUrl }));
+                                  setSellerFormData(prev => ({ ...prev, shop_logo: directUrl }));
                                   showToast(isBangla ? 'প্রোফাইল ছবি সফলভাবে ImgBB তে আপলোড হয়েছে! 🎉' : 'Profile image uploaded to ImgBB!');
+                                } else {
+                                  showToast(res?.message || (isBangla ? 'ছবি আপলোড করতে সমস্যা হয়েছে' : 'Image upload failed'), 'error');
                                 }
                               } catch (err) {
-                                showToast(isBangla ? 'ছবি আপলোড করতে সমস্যা হয়েছে' : 'Image upload failed', 'error');
+                                showToast(err?.message || (isBangla ? 'ছবি আপলোড করতে সমস্যা হয়েছে' : 'Image upload failed'), 'error');
                               } finally {
                                 setIsUploadingSellerAvatar(false);
+                                e.target.value = '';
                               }
                             }}
                           />

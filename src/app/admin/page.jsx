@@ -294,6 +294,55 @@ export default function AdminDashboardPage() {
 
   // State: Edit Product Modal
   const [editingProd, setEditingProd] = useState(null);
+  const [editCustomCategory, setEditCustomCategory] = useState(false);
+  const [addCustomCategory, setAddCustomCategory] = useState(false);
+
+  // Synchronized Categories derived from both categoriesList & productsList
+  const availableCategories = React.useMemo(() => {
+    const map = new Map();
+    (categoriesList || []).forEach(cat => {
+      const name = (cat.name || cat.name_bn || '').trim();
+      if (name) {
+        map.set(name, {
+          id: cat.id || cat._id || cat.slug,
+          _id: cat._id || cat.id,
+          name: name,
+          name_bn: cat.name_bn || name,
+          name_en: cat.name_en || cat.nameEn || '',
+          slug: cat.slug || name.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+          icon: cat.icon || '🏷️'
+        });
+      }
+    });
+    (productsList || []).forEach(p => {
+      const pCat = (p.category || p.category_bn || '').trim();
+      if (pCat && !map.has(pCat)) {
+        map.set(pCat, {
+          id: p.category_id || p.categorySlug || pCat,
+          _id: p.category_id || p.categorySlug || pCat,
+          name: pCat,
+          name_bn: pCat,
+          name_en: p.category_en || p.categorySlug || '',
+          slug: p.categorySlug || pCat.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+          icon: '🏷️'
+        });
+      }
+    });
+    if (map.size === 0) {
+      const defaults = [
+        { name: 'মধু', slug: 'honey', icon: '🍯' },
+        { name: 'ঘি ও বাটার', slug: 'ghee', icon: '🧈' },
+        { name: 'তেল ও ঘানি', slug: 'oil', icon: '🛢️' },
+        { name: 'খেজুর ও ড্রাই ফ্রুটস', slug: 'dates', icon: '🌴' },
+        { name: 'বাদাম ও বীজ', slug: 'nuts-seeds', icon: '🥜' },
+        { name: 'চা ও মশলা', slug: 'tea-spices', icon: '☕' }
+      ];
+      defaults.forEach((d, idx) => {
+        map.set(d.name, { id: idx + 1, _id: idx + 1, name: d.name, name_bn: d.name, slug: d.slug, icon: d.icon });
+      });
+    }
+    return Array.from(map.values());
+  }, [categoriesList, productsList]);
 
   // State: Stock Transfer Modal (Admin Master Stock -> Seller Stock)
   const [stockTransferModal, setStockTransferModal] = useState({
@@ -697,16 +746,34 @@ export default function AdminDashboardPage() {
       return;
     }
     const targetId = editingProd._id || editingProd.id;
-    const selectedCat = categoriesList.find((c) => String(c.id) === String(editingProd.category_id) || c.slug === editingProd.category_id || String(c._id) === String(editingProd.category_id));
-    const prodImg = editingProd.thumbnail || editingProd.images?.[0] || '';
+    const prodImg = editingProd.thumbnail || (Array.isArray(editingProd.images) && editingProd.images[0]) || '';
+
+    // Synchronize category directly from user selection
+    const finalCategory = (editingProd.category || editingProd.category_bn || '').trim() || 'সকল পণ্য';
+    const matchedCat = availableCategories.find(c => 
+      c.name === finalCategory || 
+      c.name_bn === finalCategory || 
+      c.slug === finalCategory ||
+      c.slug === editingProd.categorySlug
+    );
+    const finalCategorySlug = matchedCat ? matchedCat.slug : (editingProd.categorySlug || finalCategory.toLowerCase().replace(/[^a-z0-9]+/g, '-'));
+    const finalCategoryId = matchedCat ? (matchedCat.id || matchedCat._id) : (editingProd.category_id || 1);
 
     const payload = {
       ...editingProd,
+      id: targetId,
       thumbnail: prodImg,
-      images: editingProd.images && editingProd.images.length > 0 ? editingProd.images : (prodImg ? [prodImg] : []),
-      category: selectedCat ? (selectedCat.name || selectedCat.name_bn) : (editingProd.category || 'সকল পণ্য'),
-      categorySlug: selectedCat ? selectedCat.slug : (editingProd.categorySlug || 'all'),
-      category_id: selectedCat ? (selectedCat.id || selectedCat._id) : 1,
+      images: Array.isArray(editingProd.images) && editingProd.images.length > 0 ? editingProd.images : (prodImg ? [prodImg] : []),
+      category: finalCategory,
+      category_bn: finalCategory,
+      category_name: finalCategory,
+      categoryName: finalCategory,
+      category_en: editingProd.category_en || finalCategorySlug,
+      categorySlug: finalCategorySlug,
+      category_slug: finalCategorySlug,
+      category_id: finalCategoryId,
+      categoryId: finalCategoryId,
+      name: editingProd.name,
       name_bn: editingProd.name_bn || editingProd.name,
       name_en: editingProd.name_en || editingProd.nameEn || editingProd.name,
       nameEn: editingProd.name_en || editingProd.nameEn || editingProd.name,
@@ -714,14 +781,54 @@ export default function AdminDashboardPage() {
       regularPrice: Number(editingProd.regularPrice || editingProd.price),
       admin_stock: Number(editingProd.admin_stock !== undefined ? editingProd.admin_stock : (editingProd.adminStock !== undefined ? editingProd.adminStock : 70)),
       adminStock: Number(editingProd.admin_stock !== undefined ? editingProd.admin_stock : (editingProd.adminStock !== undefined ? editingProd.adminStock : 70)),
-      stock_quantity: Number(editingProd.stock_quantity !== undefined ? editingProd.stock_quantity : 0),
-      stock: Number(editingProd.stock_quantity !== undefined ? editingProd.stock_quantity : 0),
+      stock_quantity: Number(editingProd.stock_quantity !== undefined ? editingProd.stock_quantity : (editingProd.stock || 0)),
+      stock: Number(editingProd.stock_quantity !== undefined ? editingProd.stock_quantity : (editingProd.stock || 0)),
+      sku: editingProd.sku || '',
+      description: editingProd.description || '',
     };
+
+    // Optimistic UI update so admin sees category change instantly without waiting
+    setProductsList(prev => prev.map(p => {
+      const isMatch = (p._id && p._id === targetId) || 
+                      (p.id && p.id === targetId) || 
+                      (p.slug && p.slug === targetId) ||
+                      (editingProd._id && p._id === editingProd._id) ||
+                      (editingProd.id && p.id === editingProd.id);
+      if (isMatch) {
+        return {
+          ...p,
+          ...payload,
+          category: finalCategory,
+          category_bn: finalCategory,
+          category_name: finalCategory,
+          categorySlug: finalCategorySlug,
+          category_id: finalCategoryId
+        };
+      }
+      return p;
+    }));
+
+    // Update categoriesList if new category was added
+    setCategoriesList(prev => {
+      const exists = prev.some(c => c.name === finalCategory || c.slug === finalCategorySlug);
+      if (!exists) {
+        return [...prev, {
+          id: finalCategoryId,
+          _id: finalCategoryId,
+          name: finalCategory,
+          name_bn: finalCategory,
+          slug: finalCategorySlug,
+          icon: '🏷️'
+        }];
+      }
+      return prev;
+    });
 
     const res = await updateProduct(targetId, payload);
     if (res?.success !== false) {
-      showToast(isBangla ? 'পণ্য ও স্টক তথ্য সফলভাবে ডাটাবেসে আপডেট হয়েছে!' : 'Product and stock updated successfully in database!');
+      showToast(isBangla ? 'পণ্য ও ক্যাটাগরি সফলভাবে ডাটাবেসে আপডেট হয়েছে!' : 'Product and category updated successfully in database!');
       setEditingProd(null);
+      setEditCustomCategory(false);
       loadAllData();
     } else {
       showToast(res?.message || (isBangla ? 'পণ্য আপডেট করতে সমস্যা হয়েছে' : 'Failed to update product'), 'error');
@@ -872,16 +979,29 @@ export default function AdminDashboardPage() {
       showToast(isBangla ? 'পণ্যের নাম ও মূল্য দিন' : 'Please provide product name and price', 'error');
       return;
     }
-    const selectedCat = categoriesList.find((c) => String(c.id) === String(newProd.category_id) || c.slug === newProd.category_id || String(c._id) === String(newProd.category_id));
+    const catName = (newProd.category || newProd.category_bn || '').trim();
+    const selectedCat = availableCategories.find(
+      (c) => c.name === catName || 
+             c.name_bn === catName || 
+             c.slug === catName ||
+             c.slug === newProd.categorySlug || 
+             String(c.id) === String(newProd.category_id) || 
+             String(c._id) === String(newProd.category_id)
+    );
     const prodImg = newProd.thumbnail || '';
+    const finalCategory = catName || (selectedCat ? (selectedCat.name || selectedCat.name_bn) : 'মধু');
+    const finalCategorySlug = selectedCat ? selectedCat.slug : (newProd.categorySlug || finalCategory.toLowerCase().replace(/[^a-z0-9]+/g, '-'));
+    const finalCategoryId = selectedCat ? (selectedCat.id || selectedCat._id) : 1;
 
     const payload = {
       ...newProd,
       thumbnail: prodImg,
       images: (Array.isArray(newProd.images) && newProd.images.length > 0) ? newProd.images : (prodImg ? [prodImg] : []),
-      category: selectedCat ? (selectedCat.name || selectedCat.name_bn) : 'সকল পণ্য',
-      categorySlug: selectedCat ? selectedCat.slug : 'all',
-      category_id: selectedCat ? (selectedCat.id || selectedCat._id) : 1,
+      category: finalCategory,
+      category_bn: finalCategory,
+      category_en: newProd.category_en || finalCategorySlug,
+      categorySlug: finalCategorySlug,
+      category_id: finalCategoryId,
       name_bn: newProd.name_bn || newProd.name,
       name_en: newProd.name_en || newProd.name,
       nameEn: newProd.name_en || newProd.name,
@@ -901,6 +1021,7 @@ export default function AdminDashboardPage() {
         name: '',
         name_bn: '',
         name_en: '',
+        category: availableCategories[0]?.name || 'মধু',
         category_id: 1,
         price: '',
         regularPrice: '',
@@ -911,6 +1032,7 @@ export default function AdminDashboardPage() {
         description: '',
         is_featured: true,
       });
+      setAddCustomCategory(false);
       setActiveSubTab('all');
       loadAllData();
     } else {
@@ -2912,11 +3034,11 @@ export default function AdminDashboardPage() {
                       className="px-3 py-1.5 text-xs font-bold bg-emerald-50 dark:bg-black/40 text-emerald-900 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800/80 rounded-xl focus:outline-none cursor-pointer shadow-sm hover:bg-emerald-100 transition-colors"
                     >
                       <option value="all">📦 {isBangla ? 'সকল ক্যাটাগরি' : 'All Categories'} ({productsList.length})</option>
-                      {categoriesList.map((cat) => {
-                        const cCount = productsList.filter(p => p.categorySlug === cat.slug || p.category === cat.name || p.category_id === cat.id).length;
+                      {availableCategories.map((cat) => {
+                        const cCount = productsList.filter(p => p.category === cat.name || p.category_bn === cat.name || p.categorySlug === cat.slug || String(p.category_id) === String(cat.id)).length;
                         return (
-                          <option key={cat.id || cat.slug} value={cat.slug || cat.name}>
-                            {cat.icon || '🏷️'} {cat.name || cat.name_bn} ({cCount})
+                          <option key={cat.slug || cat.id} value={cat.name}>
+                            {cat.icon || '🏷️'} {cat.name} ({cCount})
                           </option>
                         );
                       })}
@@ -2994,7 +3116,10 @@ export default function AdminDashboardPage() {
                         if (sName !== selectedSellerFilter) return false;
                       }
                       if (selectedAdminCategoryFilter !== 'all') {
-                        const cMatch = prod.categorySlug === selectedAdminCategoryFilter || prod.category === selectedAdminCategoryFilter || String(prod.category_id) === selectedAdminCategoryFilter;
+                        const cMatch = prod.category === selectedAdminCategoryFilter || 
+                                       prod.category_bn === selectedAdminCategoryFilter || 
+                                       prod.categorySlug === selectedAdminCategoryFilter || 
+                                       String(prod.category_id) === selectedAdminCategoryFilter;
                         if (!cMatch) return false;
                       }
                       return true;
@@ -3014,9 +3139,14 @@ export default function AdminDashboardPage() {
                             <div className="flex gap-3">
                               <img src={prod.thumbnail || prod.images?.[0]} alt={prod.name} className="w-20 h-20 rounded-2xl object-cover border flex-shrink-0" />
                               <div className="flex-1 min-w-0">
-                                <span className="text-[10px] font-bold text-emerald-700 dark:text-emerald-400 uppercase">
-                                  SKU: {prod.sku || 'GB-001'}
-                                </span>
+                                <div className="flex items-center gap-1.5 flex-wrap mb-1">
+                                  <span className="text-[10px] font-bold text-emerald-700 dark:text-emerald-400 uppercase">
+                                    SKU: {prod.sku || 'GB-001'}
+                                  </span>
+                                  <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800">
+                                    🏷️ {prod.category || prod.category_bn || prod.categorySlug || 'সাধারণ পণ্য'}
+                                  </span>
+                                </div>
                                 <h4 className="font-bold text-xs sm:text-sm line-clamp-2 leading-snug">{prod.name}</h4>
                                 <div className="mt-1.5 flex items-baseline gap-2">
                                   <span className="text-base font-black text-brand-900 dark:text-secondary">৳ {prod.price}</span>
@@ -3087,7 +3217,26 @@ export default function AdminDashboardPage() {
 
                             <div className="flex items-center gap-1">
                               <button
-                                onClick={() => setEditingProd(prod)}
+                                onClick={() => {
+                                  const pCat = prod.category || prod.category_bn || '';
+                                  const matchingCat = availableCategories.find(c => 
+                                    c.name === pCat || 
+                                    c.name_bn === pCat || 
+                                    c.slug === prod.categorySlug || 
+                                    String(c.id) === String(prod.category_id) || 
+                                    String(c._id) === String(prod.category_id)
+                                  );
+                                  setEditingProd({
+                                    ...prod,
+                                    category: pCat || (matchingCat ? matchingCat.name : (availableCategories[0]?.name || 'মধু')),
+                                    category_bn: pCat || (matchingCat ? (matchingCat.name_bn || matchingCat.name) : 'মধু'),
+                                    categorySlug: prod.categorySlug || (matchingCat ? matchingCat.slug : 'honey'),
+                                    category_id: prod.category_id || (matchingCat ? (matchingCat.id || matchingCat._id) : 1),
+                                    admin_stock: prod.admin_stock !== undefined ? prod.admin_stock : (prod.adminStock !== undefined ? prod.adminStock : 70),
+                                    stock_quantity: prod.stock_quantity !== undefined ? prod.stock_quantity : (prod.stock !== undefined ? prod.stock : 0),
+                                  });
+                                  setEditCustomCategory(false);
+                                }}
                                 className="p-1.5 text-brand-800 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 rounded-lg transition-colors border border-transparent hover:border-emerald-200 dark:hover:border-emerald-900"
                                 title={isBangla ? 'এডিট করুন' : 'Edit Product'}
                               >
@@ -3140,16 +3289,58 @@ export default function AdminDashboardPage() {
 
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     <div>
-                      <label className="block text-xs font-bold mb-1">Category *</label>
+                      <label className="block text-xs font-bold mb-1">
+                        {isBangla ? 'ক্যাটাগরি নির্বাচন করুন *' : 'Category *'}
+                      </label>
                       <select
-                        value={newProd.category_id}
-                        onChange={(e) => setNewProd({ ...newProd, category_id: Number(e.target.value) })}
-                        className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-black/30 border border-gray-300 dark:border-emerald-900 rounded-xl text-xs sm:text-sm"
+                        value={addCustomCategory ? '__custom__' : (newProd.category || availableCategories[0]?.name || '')}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          if (val === '__custom__') {
+                            setAddCustomCategory(true);
+                          } else {
+                            setAddCustomCategory(false);
+                            const matched = availableCategories.find(c => c.name === val || c.slug === val);
+                            setNewProd({
+                              ...newProd,
+                              category: matched ? matched.name : val,
+                              category_bn: matched ? (matched.name_bn || matched.name) : val,
+                              categorySlug: matched ? matched.slug : val.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+                              category_id: matched ? (matched.id || matched._id) : val
+                            });
+                          }
+                        }}
+                        className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-black/30 border border-gray-300 dark:border-emerald-900 rounded-xl text-xs sm:text-sm font-semibold text-gray-900 dark:text-emerald-100"
                       >
-                        {categoriesList.map((c) => (
-                          <option key={c.id} value={c.id}>{c.name}</option>
+                        {availableCategories.map((c, i) => (
+                          <option key={c.slug || c.id || i} value={c.name}>
+                            {c.icon || '🏷️'} {c.name}
+                          </option>
                         ))}
+                        <option value="__custom__">➕ {isBangla ? 'নতুন ক্যাটাগরি তৈরি করুন...' : 'Add New Category...'}</option>
                       </select>
+
+                      {addCustomCategory && (
+                        <div className="mt-2">
+                          <input
+                            type="text"
+                            placeholder={isBangla ? 'নতুন ক্যাটাগরির নাম লিখুন...' : 'Enter new category name...'}
+                            value={newProd.category || ''}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setNewProd({
+                                ...newProd,
+                                category: val,
+                                category_bn: val,
+                                categorySlug: val.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+                                category_id: val
+                              });
+                            }}
+                            className="w-full px-3 py-2 bg-emerald-50/70 dark:bg-emerald-950/40 border border-emerald-400 dark:border-emerald-600 rounded-xl text-xs sm:text-sm font-bold text-emerald-900 dark:text-emerald-200"
+                            autoFocus
+                          />
+                        </div>
+                      )}
                     </div>
                     <div>
                       <label className="block text-xs font-bold mb-1">Sale Price (৳) *</label>
@@ -3704,7 +3895,10 @@ export default function AdminDashboardPage() {
                         <p className="text-xs text-gray-500">ID: #{editingProd.id || editingProd._id?.slice(-6)}</p>
                       </div>
                       <button
-                        onClick={() => setEditingProd(null)}
+                        onClick={() => {
+                          setEditingProd(null);
+                          setEditCustomCategory(false);
+                        }}
                         className="p-1.5 rounded-xl hover:bg-gray-100 dark:hover:bg-emerald-950 text-gray-500"
                       >
                         <X className="w-5 h-5" />
@@ -3736,16 +3930,66 @@ export default function AdminDashboardPage() {
 
                       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                         <div>
-                          <label className="block text-xs font-bold mb-1">Category *</label>
+                          <label className="block text-xs font-bold mb-1">
+                            {isBangla ? 'ক্যাটাগরি পরিবর্তন করুন *' : 'Change Category *'}
+                          </label>
                           <select
-                            value={editingProd.category_id || 1}
-                            onChange={(e) => setEditingProd({ ...editingProd, category_id: Number(e.target.value) })}
-                            className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-black/30 border border-gray-300 dark:border-emerald-900 rounded-xl text-xs sm:text-sm"
+                            value={editCustomCategory ? '__custom__' : (editingProd.category || editingProd.category_bn || '')}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              if (val === '__custom__') {
+                                setEditCustomCategory(true);
+                              } else {
+                                setEditCustomCategory(false);
+                                const matched = availableCategories.find(c => c.name === val || c.slug === val);
+                                setEditingProd(prev => ({
+                                  ...prev,
+                                  category: val,
+                                  category_bn: matched ? (matched.name_bn || matched.name) : val,
+                                  category_name: val,
+                                  categorySlug: matched ? matched.slug : val.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+                                  category_id: matched ? (matched.id || matched._id) : val
+                                }));
+                              }
+                            }}
+                            className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-black/30 border border-gray-300 dark:border-emerald-900 rounded-xl text-xs sm:text-sm font-semibold text-gray-900 dark:text-emerald-100"
                           >
-                            {categoriesList.map((c) => (
-                              <option key={c.id} value={c.id}>{c.name}</option>
+                            <option value="" disabled>{isBangla ? '-- ক্যাটাগরি বাছাই করুন --' : '-- Select Category --'}</option>
+                            {/* If current product has category not in availableCategories, still display it properly */}
+                            {editingProd.category && !availableCategories.some(c => c.name === editingProd.category) && (
+                              <option value={editingProd.category}>
+                                🏷️ {editingProd.category} ({isBangla ? 'বর্তমান' : 'Current'})
+                              </option>
+                            )}
+                            {availableCategories.map((c, i) => (
+                              <option key={c.slug || c.id || i} value={c.name}>
+                                {c.icon || '🏷️'} {c.name}
+                              </option>
                             ))}
+                            <option value="__custom__">➕ {isBangla ? 'নতুন ক্যাটাগরি তৈরি করুন...' : 'Add New Category...'}</option>
                           </select>
+
+                          {editCustomCategory && (
+                            <div className="mt-2">
+                              <input
+                                type="text"
+                                placeholder={isBangla ? 'নতুন ক্যাটাগরির নাম লিখুন...' : 'Enter new category name...'}
+                                value={editingProd.category || ''}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setEditingProd({
+                                    ...editingProd,
+                                    category: val,
+                                    category_bn: val,
+                                    categorySlug: val.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+                                    category_id: val
+                                  });
+                                }}
+                                className="w-full px-3 py-2 bg-emerald-50/70 dark:bg-emerald-950/40 border border-emerald-400 dark:border-emerald-600 rounded-xl text-xs sm:text-sm font-bold text-emerald-900 dark:text-emerald-200"
+                                autoFocus
+                              />
+                            </div>
+                          )}
                         </div>
                         <div>
                           <label className="block text-xs font-bold mb-1">Sale Price (৳) *</label>
@@ -3829,7 +4073,10 @@ export default function AdminDashboardPage() {
                       <div className="flex items-center justify-end gap-3 pt-3 border-t border-[#e0ebe2] dark:border-[#1d3b28]">
                         <button
                           type="button"
-                          onClick={() => setEditingProd(null)}
+                          onClick={() => {
+                            setEditingProd(null);
+                            setEditCustomCategory(false);
+                          }}
                           className="px-5 py-2.5 rounded-xl border border-gray-300 dark:border-emerald-900 text-xs font-bold hover:bg-gray-100 dark:hover:bg-black/40"
                         >
                           {isBangla ? 'বাতিল' : 'Cancel'}
