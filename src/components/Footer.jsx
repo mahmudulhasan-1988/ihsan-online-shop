@@ -105,11 +105,11 @@ export default function Footer() {
                   🛒 {t('allProducts')}
                 </Link>
               </li>
-              <li>
+              {/* <li>
                 <Link href="/admin" className="hover:text-secondary transition-colors">
                   🛠️ {t('adminPanel')}
                 </Link>
-              </li>
+              </li> */}
               <li>
                 <span className="text-gray-400">🚚 {t('freeDelivery')}</span>
               </li>
@@ -128,11 +128,11 @@ export default function Footer() {
               {isBangla ? 'যোগাযোগ ও হটলাইন' : 'Contact & Support'}
             </h4>
 
-            <a href="tel:09613827282" className="flex items-start gap-3 p-3 bg-[#112417] rounded-2xl border border-[#1d3d28] hover:border-secondary transition-colors">
+            <a href="tel:09611-562080" className="flex items-start gap-3 p-3 bg-[#112417] rounded-2xl border border-[#1d3d28] hover:border-secondary transition-colors">
               <PhoneCall className="w-5 h-5 text-secondary flex-shrink-0 mt-0.5" />
               <div>
                 <p className="text-xs text-gray-400">{isBangla ? 'হটলাইন (সকাল ৯টা - রাত ১০টা)' : 'Hotline (9 AM - 10 PM)'}</p>
-                <p className="text-sm font-bold text-white">09613-827282</p>
+                <p className="text-sm font-bold text-white">09611-562080</p>
               </div>
             </a>
 

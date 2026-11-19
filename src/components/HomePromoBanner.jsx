@@ -34,11 +34,11 @@ export default function HomePromoBanner() {
             {isBangla ? 'এখনই অর্ডার করুন' : 'Shop All Products'}
           </Link>
           <a
-            href="tel:09613827282"
+            href="tel:09611-562080"
             className="bg-secondary hover:bg-gold-600 text-brand-950 font-black px-6 py-3.5 rounded-2xl text-xs sm:text-sm shadow-md transition-all flex items-center justify-center gap-1.5"
           >
             <PhoneCall className="w-4 h-4" />
-            <span>09613-827282</span>
+            <span>09611-562080</span>
           </a>
         </div>
 
