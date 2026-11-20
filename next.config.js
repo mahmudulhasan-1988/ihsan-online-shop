@@ -13,6 +13,8 @@ const nextConfig = {
       'i.ibb.co',
       'ibb.co',
       'api.imgbb.com',
+      'lh3.googleusercontent.com',
+      'avatars.githubusercontent.com',
     ],
     remotePatterns: [
       {

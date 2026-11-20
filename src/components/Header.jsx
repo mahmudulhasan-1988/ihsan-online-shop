@@ -391,16 +391,27 @@ export default function Header() {
               {user ? (
                 <>
                   <div className="flex items-center gap-1.5 sm:gap-2 cursor-pointer bg-[#f4f7f4] dark:bg-[#14291d] p-1.5 sm:px-3 sm:py-2 rounded-xl sm:rounded-2xl border border-gray-200 dark:border-[#254933] hover:bg-gray-100 dark:hover:bg-[#1b3627] transition-all">
-                    {user.avatar ? (
-                      <img src={user.avatar} alt={user.name} className="w-6 h-6 sm:w-7 sm:h-7 rounded-full object-cover shadow-sm border border-emerald-500/30" />
-                    ) : (
-                      <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-brand-800 dark:bg-emerald-600 text-white flex items-center justify-center text-xs font-bold shadow-sm">
-                        {user.name?.charAt(0) || 'U'}
-                      </div>
-                    )}
+                    {(user.avatar || user.image) ? (
+                      <img 
+                        src={user.avatar || user.image} 
+                        alt={user.name || 'User'} 
+                        referrerPolicy="no-referrer"
+                        className="w-6 h-6 sm:w-7 sm:h-7 rounded-full object-cover shadow-sm border border-emerald-500/30" 
+                        onError={(e) => {
+                          e.target.style.display = 'none';
+                          if (e.target.nextSibling) e.target.nextSibling.style.display = 'flex';
+                        }}
+                      />
+                    ) : null}
+                    <div 
+                      style={{ display: (user.avatar || user.image) ? 'none' : 'flex' }}
+                      className="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-brand-800 dark:bg-emerald-600 text-white items-center justify-center text-xs font-bold shadow-sm"
+                    >
+                      {user.name?.charAt(0) || 'U'}
+                    </div>
                     <div className="hidden sm:flex flex-col items-start leading-none">
                       <span className="text-xs font-semibold text-gray-800 dark:text-gray-200 max-w-[90px] truncate">
-                        {user.name}
+                        {user.name || 'User'}
                       </span>
                       <span className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded-full mt-0.5 ${user.role === 'admin'
                         ? 'bg-purple-600 text-white'

@@ -49,6 +49,94 @@ export const auth = betterAuth({
   database: mongodbAdapter(db, {
     client,
   }),
+  databaseHooks: {
+    user: {
+      create: {
+        before: async (userData) => {
+          const photo = userData.image || userData.avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=200&q=80';
+          return {
+            data: {
+              ...userData,
+              avatar: photo,
+              image: photo,
+              role: userData.role || 'customer',
+              status: 'active',
+            }
+          };
+        },
+        after: async (createdUser) => {
+          try {
+            if (db && createdUser?.email) {
+              const photo = createdUser.avatar || createdUser.image || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=200&q=80';
+              await db.collection('users').updateOne(
+                { email: createdUser.email.toLowerCase().trim() },
+                {
+                  $set: {
+                    name: createdUser.name,
+                    email: createdUser.email.toLowerCase().trim(),
+                    avatar: photo,
+                    image: photo,
+                    role: createdUser.role || 'customer',
+                    status: 'active',
+                    emailVerified: Boolean(createdUser.emailVerified),
+                    updatedAt: new Date(),
+                  },
+                  $setOnInsert: {
+                    phone: createdUser.phone || '',
+                    address: '',
+                    createdAt: new Date(),
+                    isBlocked: false,
+                  }
+                },
+                { upsert: true }
+              );
+            }
+          } catch (e) {
+            console.error('Error syncing Google user to MongoDB users collection:', e);
+          }
+        }
+      }
+    },
+    session: {
+      create: {
+        after: async (session) => {
+          try {
+            if (db && session?.userId) {
+              const u = (await db.collection('user').findOne({ id: session.userId })) ||
+                        (await db.collection('user').findOne({ _id: session.userId })) ||
+                        (await db.collection('users').findOne({ id: session.userId }));
+              if (u && u.email) {
+                const photo = u.avatar || u.image || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=200&q=80';
+                await db.collection('users').updateOne(
+                  { email: u.email.toLowerCase().trim() },
+                  {
+                    $set: {
+                      name: u.name,
+                      email: u.email.toLowerCase().trim(),
+                      avatar: photo,
+                      image: photo,
+                      role: u.role || 'customer',
+                      status: 'active',
+                      updatedAt: new Date(),
+                    },
+                    $setOnInsert: {
+                      phone: u.phone || '',
+                      address: '',
+                      createdAt: new Date(),
+                      isBlocked: false,
+                    }
+                  },
+                  { upsert: true }
+                );
+              }
+            }
+          } catch (e) {
+            console.error('Error in session create hook:', e);
+          }
+        }
+      }
+    }
+  },
   emailAndPassword: {
     enabled: true,
   },

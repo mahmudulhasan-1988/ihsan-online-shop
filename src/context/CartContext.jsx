@@ -10,6 +10,7 @@ import {
   removeFromWishlist as apiRemoveFromWishlist
 } from '@/lib/api';
 import { trackIncompleteOrder } from '@/lib/incompleteTracker';
+import { authClient } from '@/lib/auth-client';
 
 const CartContext = createContext();
 
@@ -57,6 +58,55 @@ export function CartProvider({ children }) {
     } catch (e) {
       console.error('Error loading cart/user/wishlist from storage', e);
     }
+  }, []);
+
+  // Synchronize Better Auth (e.g. Google OAuth) session with CartContext, Header & MongoDB
+  useEffect(() => {
+    let isMounted = true;
+    const syncBetterAuthSession = async () => {
+      try {
+        if (!authClient || typeof authClient.getSession !== 'function') return;
+        const sessionRes = await authClient.getSession();
+        const sessionUser = sessionRes?.data?.user;
+
+        if (isMounted && sessionUser) {
+          const userAvatar = sessionUser.avatar || sessionUser.image || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=200&q=80';
+          const normalizedUser = {
+            id: sessionUser.id || sessionUser._id,
+            _id: sessionUser.id || sessionUser._id,
+            name: sessionUser.name || 'Google User',
+            email: sessionUser.email || '',
+            phone: sessionUser.phone || '',
+            avatar: userAvatar,
+            image: userAvatar,
+            role: sessionUser.role || 'customer',
+            status: sessionUser.status || 'active',
+          };
+
+          setUser(prev => {
+            const merged = {
+              ...(prev || {}),
+              ...normalizedUser,
+              name: prev?.name || normalizedUser.name,
+              avatar: normalizedUser.avatar || prev?.avatar,
+              phone: prev?.phone || normalizedUser.phone,
+            };
+            try {
+              localStorage.setItem('gb_user', JSON.stringify(merged));
+              if (sessionRes?.data?.session?.token) {
+                localStorage.setItem('gb_token', sessionRes.data.session.token);
+              }
+            } catch (storageErr) {}
+            return merged;
+          });
+        }
+      } catch (err) {
+        // Ignored in offline or server environments
+      }
+    };
+
+    syncBetterAuthSession();
+    return () => { isMounted = false; };
   }, []);
 
   // Fetch & Sync user Wishlist from MongoDB on login
@@ -342,7 +392,7 @@ export function CartProvider({ children }) {
     showToast(`স্বাগতম, ${userData.name}!`);
   };
 
-  const logout = () => {
+  const logout = async () => {
     if (user) {
       sendUserOffline({
         userId: user.id || user._id,
@@ -350,6 +400,11 @@ export function CartProvider({ children }) {
         phone: user.phone,
       });
     }
+    try {
+      if (authClient && typeof authClient.signOut === 'function') {
+        await authClient.signOut();
+      }
+    } catch (e) {}
     setUser(null);
     localStorage.removeItem('gb_user');
     localStorage.removeItem('gb_token');
