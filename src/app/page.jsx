@@ -58,13 +58,29 @@ const CATEGORY_METADATA = {
     subtitle: 'তাজা ও উন্নত উপাদানে প্রস্তুত সুস্বাদু কেক, পেস্ট্রি ও বেকরি খাবার',
     subtitleEn: 'Delicious freshly baked artisan cakes and delightful confectionery'
   },
+  'computer-camera-accessories': {
+    coverImage: 'https://images.unsplash.com/photo-1527864550417-7fd91fc51a46?auto=format&fit=crop&w=1200&q=80',
+    icon: '💻📷',
+    badge: 'কম্পিউটার ও ক্যামেরা অ্যাকসেসরিজ',
+    badgeEn: 'COMPUTER & CAMERA ACCESSORIES',
+    subtitle: 'হাই-পারফর্মেন্স কম্পিউটার পেরিফেরালস, ডিজিটাল ক্যামেরা ও গেমিং গ্যাজেটস',
+    subtitleEn: 'High-performance computer peripherals, camera gear, and modern gadgets'
+  },
   'computer-accessories': {
     coverImage: 'https://images.unsplash.com/photo-1527864550417-7fd91fc51a46?auto=format&fit=crop&w=1200&q=80',
-    icon: '💻',
-    badge: 'কম্পিউটার ও গেমিং',
-    badgeEn: 'TECH & GAMING',
-    subtitle: 'হাই-পারফর্মেন্স ওয়্যারলেস গেমিং কন্ট্রোলার, কিবোর্ড ও কম্পিউটার গ্যাজেটস',
-    subtitleEn: 'High-performance wireless controllers, keyboards, and computer peripherals'
+    icon: '💻📷',
+    badge: 'কম্পিউটার ও ক্যামেরা অ্যাকসেসরিজ',
+    badgeEn: 'COMPUTER & CAMERA ACCESSORIES',
+    subtitle: 'হাই-পারফর্মেন্স কম্পিউটার পেরিফেরালস, ডিজিটাল ক্যামেরা ও গেমিং গ্যাজেটস',
+    subtitleEn: 'High-performance computer peripherals, camera gear, and modern gadgets'
+  },
+  'handmade-products': {
+    coverImage: 'https://images.unsplash.com/photo-1513519245088-0e12902e5a38?auto=format&fit=crop&w=1200&q=80',
+    icon: '🎨',
+    badge: 'হস্তশিল্প ও হ্যান্ডমেড পণ্য',
+    badgeEn: 'HANDMADE PRODUCTS',
+    subtitle: 'নিখুঁত কারুকাজ ও ঐতিহ্যের ছোঁয়ায় তৈরি খাঁটি দেশীয় হস্তশিল্প সম্ভার',
+    subtitleEn: 'Authentic handmade crafts, traditional artisan creations, and lifestyle decor'
   },
   'mobile-accessories': {
     coverImage: 'https://images.unsplash.com/photo-1584438784894-089d6a62b8fa?auto=format&fit=crop&w=1200&q=80',

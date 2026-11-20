@@ -162,18 +162,26 @@ function ProductsContent() {
     { id: 4, name: 'খেজুর ও বাদাম', nameEn: 'Dates & Nuts', slug: 'dates-nuts', icon: '🥜' },
     { id: 5, name: 'অর্গানিক মসলা', nameEn: 'Organic Spices', slug: 'organic-spices', icon: '🌶️' },
     { id: 6, name: 'স্বাস্থ্যকর চাল ও ডাল', nameEn: 'Healthy Rice & Grains', slug: 'rice-grains', icon: '🌾' },
+    { id: 7, name: 'পোশাক ও ফ্যাশন', nameEn: 'Fashion & Clothing', slug: 'fashion', icon: '👗' },
+    { id: 8, name: 'বেকরি ও কেক', nameEn: 'Bakery & Cake', slug: 'bakery-cake', icon: '🎂' },
+    { id: 9, name: 'কম্পিউটার ও ক্যামেরা অ্যাকসেসরিজ', nameEn: 'Computer & Camera Accessories', slug: 'computer-camera-accessories', icon: '💻📷' },
+    { id: 10, name: 'মোবাইল এক্সেসরিজ', nameEn: 'Mobile Accessories', slug: 'mobile-accessories', icon: '📱' },
+    { id: 11, name: 'ইলেকট্রনিক এক্সেসরিজ', nameEn: 'Electronic Accessories', slug: 'electronic-accessories', icon: '🔌' },
+    { id: 12, name: 'হস্তশিল্প ও হ্যান্ডমেড পণ্য', nameEn: 'Handmade Products', slug: 'handmade-products', icon: '🎨' },
   ], []);
 
   const allCategoriesList = useMemo(() => {
     if (!categories || categories.length === 0) return defaultCategoryList;
     const items = [{ id: 'all', name: 'সকল পণ্য', nameEn: 'All Products', slug: 'all', icon: '🛒' }];
     categories.forEach(c => {
+      const rawSlug = c.slug || c.categorySlug || String(c.id);
+      const isComputerOld = rawSlug === 'computer-accessories' || (c.name_en && c.name_en.toLowerCase() === 'computer accessories');
       items.push({
-        id: c.id || c._id || c.slug,
-        name: c.name || c.name_bn,
-        nameEn: c.name_en || c.nameEn || c.name,
-        slug: c.slug || c.categorySlug || String(c.id),
-        icon: c.icon || '🌿'
+        id: c.id || c._id || (isComputerOld ? 'computer-camera-accessories' : rawSlug),
+        name: isComputerOld ? 'কম্পিউটার ও ক্যামেরা অ্যাকসেসরিজ' : (c.name || c.name_bn),
+        nameEn: isComputerOld ? 'Computer & Camera Accessories' : (c.name_en || c.nameEn || c.name),
+        slug: isComputerOld ? 'computer-camera-accessories' : rawSlug,
+        icon: isComputerOld ? '💻📷' : (c.icon || '🏷️')
       });
     });
     return items;

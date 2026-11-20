@@ -303,19 +303,25 @@ export default function AdminDashboardPage() {
     (categoriesList || []).forEach(cat => {
       const name = (cat.name || cat.name_bn || '').trim();
       if (name) {
-        map.set(name, {
-          id: cat.id || cat._id || cat.slug,
-          _id: cat._id || cat.id,
-          name: name,
-          name_bn: cat.name_bn || name,
-          name_en: cat.name_en || cat.nameEn || '',
-          slug: cat.slug || name.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
-          icon: cat.icon || '🏷️'
+        const isComputerOld = cat.slug === 'computer-accessories' || (cat.name_en && cat.name_en.toLowerCase() === 'computer accessories') || name === 'Computer Accessories' || name === 'কম্পিউটার এক্সেসরিজ';
+        const finalName = isComputerOld ? 'কম্পিউটার ও ক্যামেরা অ্যাকসেসরিজ' : name;
+        const finalSlug = isComputerOld ? 'computer-camera-accessories' : (cat.slug || name.toLowerCase().replace(/[^a-z0-9]+/g, '-'));
+        map.set(finalName, {
+          id: cat.id || cat._id || (isComputerOld ? 9 : finalSlug),
+          _id: cat._id || cat.id || (isComputerOld ? 9 : finalSlug),
+          name: finalName,
+          name_bn: isComputerOld ? 'কম্পিউটার ও ক্যামেরা অ্যাকসেসরিজ' : (cat.name_bn || name),
+          name_en: isComputerOld ? 'Computer & Camera Accessories' : (cat.name_en || cat.nameEn || ''),
+          slug: finalSlug,
+          icon: isComputerOld ? '💻📷' : (cat.icon || '🏷️')
         });
       }
     });
     (productsList || []).forEach(p => {
-      const pCat = (p.category || p.category_bn || '').trim();
+      let pCat = (p.category || p.category_bn || '').trim();
+      if (pCat === 'Computer Accessories' || pCat === 'কম্পিউটার এক্সেসরিজ' || p.categorySlug === 'computer-accessories') {
+        pCat = 'কম্পিউটার ও ক্যামেরা অ্যাকসেসরিজ';
+      }
       if (pCat && !map.has(pCat)) {
         map.set(pCat, {
           id: p.category_id || p.categorySlug || pCat,
@@ -324,18 +330,43 @@ export default function AdminDashboardPage() {
           name_bn: pCat,
           name_en: p.category_en || p.categorySlug || '',
           slug: p.categorySlug || pCat.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
-          icon: '🏷️'
+          icon: pCat === 'কম্পিউটার ও ক্যামেরা অ্যাকসেসরিজ' ? '💻📷' : (pCat === 'হস্তশিল্প ও হ্যান্ডমেড পণ্য' ? '🎨' : '🏷️')
         });
       }
     });
+    // Ensure essential categories are present
+    if (!map.has('কম্পিউটার ও ক্যামেরা অ্যাকসেসরিজ')) {
+      map.set('কম্পিউটার ও ক্যামেরা অ্যাকসেসরিজ', {
+        id: 9,
+        _id: 9,
+        name: 'কম্পিউটার ও ক্যামেরা অ্যাকসেসরিজ',
+        name_bn: 'কম্পিউটার ও ক্যামেরা অ্যাকসেসরিজ',
+        name_en: 'Computer & Camera Accessories',
+        slug: 'computer-camera-accessories',
+        icon: '💻📷'
+      });
+    }
+    if (!map.has('হস্তশিল্প ও হ্যান্ডমেড পণ্য')) {
+      map.set('হস্তশিল্প ও হ্যান্ডমেড পণ্য', {
+        id: 12,
+        _id: 12,
+        name: 'হস্তশিল্প ও হ্যান্ডমেড পণ্য',
+        name_bn: 'হস্তশিল্প ও হ্যান্ডমেড পণ্য',
+        name_en: 'Handmade Products',
+        slug: 'handmade-products',
+        icon: '🎨'
+      });
+    }
     if (map.size === 0) {
       const defaults = [
-        { name: 'মধু', slug: 'honey', icon: '🍯' },
-        { name: 'ঘি ও বাটার', slug: 'ghee', icon: '🧈' },
-        { name: 'তেল ও ঘানি', slug: 'oil', icon: '🛢️' },
-        { name: 'খেজুর ও ড্রাই ফ্রুটস', slug: 'dates', icon: '🌴' },
+        { name: 'খাঁটি মধু', slug: 'pure-honey', icon: '🍯' },
+        { name: 'ঘি ও বাটার', slug: 'pure-ghee', icon: '🧈' },
+        { name: 'তেল ও ঘানি', slug: 'mustard-oil', icon: '🛢️' },
+        { name: 'খেজুর ও ড্রাই ফ্রুটস', slug: 'dates-nuts', icon: '🌴' },
         { name: 'বাদাম ও বীজ', slug: 'nuts-seeds', icon: '🥜' },
-        { name: 'চা ও মশলা', slug: 'tea-spices', icon: '☕' }
+        { name: 'চা ও মশলা', slug: 'organic-spices', icon: '☕' },
+        { name: 'কম্পিউটার ও ক্যামেরা অ্যাকসেসরিজ', slug: 'computer-camera-accessories', icon: '💻📷' },
+        { name: 'হস্তশিল্প ও হ্যান্ডমেড পণ্য', slug: 'handmade-products', icon: '🎨' }
       ];
       defaults.forEach((d, idx) => {
         map.set(d.name, { id: idx + 1, _id: idx + 1, name: d.name, name_bn: d.name, slug: d.slug, icon: d.icon });

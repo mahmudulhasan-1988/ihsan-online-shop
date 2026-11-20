@@ -157,8 +157,24 @@ export default function SellerDashboardPage() {
   const [withdrawAmount, setWithdrawAmount] = useState('');
   const [withdrawAccount, setWithdrawAccount] = useState('');
 
+  // Default Canonical Categories for Seller Dashboard
+  const DEFAULT_SELLER_CATEGORIES = [
+    { id: 1, name: 'খাঁটি মধু', name_bn: 'খাঁটি মধু', name_en: 'Pure Honey', slug: 'pure-honey', icon: '🍯' },
+    { id: 2, name: 'সরিষার তেল', name_bn: 'সরিষার তেল', name_en: 'Mustard Oil', slug: 'mustard-oil', icon: '🛢️' },
+    { id: 3, name: 'খাঁটি গাওয়া ঘি', name_bn: 'খাঁটি গাওয়া ঘি', name_en: 'Pure Cow Ghee', slug: 'pure-ghee', icon: '🧈' },
+    { id: 4, name: 'খেজুর ও বাদাম', name_bn: 'খেজুর ও বাদাম', name_en: 'Dates & Nuts', slug: 'dates-nuts', icon: '🥜' },
+    { id: 5, name: 'অর্গানিক মসলা', name_bn: 'অর্গানিক মসলা', name_en: 'Organic Spices', slug: 'organic-spices', icon: '🌶️' },
+    { id: 6, name: 'স্বাস্থ্যকর চাল ও ডাল', name_bn: 'স্বাস্থ্যকর চাল ও ডাল', name_en: 'Healthy Rice & Grains', slug: 'rice-grains', icon: '🌾' },
+    { id: 7, name: 'পোশাক ও ফ্যাশন', name_bn: 'পোশাক ও ফ্যাশন', name_en: 'Fashion & Clothing', slug: 'fashion', icon: '👗' },
+    { id: 8, name: 'বেকরি ও কেক', name_bn: 'বেকরি ও কেক', name_en: 'Bakery & Cake', slug: 'bakery-cake', icon: '🎂' },
+    { id: 9, name: 'কম্পিউটার ও ক্যামেরা অ্যাকসেসরিজ', name_bn: 'কম্পিউটার ও ক্যামেরা অ্যাকসেসরিজ', name_en: 'Computer & Camera Accessories', slug: 'computer-camera-accessories', icon: '💻📷' },
+    { id: 10, name: 'মোবাইল এক্সেসরিজ', name_bn: 'মোবাইল এক্সেসরিজ', name_en: 'Mobile Accessories', slug: 'mobile-accessories', icon: '📱' },
+    { id: 11, name: 'ইলেকট্রনিক এক্সেসরিজ', name_bn: 'ইলেকট্রনিক এক্সেসরিজ', name_en: 'Electronic Accessories', slug: 'electronic-accessories', icon: '🔌' },
+    { id: 12, name: 'হস্তশিল্প ও হ্যান্ডমেড পণ্য', name_bn: 'হস্তশিল্প ও হ্যান্ডমেড পণ্য', name_en: 'Handmade Products', slug: 'handmade-products', icon: '🎨' },
+  ];
+
   // Categories & Enhanced Product States
-  const [categoriesList, setCategoriesList] = useState([]);
+  const [categoriesList, setCategoriesList] = useState(DEFAULT_SELLER_CATEGORIES);
   const [selectedCategoryFilter, setSelectedCategoryFilter] = useState('all');
   const [productSearchQuery, setProductSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
@@ -288,7 +304,28 @@ export default function SellerDashboardPage() {
       setMyOrders(ordRes?.data || []);
       setMyWithdrawals(withRes?.data || []);
       setMyReviews(revRes?.data || []);
-      setCategoriesList(catRes?.data || []);
+      if (Array.isArray(catRes?.data) && catRes.data.length > 0) {
+        const catMap = new Map();
+        DEFAULT_SELLER_CATEGORIES.forEach(c => catMap.set(c.slug, c));
+        catRes.data.forEach(c => {
+          if (c && c.slug) {
+            const rawSlug = c.slug;
+            const isComputerOld = rawSlug === 'computer-accessories' || (c.name_en && c.name_en.toLowerCase() === 'computer accessories');
+            const finalSlug = isComputerOld ? 'computer-camera-accessories' : rawSlug;
+            catMap.set(finalSlug, {
+              id: c.id || c._id || (isComputerOld ? 9 : finalSlug),
+              name: isComputerOld ? 'কম্পিউটার ও ক্যামেরা অ্যাকসেসরিজ' : (c.name || c.name_bn),
+              name_bn: isComputerOld ? 'কম্পিউটার ও ক্যামেরা অ্যাকসেসরিজ' : (c.name_bn || c.name),
+              name_en: isComputerOld ? 'Computer & Camera Accessories' : (c.name_en || c.nameEn || ''),
+              slug: finalSlug,
+              icon: isComputerOld ? '💻📷' : (c.icon || '🏷️')
+            });
+          }
+        });
+        setCategoriesList(Array.from(catMap.values()));
+      } else {
+        setCategoriesList(DEFAULT_SELLER_CATEGORIES);
+      }
 
       if (sellerProfileRes?.data) {
         const sData = sellerProfileRes.data;
@@ -715,7 +752,7 @@ export default function SellerDashboardPage() {
       seller_name_bn: product.seller_name_bn || product.seller_name || product.shop_name || sellerInfo.shop_name || 'সুন্দরবন অর্গানিক ফার্মস',
       seller_name_en: product.seller_name_en || product.sellerName || product.shop_name_en || 'Sundarban Organic Farms',
       category: product.category || product.category_name || 'খাঁটি মধু',
-      categorySlug: product.categorySlug || 'pure-honey',
+      categorySlug: product.categorySlug === 'computer-accessories' ? 'computer-camera-accessories' : (product.categorySlug || 'pure-honey'),
       price: product.price || 0,
       regularPrice: product.regularPrice || product.regular_price || product.price || 0,
       stock_quantity: product.stock_quantity ?? product.stock ?? 50,
@@ -776,6 +813,7 @@ export default function SellerDashboardPage() {
         category: catName,
         category_name: catName,
         categorySlug: catSlug,
+        category_id: catId,
         price: salePrice,
         regularPrice: regPrice,
         regular_price: regPrice,
@@ -2108,7 +2146,7 @@ export default function SellerDashboardPage() {
                         >
                           {categoriesList.map((cat) => (
                             <option key={cat.id || cat.slug} value={cat.slug}>
-                              {cat.icon || '🏷️'} {cat.name || cat.name_bn}
+                              {cat.icon || '🏷️'} {cat.name || cat.name_bn}{cat.name_en ? ` (${cat.name_en})` : ''}
                             </option>
                           ))}
                         </select>
@@ -2838,7 +2876,7 @@ export default function SellerDashboardPage() {
                         <div>
                           <label className="block font-bold mb-1">{isBangla ? 'ক্যাটাগরি *' : 'Category *'}</label>
                           <select
-                            value={editingProduct.categorySlug}
+                            value={editingProduct.categorySlug === 'computer-accessories' ? 'computer-camera-accessories' : editingProduct.categorySlug}
                             onChange={(e) => {
                               const s = e.target.value;
                               const c = categoriesList.find(x => x.slug === s);
@@ -2846,6 +2884,7 @@ export default function SellerDashboardPage() {
                                 ...editingProduct,
                                 categorySlug: s,
                                 category: c ? (c.name || c.name_bn) : s,
+                                category_name: c ? (c.name || c.name_bn) : s,
                                 category_id: c ? (c.id || c._id) : 1
                               });
                             }}
@@ -2853,7 +2892,7 @@ export default function SellerDashboardPage() {
                           >
                             {categoriesList.map((cat) => (
                               <option key={cat.id || cat.slug} value={cat.slug}>
-                                {cat.icon || '🏷️'} {cat.name || cat.name_bn}
+                                {cat.icon || '🏷️'} {cat.name || cat.name_bn}{cat.name_en ? ` (${cat.name_en})` : ''}
                               </option>
                             ))}
                           </select>
