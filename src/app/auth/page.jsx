@@ -148,10 +148,15 @@ export default function AuthPage() {
       setLoading(true);
       // Attempt Better Auth Social Sign In
       if (signIn && typeof signIn.social === 'function') {
-        await signIn.social({
+        const callbackUrl = typeof window !== 'undefined' ? `${window.location.origin}/` : '/';
+        const res = await signIn.social({
           provider: 'google',
-          callbackURL: window.location.origin + '/',
+          callbackURL: callbackUrl,
         });
+        if (res?.error) {
+          console.error('Google sign-in response error:', res.error);
+          showToast(res.error.message || (isBangla ? 'Google লগইন সম্পন্ন করা যায়নি' : 'Google login could not be completed'), 'error');
+        }
       } else {
         // Fallback demo simulation
         const googleUser = {
