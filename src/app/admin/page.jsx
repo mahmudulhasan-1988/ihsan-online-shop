@@ -133,6 +133,30 @@ import { useCart } from '@/context/CartContext';
 import { useThemeLanguage } from '@/context/ThemeLanguageContext';
 import { DashboardStatsSkeleton, TableSkeleton, GlobalSpinner } from '@/components/SkeletonLoaders';
 
+const getSellerAvatar = (seller) => {
+  const av = seller?.shop_logo || seller?.avatar || seller?.image;
+  if (
+    av &&
+    typeof av === 'string' &&
+    !av.includes('unsplash.com/photo-1542838132') &&
+    !av.includes('unsplash.com/photo-1535713875002') &&
+    !av.includes('placeholder') &&
+    av.trim() !== ''
+  ) {
+    return av.trim();
+  }
+  return null;
+};
+
+const getSellerInitials = (seller) => {
+  const name = seller?.shop_name || seller?.seller_name || seller?.name || 'Store';
+  const clean = name.replace(/[^\w\s\u0980-\u09FF]/gi, '').trim();
+  if (!clean) return '🏪';
+  const parts = clean.split(/\s+/).filter(Boolean);
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+};
+
 export default function AdminDashboardPage() {
   const router = useRouter();
   const { user, logout, showToast } = useCart();
@@ -397,6 +421,7 @@ export default function AdminDashboardPage() {
 
   // State: Add User Modal
   const [isAddUserModalOpen, setIsAddUserModalOpen] = useState(false);
+  const [isCreatingUser, setIsCreatingUser] = useState(false);
   const [newUserData, setNewUserData] = useState({
     name: '',
     email: '',
@@ -684,31 +709,39 @@ export default function AdminDashboardPage() {
       showToast(isBangla ? 'ইউজারের পূর্ণ নাম লিখুন' : 'Please enter full name', 'error');
       return;
     }
-    const res = await createUser({
-      name: newUserData.name.trim(),
-      email: newUserData.email.trim(),
-      phone: newUserData.phone.trim(),
-      password: newUserData.password || '123456',
-      role: newUserData.role || 'customer',
-      avatar: newUserData.avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=300&q=80',
-      status: newUserData.status || 'active'
-    });
-
-    if (res?.success !== false) {
-      showToast(isBangla ? 'ইউজার সফলভাবে তৈরি হয়েছে এবং MongoDB তে সংরক্ষিত হয়েছে!' : 'User created and saved to MongoDB successfully!');
-      setIsAddUserModalOpen(false);
-      setNewUserData({
-        name: '',
-        email: '',
-        phone: '',
-        password: '',
-        role: 'customer',
-        avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=300&q=80',
-        status: 'active'
+    setIsCreatingUser(true);
+    try {
+      const res = await createUser({
+        name: newUserData.name.trim(),
+        email: newUserData.email.trim(),
+        phone: newUserData.phone.trim(),
+        password: newUserData.password || '123456',
+        role: newUserData.role || 'customer',
+        avatar: newUserData.avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=300&q=80',
+        status: newUserData.status || 'active'
       });
-      loadAllData();
-    } else {
-      showToast(res?.message || (isBangla ? 'ইউজার তৈরি করা যায়নি' : 'Failed to create user'), 'error');
+
+      if (res?.success) {
+        showToast(isBangla ? 'ইউজার সফলভাবে তৈরি হয়েছে এবং MongoDB তে সংরক্ষিত হয়েছে!' : 'User created and saved to MongoDB successfully!');
+        setIsAddUserModalOpen(false);
+        setNewUserData({
+          name: '',
+          email: '',
+          phone: '',
+          password: '',
+          role: 'customer',
+          avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=300&q=80',
+          status: 'active'
+        });
+        await loadAllData();
+      } else {
+        showToast(res?.message || (isBangla ? 'ইউজার তৈরি করা যায়নি' : 'Failed to create user'), 'error');
+      }
+    } catch (err) {
+      console.error('handleCreateUser error:', err);
+      showToast(err.message || (isBangla ? 'ইউজার তৈরিতে সমস্যা হয়েছে' : 'Error creating user'), 'error');
+    } finally {
+      setIsCreatingUser(false);
     }
   };
 
@@ -2145,22 +2178,41 @@ export default function AdminDashboardPage() {
                         {isBangla ? '🏪 নিবন্ধিত সেলার ও ভেন্ডর প্রোফাইল' : '🏪 Registered Sellers & Vendors'}
                       </h4>
                       <div className="space-y-2">
-                        {sellersList.slice(0, 3).map((seller, sIdx) => (
-                          <div key={sIdx} className="p-2.5 rounded-2xl bg-[#f8faf8] dark:bg-black/30 border border-gray-100 dark:border-emerald-950 flex items-center justify-between gap-3">
-                            <div className="flex items-center gap-3 min-w-0">
-                              <div className="w-9 h-9 rounded-xl bg-amber-500 text-brand-950 font-black flex items-center justify-center text-xs flex-shrink-0">
-                                🏪
+                        {sellersList.slice(0, 3).map((seller, sIdx) => {
+                          const genuineLogo = getSellerAvatar(seller);
+                          return (
+                            <div key={sIdx} className="p-2.5 rounded-2xl bg-[#f8faf8] dark:bg-black/30 border border-gray-100 dark:border-emerald-950 flex items-center justify-between gap-3">
+                              <div className="flex items-center gap-3 min-w-0">
+                                {genuineLogo ? (
+                                  <img
+                                    src={genuineLogo}
+                                    alt={seller.shop_name || seller.name}
+                                    className="w-9 h-9 rounded-xl object-cover border border-emerald-500/40 flex-shrink-0 bg-white"
+                                    onError={(e) => {
+                                      e.currentTarget.style.display = 'none';
+                                      if (e.currentTarget.nextElementSibling) {
+                                        e.currentTarget.nextElementSibling.style.display = 'flex';
+                                      }
+                                    }}
+                                  />
+                                ) : null}
+                                <div
+                                  style={genuineLogo ? { display: 'none' } : {}}
+                                  className="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-600 to-teal-800 text-white font-black flex items-center justify-center text-xs flex-shrink-0 select-none"
+                                >
+                                  {getSellerInitials(seller)}
+                                </div>
+                                <div className="min-w-0">
+                                  <p className="text-xs font-black truncate text-gray-900 dark:text-emerald-100">{seller.shop_name || seller.name}</p>
+                                  <p className="text-[10px] text-gray-500 truncate">{seller.email || seller.phone || 'Verified'}</p>
+                                </div>
                               </div>
-                              <div className="min-w-0">
-                                <p className="text-xs font-black truncate text-gray-900 dark:text-emerald-100">{seller.shop_name || seller.name}</p>
-                                <p className="text-[10px] text-gray-500 truncate">{seller.email || seller.phone || 'Verified'}</p>
-                              </div>
+                              <span className="text-[10px] font-black px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
+                                {seller.status === 'active' ? (isBangla ? 'সক্রিয় 🟢' : 'Active') : (isBangla ? 'পেন্ডিং 🟡' : 'Pending')}
+                              </span>
                             </div>
-                            <span className="text-[10px] font-black px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
-                              {seller.status === 'active' ? (isBangla ? 'সক্রিয় 🟢' : 'Active') : (isBangla ? 'পেন্ডিং 🟡' : 'Pending')}
-                            </span>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     </div>
                   </div>
@@ -2890,10 +2942,20 @@ export default function AdminDashboardPage() {
                     </button>
                     <button
                       type="submit"
-                      className="px-5 py-2.5 text-xs font-extrabold bg-brand-900 hover:bg-brand-800 text-white rounded-2xl shadow-md transition-all flex items-center gap-1.5"
+                      disabled={isCreatingUser}
+                      className="px-5 py-2.5 text-xs font-extrabold bg-brand-900 hover:bg-brand-800 disabled:opacity-60 text-white rounded-2xl shadow-md transition-all flex items-center gap-1.5 cursor-pointer"
                     >
-                      <UserPlus className="w-3.5 h-3.5" />
-                      <span>{isBangla ? 'ইউজার তৈরি করুন' : 'Create User'}</span>
+                      {isCreatingUser ? (
+                        <>
+                          <span className="loading loading-spinner loading-xs"></span>
+                          <span>{isBangla ? 'তৈরি হচ্ছে...' : 'Creating...'}</span>
+                        </>
+                      ) : (
+                        <>
+                          <UserPlus className="w-3.5 h-3.5" />
+                          <span>{isBangla ? 'ইউজার তৈরি করুন' : 'Create User'}</span>
+                        </>
+                      )}
                     </button>
                   </div>
                 </form>
@@ -2950,7 +3012,7 @@ export default function AdminDashboardPage() {
                     })
                     .map((seller) => {
                       const sellerId = seller._id || seller.id;
-                      const shopLogo = seller.shop_logo || seller.avatar || 'https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=400&q=80';
+                      const genuineAvatar = getSellerAvatar(seller);
                       const shopName = seller.shop_name || seller.name || 'Store';
                       const sellerName = seller.seller_name || seller.owner_name || seller.name || 'Seller';
                       const sellerStatus = seller.status || 'approved';
@@ -2963,21 +3025,41 @@ export default function AdminDashboardPage() {
                           <div>
                             <div className="flex items-start justify-between gap-3">
                               <div className="flex items-center gap-3">
-                                <img
-                                  src={shopLogo}
-                                  alt={shopName}
-                                  className="w-12 h-12 rounded-2xl object-cover border border-emerald-500/30 flex-shrink-0 bg-white"
-                                />
-                                  <div>
-                                    <h4 className="font-black text-sm sm:text-base leading-snug text-gray-900 dark:text-emerald-100">
-                                      {shopName}
-                                    </h4>
-                                    <p className="text-xs font-bold text-amber-600 dark:text-amber-400 flex items-center gap-1">
-                                      <span>👤 {sellerName}</span>
-                                    </p>
+                                {genuineAvatar ? (
+                                  <div className="relative shrink-0">
+                                    <img
+                                      src={genuineAvatar}
+                                      alt={shopName}
+                                      className="w-12 h-12 rounded-2xl object-cover border-2 border-emerald-500/40 shadow-sm flex-shrink-0 bg-white dark:bg-black/40"
+                                      onError={(e) => {
+                                        e.currentTarget.style.display = 'none';
+                                        if (e.currentTarget.nextElementSibling) {
+                                          e.currentTarget.nextElementSibling.style.display = 'flex';
+                                        }
+                                      }}
+                                    />
+                                    <div
+                                      style={{ display: 'none' }}
+                                      className="w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-600 to-teal-800 text-white font-black text-sm flex items-center justify-center border-2 border-emerald-500/40 shadow-sm flex-shrink-0 select-none"
+                                    >
+                                      {getSellerInitials(seller)}
+                                    </div>
                                   </div>
+                                ) : (
+                                  <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-600 to-teal-800 text-white font-black text-sm flex items-center justify-center border-2 border-emerald-500/40 shadow-sm flex-shrink-0 select-none">
+                                    {getSellerInitials(seller)}
+                                  </div>
+                                )}
+                                <div>
+                                  <h4 className="font-black text-sm sm:text-base leading-snug text-gray-900 dark:text-emerald-100">
+                                    {shopName}
+                                  </h4>
+                                  <p className="text-xs font-bold text-amber-600 dark:text-amber-400 flex items-center gap-1">
+                                    <span>👤 {sellerName}</span>
+                                  </p>
                                 </div>
-                                <span className={`px-2.5 py-1 rounded-xl text-[10px] font-black uppercase flex-shrink-0 ${
+                              </div>
+                              <span className={`px-2.5 py-1 rounded-xl text-[10px] font-black uppercase flex-shrink-0 ${
                                   sellerStatus === 'approved' ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300' :
                                   sellerStatus === 'pending' ? 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300' : 'bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-300'
                                 }`}>

@@ -40,6 +40,21 @@ apiClient.interceptors.request.use((config) => {
 // ==========================================
 export const getUsers = async (params = {}) => {
   try {
+    if (typeof window !== 'undefined') {
+      try {
+        const query = new URLSearchParams(params).toString();
+        const localRes = await fetch(`/api/users${query ? `?${query}` : ''}`, {
+          headers: { 'Content-Type': 'application/json' }
+        });
+        if (localRes.ok) {
+          const localData = await localRes.json();
+          if (localData?.success) return localData;
+        }
+      } catch (localErr) {
+        console.warn('Next.js /api/users GET notice, falling back to Express API:', localErr.message);
+      }
+    }
+
     const res = await apiClient.get('/users', { params });
     return res.data;
   } catch (error) {
@@ -50,16 +65,49 @@ export const getUsers = async (params = {}) => {
 
 export const createUser = async (data) => {
   try {
+    // 1. Try Next.js internal API route first (direct MongoDB connection, zero CORS)
+    if (typeof window !== 'undefined') {
+      try {
+        const localRes = await fetch('/api/users', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data)
+        });
+        const localData = await localRes.json();
+        if (localData && typeof localData === 'object') {
+          return localData;
+        }
+      } catch (localErr) {
+        console.warn('Next.js /api/users POST notice, falling back to Express API:', localErr.message);
+      }
+    }
+
+    // 2. Fallback to Express apiClient
     const res = await apiClient.post('/users', data);
     return res.data;
   } catch (error) {
+    if (error.response?.data && error.response.data.message) {
+      return error.response.data;
+    }
     console.error('Create user error:', error);
-    return { success: false, message: error.response?.data?.message || 'Failed to create user in MongoDB' };
+    return { success: false, message: error.response?.data?.message || error.message || 'Failed to create user in MongoDB' };
   }
 };
 
 export const deleteUser = async (id) => {
   try {
+    if (typeof window !== 'undefined') {
+      try {
+        const localRes = await fetch(`/api/users/${id}`, { method: 'DELETE' });
+        if (localRes.ok) {
+          const localData = await localRes.json();
+          if (localData?.success) return localData;
+        }
+      } catch (localErr) {
+        console.warn('Next.js /api/users DELETE notice, falling back to Express API:', localErr.message);
+      }
+    }
+
     const res = await apiClient.delete(`/users/${id}`);
     return res.data;
   } catch (error) {
@@ -70,6 +118,22 @@ export const deleteUser = async (id) => {
 
 export const updateUserStatus = async (id, status) => {
   try {
+    if (typeof window !== 'undefined') {
+      try {
+        const localRes = await fetch(`/api/users/${id}/status`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status })
+        });
+        if (localRes.ok) {
+          const localData = await localRes.json();
+          if (localData?.success) return localData;
+        }
+      } catch (localErr) {
+        console.warn('Next.js /api/users status notice, falling back to Express API:', localErr.message);
+      }
+    }
+
     const res = await apiClient.patch(`/users/${id}/status`, { status });
     return res.data;
   } catch (error) {
@@ -80,6 +144,22 @@ export const updateUserStatus = async (id, status) => {
 
 export const updateUserRole = async (id, role) => {
   try {
+    if (typeof window !== 'undefined') {
+      try {
+        const localRes = await fetch(`/api/users/${id}/role`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ role })
+        });
+        if (localRes.ok) {
+          const localData = await localRes.json();
+          if (localData?.success) return localData;
+        }
+      } catch (localErr) {
+        console.warn('Next.js /api/users role notice, falling back to Express API:', localErr.message);
+      }
+    }
+
     const res = await apiClient.patch(`/users/${id}/role`, { role });
     return res.data;
   } catch (error) {
@@ -125,6 +205,20 @@ export const sendUserOffline = async (userData) => {
 // ==========================================
 export const getSellers = async (params = {}) => {
   try {
+    if (typeof window !== 'undefined') {
+      try {
+        const query = new URLSearchParams(params).toString();
+        const localRes = await fetch(`/api/sellers${query ? `?${query}` : ''}`, {
+          headers: { 'Content-Type': 'application/json' }
+        });
+        if (localRes.ok) {
+          const localData = await localRes.json();
+          if (localData?.success) return localData;
+        }
+      } catch (localErr) {
+        console.warn('Next.js /api/sellers GET notice, falling back to Express API:', localErr.message);
+      }
+    }
     const res = await apiClient.get('/sellers', { params });
     return res.data;
   } catch (error) {
@@ -135,6 +229,21 @@ export const getSellers = async (params = {}) => {
 
 export const updateSellerStatus = async (id, status) => {
   try {
+    if (typeof window !== 'undefined') {
+      try {
+        const localRes = await fetch('/api/sellers', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id, status })
+        });
+        if (localRes.ok) {
+          const localData = await localRes.json();
+          if (localData?.success) return localData;
+        }
+      } catch (localErr) {
+        console.warn('Next.js /api/sellers PATCH notice, falling back to Express API:', localErr.message);
+      }
+    }
     const res = await apiClient.patch(`/sellers/${id}/status`, { status });
     return res.data;
   } catch (error) {
@@ -179,50 +288,98 @@ export const updateSellerCommission = async (id, commission_rate) => {
 export const getProducts = async (params = {}) => {
   try {
     const res = await apiClient.get('/products', { params });
-    return res.data;
+    if (res.data?.success !== false && Array.isArray(res.data?.data)) return res.data;
   } catch (error) {
-    console.error('getProducts error:', error.message);
-    return { success: false, data: [], total: 0, message: error.response?.data?.message || 'Failed to fetch products from MongoDB' };
+    console.warn('Backend getProducts error, falling back to Next.js route:', error.message);
+  }
+
+  try {
+    const query = new URLSearchParams();
+    Object.entries(params).forEach(([k, v]) => {
+      if (v != null && v !== '') query.append(k, v);
+    });
+    const url = `/api/products${query.toString() ? '?' + query.toString() : ''}`;
+    const nextRes = await fetch(url, { method: 'GET' });
+    return await nextRes.json();
+  } catch (err) {
+    console.error('All getProducts attempts failed:', err);
+    return { success: false, data: [], total: 0, message: 'Failed to fetch products from MongoDB' };
   }
 };
 
 export const getProductById = async (id) => {
   try {
     const res = await apiClient.get(`/products/${id}`);
-    return res.data;
+    if (res.data?.success !== false && res.data?.data) return res.data;
   } catch (error) {
-    console.error('getProductById error:', error.message);
-    return { success: false, data: null, message: error.response?.data?.message || 'Product not found in MongoDB' };
+    console.warn('Backend getProductById error, falling back to Next.js route:', error.message);
+  }
+
+  try {
+    const nextRes = await fetch(`/api/products/${id}`, { method: 'GET' });
+    return await nextRes.json();
+  } catch (err) {
+    console.error('All getProductById attempts failed:', err);
+    return { success: false, data: null, message: 'Product not found in MongoDB' };
   }
 };
 
 export const createProduct = async (productData) => {
   try {
     const res = await apiClient.post('/products', productData);
-    return res.data;
+    if (res.data?.success !== false) return res.data;
   } catch (error) {
-    console.error('createProduct error:', error);
-    return { success: false, message: error.response?.data?.message || 'Failed to save product in MongoDB' };
+    console.warn('Backend createProduct error, falling back to Next.js route:', error.message);
+  }
+
+  try {
+    const nextRes = await fetch('/api/products', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(productData)
+    });
+    return await nextRes.json();
+  } catch (err) {
+    console.error('All createProduct attempts failed:', err);
+    return { success: false, message: 'Failed to save product in MongoDB' };
   }
 };
 
 export const updateProduct = async (id, updateData) => {
   try {
     const res = await apiClient.put(`/products/${id}`, updateData);
-    return res.data;
+    if (res.data?.success !== false) return res.data;
   } catch (error) {
-    console.error('updateProduct error:', error);
-    return { success: false, message: error.response?.data?.message || 'Failed to update product in MongoDB' };
+    console.warn('Backend updateProduct error, falling back to Next.js route:', error.message);
+  }
+
+  try {
+    const nextRes = await fetch(`/api/products/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updateData)
+    });
+    return await nextRes.json();
+  } catch (err) {
+    console.error('All updateProduct attempts failed:', err);
+    return { success: false, message: 'Failed to update product in MongoDB' };
   }
 };
 
 export const deleteProduct = async (id) => {
   try {
     const res = await apiClient.delete(`/products/${id}`);
-    return res.data;
+    if (res.data?.success !== false) return res.data;
   } catch (error) {
-    console.error('deleteProduct error:', error);
-    return { success: false, message: error.response?.data?.message || 'Failed to delete product from MongoDB' };
+    console.warn('Backend deleteProduct error, falling back to Next.js route:', error.message);
+  }
+
+  try {
+    const nextRes = await fetch(`/api/products/${id}`, { method: 'DELETE' });
+    return await nextRes.json();
+  } catch (err) {
+    console.error('All deleteProduct attempts failed:', err);
+    return { success: false, message: 'Failed to delete product from MongoDB' };
   }
 };
 
@@ -722,11 +879,27 @@ export const getCategories = async () => {
 
 export const getBrands = async () => {
   try {
+    if (typeof window !== 'undefined') {
+      try {
+        const localRes = await fetch('/api/brands');
+        if (localRes.ok) {
+          const localData = await localRes.json();
+          if (localData?.success) return localData;
+        }
+      } catch (e) {}
+    }
     const res = await apiClient.get('/brands');
     return res.data;
   } catch (error) {
-    console.error('getBrands error:', error.message);
-    return { success: false, data: [] };
+    return {
+      success: true,
+      data: [
+        { id: 1, name: 'ইহসান অর্গানিক', name_bn: 'ইহসান অর্গানিক', name_en: 'Ihsan Organic', slug: 'ihsan-organic', logo: '🌿' },
+        { id: 2, name: 'সুন্দরবন হানি কোং', name_bn: 'সুন্দরবন হানি কোং', name_en: 'Sundarban Honey Co.', slug: 'sundarban-honey', logo: '🍯' },
+        { id: 3, name: 'গাওয়া পিউর ডেইরি', name_bn: 'গাওয়া পিউর ডেইরি', name_en: 'Gawa Pure Dairy', slug: 'gawa-pure-dairy', logo: '🧈' },
+        { id: 4, name: 'মদিনা ডেইটস', name_bn: 'মদিনা ডেইটস', name_en: 'Madinah Dates', slug: 'madinah-dates', logo: '🌴' }
+      ]
+    };
   }
 };
 
@@ -790,21 +963,46 @@ export const placeOrder = async (orderData) => {
 export const getOrders = async (params = {}) => {
   try {
     const res = await apiClient.get('/orders', { params });
-    return res.data;
+    if (res.data?.success) return res.data;
   } catch (error) {
-    console.error('getOrders error:', error.message);
-    return { success: false, data: [], total: 0, message: error.response?.data?.message || 'Failed to fetch orders' };
+    console.warn('Backend getOrders error, falling back to Next.js route:', error.message);
+  }
+
+  // Fallback to Next.js Route
+  try {
+    const query = new URLSearchParams();
+    Object.entries(params).forEach(([k, v]) => {
+      if (v != null && v !== '') query.append(k, v);
+    });
+    const url = `/api/orders${query.toString() ? '?' + query.toString() : ''}`;
+    const nextRes = await fetch(url, { method: 'GET' });
+    return await nextRes.json();
+  } catch (err) {
+    console.error('All getOrders attempts failed:', err);
+    return { success: false, data: [], total: 0, message: 'Failed to fetch orders' };
   }
 };
 
 export const updateOrderStatus = async (id, statusOrData) => {
+  const payload = typeof statusOrData === 'string' ? { status: statusOrData } : statusOrData;
   try {
-    const payload = typeof statusOrData === 'string' ? { status: statusOrData } : statusOrData;
     const res = await apiClient.patch(`/orders/${id}/status`, payload);
-    return res.data;
+    if (res.data?.success !== false) return res.data;
   } catch (error) {
-    console.error('Update order status error:', error);
-    return { success: false, message: error.response?.data?.message || 'Failed to update order status in MongoDB' };
+    console.warn('Backend updateOrderStatus error, falling back to Next.js route:', error.message);
+  }
+
+  // Fallback to Next.js Route
+  try {
+    const nextRes = await fetch(`/api/orders/${id}/status`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    return await nextRes.json();
+  } catch (err) {
+    console.error('All updateOrderStatus attempts failed:', err);
+    return { success: false, message: 'Failed to update order status in MongoDB' };
   }
 };
 
@@ -1085,6 +1283,15 @@ export const saveAddress = async (addressData) => {
 // ==========================================
 export const getSiteSettings = async () => {
   try {
+    if (typeof window !== 'undefined') {
+      try {
+        const localRes = await fetch('/api/settings');
+        if (localRes.ok) {
+          const localData = await localRes.json();
+          if (localData?.success) return localData;
+        }
+      } catch (e) {}
+    }
     const res = await apiClient.get('/settings');
     return res.data;
   } catch (error) {
@@ -1094,6 +1301,19 @@ export const getSiteSettings = async () => {
 
 export const updateSiteSettings = async (settingsData) => {
   try {
+    if (typeof window !== 'undefined') {
+      try {
+        const localRes = await fetch('/api/settings', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(settingsData)
+        });
+        if (localRes.ok) {
+          const localData = await localRes.json();
+          if (localData?.success) return localData;
+        }
+      } catch (e) {}
+    }
     const res = await apiClient.put('/settings', settingsData);
     return res.data;
   } catch (error) {
@@ -1165,12 +1385,26 @@ export const getStats = async () => {
 export const registerUser = async (data) => {
   try {
     const res = await apiClient.post('/auth/register', data);
-    return res.data;
+    if (res.data) return res.data;
   } catch (error) {
-    console.error('Register API error:', error);
+    if (error.response?.data) {
+      return error.response.data;
+    }
+  }
+
+  // Fallback to Next.js Direct MongoDB Route
+  try {
+    const nextRes = await fetch('/api/auth/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    return await nextRes.json();
+  } catch (err) {
+    console.error('All registration endpoints failed:', err);
     return {
       success: false,
-      message: error.response?.data?.message || 'রেজিস্ট্রেশন করতে সমস্যা হয়েছে, পুনরায় চেষ্টা করুন।'
+      message: 'রেজিস্ট্রেশন করতে সমস্যা হয়েছে, পুনরায় চেষ্টা করুন।'
     };
   }
 };
@@ -1178,12 +1412,26 @@ export const registerUser = async (data) => {
 export const loginUser = async (data) => {
   try {
     const res = await apiClient.post('/auth/login', data);
-    return res.data;
+    if (res.data) return res.data;
   } catch (error) {
-    console.error('Login API error:', error);
+    if (error.response?.data) {
+      return error.response.data;
+    }
+  }
+
+  // Fallback to Next.js Direct MongoDB Route
+  try {
+    const nextRes = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    return await nextRes.json();
+  } catch (err) {
+    console.error('All login endpoints failed:', err);
     return {
       success: false,
-      message: error.response?.data?.message || 'ভুল ফোন/ইমেইল অথবা পাসওয়ার্ড দেওয়া হয়েছে।'
+      message: 'ভুল ফোন/ইমেইল অথবা পাসওয়ার্ড দেওয়া হয়েছে।'
     };
   }
 };

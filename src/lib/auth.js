@@ -53,7 +53,10 @@ export const auth = betterAuth({
     user: {
       create: {
         before: async (userData) => {
-          const photo = userData.image || userData.avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=200&q=80';
+          let photo = userData.image || userData.avatar || '';
+          if (typeof photo === 'string' && photo.includes('unsplash.com/photo-1535713875002')) {
+            photo = '';
+          }
           return {
             data: {
               ...userData,
@@ -67,7 +70,10 @@ export const auth = betterAuth({
         after: async (createdUser) => {
           try {
             if (db && createdUser?.email) {
-              const photo = createdUser.avatar || createdUser.image || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=200&q=80';
+              let photo = createdUser.avatar || createdUser.image || '';
+              if (typeof photo === 'string' && photo.includes('unsplash.com/photo-1535713875002')) {
+                photo = '';
+              }
               await db.collection('users').updateOne(
                 { email: createdUser.email.toLowerCase().trim() },
                 {
@@ -106,7 +112,10 @@ export const auth = betterAuth({
                         (await db.collection('user').findOne({ _id: session.userId })) ||
                         (await db.collection('users').findOne({ id: session.userId }));
               if (u && u.email) {
-                const photo = u.avatar || u.image || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=200&q=80';
+                let photo = u.avatar || u.image || '';
+                if (typeof photo === 'string' && photo.includes('unsplash.com/photo-1535713875002')) {
+                  photo = '';
+                }
                 await db.collection('users').updateOne(
                   { email: u.email.toLowerCase().trim() },
                   {

@@ -115,7 +115,7 @@ export default function AuthPage() {
           return;
         }
 
-        const finalAvatar = avatarUrl.trim() || imagePreview || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=200&q=80';
+        const finalAvatar = avatarUrl.trim() || imagePreview || '';
 
         const res = await registerUser({
           name: name.trim(),

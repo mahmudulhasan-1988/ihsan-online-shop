@@ -76,6 +76,23 @@ import { useCart } from '@/context/CartContext';
 import { useThemeLanguage } from '@/context/ThemeLanguageContext';
 import { DashboardStatsSkeleton } from '@/components/SkeletonLoaders';
 
+const getCustomerAvatar = (order) => {
+  const av = order?.customerAvatar || order?.customerImage;
+  if (av && typeof av === 'string' && !av.includes('unsplash.com/photo-1535713875002') && av.trim() !== '') {
+    return av.trim();
+  }
+  return null;
+};
+
+const getCustomerInitials = (name) => {
+  if (!name || typeof name !== 'string') return 'C';
+  const clean = name.replace(/[^\w\s\u0980-\u09FF]/gi, '').trim();
+  if (!clean) return 'C';
+  const parts = clean.split(/\s+/).filter(Boolean);
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+};
+
 export default function SellerDashboardPage() {
   const { user, login, logout, showToast } = useCart();
   const { isBangla, theme, toggleTheme } = useThemeLanguage();
@@ -265,7 +282,7 @@ export default function SellerDashboardPage() {
       const sellerIdentifier = user?.id || user?._id || user?.email || user?.phone || 'seller';
       const [prodRes, ordRes, withRes, revRes, sellerProfileRes, catRes, stockReqRes, tickRes] = await Promise.all([
         getProducts({ sellerId: sellerIdentifier, limit: 200 }),
-        getOrders(),
+        getOrders({ sellerId: sellerIdentifier }),
         getSellerWithdrawals(),
         getReviews(),
         getSellerProfile(sellerIdentifier),
@@ -301,7 +318,67 @@ export default function SellerDashboardPage() {
       });
 
       setMyProducts(isolatedProducts.length > 0 ? isolatedProducts : allProds);
-      setMyOrders(ordRes?.data || []);
+
+      // --- 🛡️ Strict Multi-Vendor Orders & Items Fulfillment Isolation ---
+      // A seller MUST only see orders containing their products, and inside each order ONLY their own products!
+      const myProductIds = new Set(
+        isolatedProducts.map(p => String(p.id || p._id || '')).filter(Boolean)
+      );
+
+      const uId = String(user?.id || user?._id || '');
+      const uEmail = (user?.email || '').toLowerCase().trim();
+      const uPhone = (user?.phone || '').trim();
+      const sName = (sellerInfo.shop_name || sellerInfo.seller_name || user?.name || '').toLowerCase().trim();
+
+      const isMyItem = (item) => {
+        if (!item) return false;
+        const itProdId = String(item.productId || item.id || item._id || '').trim();
+        if (itProdId && myProductIds.has(itProdId)) return true;
+
+        const itSellerId = String(item.sellerId || item.seller_id || '').trim();
+        if (uId && itSellerId && itSellerId === uId) return true;
+
+        const itEmail = (item.seller_email || '').toLowerCase().trim();
+        if (uEmail && itEmail && itEmail === uEmail) return true;
+
+        const itPhone = (item.seller_phone || '').trim();
+        if (uPhone && itPhone && itPhone === uPhone) return true;
+
+        const itName = (item.sellerName || item.seller_name || item.shop_name || '').toLowerCase().trim();
+        if (sName && itName && (itName === sName || sName.includes(itName) || itName.includes(sName))) return true;
+
+        return false;
+      };
+
+      const rawOrders = Array.isArray(ordRes?.data) ? ordRes.data : [];
+      const isolatedOrders = rawOrders
+        .map(order => {
+          const originalItems = Array.isArray(order.items) ? order.items : [];
+          // Keep ONLY this seller's products inside the order (Another seller's products are completely removed)
+          const sellerOnlyItems = user?.role === 'admin' 
+            ? originalItems 
+            : originalItems.filter(isMyItem);
+
+          if (sellerOnlyItems.length === 0) {
+            return null; // This order has no products from this seller
+          }
+
+          const sellerItemsTotal = sellerOnlyItems.reduce(
+            (sum, it) => sum + (Number(it.price || 0) * Number(it.quantity || 1)),
+            0
+          );
+
+          return {
+            ...order,
+            items: sellerOnlyItems,
+            sellerTotal: sellerItemsTotal,
+            sellerItemCount: sellerOnlyItems.reduce((cnt, it) => cnt + Number(it.quantity || 1), 0),
+            originalTotal: order.totalAmount
+          };
+        })
+        .filter(Boolean);
+
+      setMyOrders(isolatedOrders);
       setMyWithdrawals(withRes?.data || []);
       setMyReviews(revRes?.data || []);
       if (Array.isArray(catRes?.data) && catRes.data.length > 0) {
@@ -780,6 +857,7 @@ export default function SellerDashboardPage() {
       const selectedCat = categoriesList.find(c => c.slug === editingProduct.categorySlug || c.name === editingProduct.category);
       const catName = selectedCat ? (selectedCat.name || selectedCat.name_bn) : (editingProduct.category || 'সকল পণ্য');
       const catSlug = selectedCat ? selectedCat.slug : (editingProduct.categorySlug || 'all');
+      const catId = selectedCat ? (selectedCat.id || selectedCat._id || 1) : (editingProduct.category_id || 1);
 
       const regPrice = Number(editingProduct.regularPrice) || Number(editingProduct.price);
       const salePrice = Number(editingProduct.price);
@@ -799,6 +877,7 @@ export default function SellerDashboardPage() {
         finalImages.unshift(finalThumb);
       }
 
+      const prodId = editingProduct.id || editingProduct._id;
       const payload = {
         name: editingProduct.name.trim(),
         name_bn: (editingProduct.name_bn || editingProduct.name).trim(),
@@ -810,6 +889,10 @@ export default function SellerDashboardPage() {
         shop_name: editSellerBn,
         shop_name_bn: editSellerBn,
         shop_name_en: editSellerEn,
+        seller_id: editingProduct.seller_id || editingProduct.sellerId || user?.id || user?._id || 1,
+        sellerId: editingProduct.sellerId || editingProduct.seller_id || user?.id || user?._id || 1,
+        seller_email: editingProduct.seller_email || user?.email || '',
+        seller_phone: editingProduct.seller_phone || user?.phone || '',
         category: catName,
         category_name: catName,
         categorySlug: catSlug,
@@ -824,23 +907,24 @@ export default function SellerDashboardPage() {
         unit: editingProduct.unit || '১ পিস',
         thumbnail: finalThumb,
         images: finalImages,
-        description: editingProduct.description,
-        isFeatured: editingProduct.is_featured,
-        is_featured: editingProduct.is_featured,
-        isBestSeller: editingProduct.is_bestseller,
-        is_bestseller: editingProduct.is_bestseller,
+        description: editingProduct.description || '',
+        isFeatured: Boolean(editingProduct.is_featured),
+        is_featured: Boolean(editingProduct.is_featured),
+        isBestSeller: Boolean(editingProduct.is_bestseller),
+        is_bestseller: Boolean(editingProduct.is_bestseller),
       };
 
-      const res = await updateProduct(editingProduct.id || editingProduct._id, payload);
+      const res = await updateProduct(prodId, payload);
       if (res?.success !== false) {
         showToast(isBangla ? '✨ পণ্যটি সফলভাবে আপডেট করা হয়েছে!' : 'Product updated successfully in MongoDB!');
         setEditingProduct(null);
         await loadSellerData();
       } else {
-        showToast(res?.message || 'Failed to update product', 'error');
+        showToast(res?.message || (isBangla ? 'পণ্য আপডেট করতে সমস্যা হয়েছে' : 'Failed to update product'), 'error');
       }
     } catch (err) {
-      showToast('Error updating product', 'error');
+      console.error('handleSaveEditProduct error:', err);
+      showToast(err?.message || (isBangla ? 'পণ্য আপডেট করতে ত্রুটি হয়েছে' : 'Error updating product'), 'error');
     } finally {
       setIsSavingProduct(false);
     }
@@ -3406,9 +3490,45 @@ export default function SellerDashboardPage() {
                                 </td>
 
                                 <td className="p-3">
-                                  <p className="font-bold text-gray-900 dark:text-emerald-100">{order.customerName}</p>
-                                  <p className="text-xs text-gray-500 font-mono">{order.customerPhone}</p>
-                                  <p className="text-[11px] text-gray-400 truncate max-w-[150px]">{order.deliveryAddress}</p>
+                                  <div className="flex items-center gap-3">
+                                    {getCustomerAvatar(order) ? (
+                                      <div className="relative shrink-0">
+                                        <img
+                                          src={getCustomerAvatar(order)}
+                                          alt={order.customerName || 'Customer'}
+                                          className="w-10 h-10 rounded-full object-cover border-2 border-emerald-500/50 shadow-sm bg-gray-100 dark:bg-black/40"
+                                          onError={(e) => {
+                                            e.currentTarget.style.display = 'none';
+                                            const sibling = e.currentTarget.nextElementSibling;
+                                            if (sibling) sibling.style.display = 'flex';
+                                          }}
+                                        />
+                                        <div
+                                          style={{ display: 'none' }}
+                                          className="w-10 h-10 rounded-full bg-gradient-to-br from-emerald-600 to-teal-800 text-white font-black text-xs flex items-center justify-center border-2 border-emerald-500/40 shadow-sm select-none"
+                                        >
+                                          {getCustomerInitials(order.customerName)}
+                                        </div>
+                                        <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 ring-2 ring-white dark:ring-emerald-950 absolute bottom-0 right-0" title="Active Customer" />
+                                      </div>
+                                    ) : (
+                                      <div className="relative shrink-0">
+                                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-emerald-600 to-teal-800 text-white font-black text-xs flex items-center justify-center border-2 border-emerald-500/40 shadow-sm select-none">
+                                          {getCustomerInitials(order.customerName)}
+                                        </div>
+                                        <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 ring-2 ring-white dark:ring-emerald-950 absolute bottom-0 right-0" title="Active Customer" />
+                                      </div>
+                                    )}
+                                    <div className="min-w-0">
+                                      <p className="font-bold text-gray-900 dark:text-emerald-100 text-xs sm:text-sm truncate max-w-[160px]">
+                                        {order.customerName || (isBangla ? 'সম্মানিত ক্রেতা' : 'Customer')}
+                                      </p>
+                                      <p className="text-xs text-gray-500 font-mono truncate">{order.customerPhone}</p>
+                                      <p className="text-[11px] text-gray-400 truncate max-w-[160px]" title={order.deliveryAddress}>
+                                        {order.deliveryAddress}
+                                      </p>
+                                    </div>
+                                  </div>
                                 </td>
 
                                 <td className="p-3">
@@ -3423,7 +3543,12 @@ export default function SellerDashboardPage() {
                                 </td>
 
                                 <td className="p-3 font-black text-brand-900 dark:text-secondary">
-                                  ৳ {order.totalAmount}
+                                  ৳ {order.sellerTotal != null ? order.sellerTotal : order.totalAmount}
+                                  {order.sellerTotal != null && order.totalAmount && order.sellerTotal !== order.totalAmount && (
+                                    <span className="block text-[9px] text-gray-400 font-normal">
+                                      {isBangla ? `(মোট: ৳${order.totalAmount})` : `(Total: ৳${order.totalAmount})`}
+                                    </span>
+                                  )}
                                   <span className="block text-[10px] uppercase text-gray-400 font-normal">
                                     {order.paymentMethod || 'COD'}
                                   </span>
@@ -3501,9 +3626,38 @@ export default function SellerDashboardPage() {
                     </div>
 
                     <div className="space-y-4 text-xs">
-                      <div className="bg-gray-50 p-3 rounded-xl border">
-                        <p><strong>Customer:</strong> {selectedOrderForSlip.customerName} ({selectedOrderForSlip.customerPhone})</p>
-                        <p><strong>Address:</strong> {selectedOrderForSlip.deliveryAddress}</p>
+                      <div className="bg-gray-50 dark:bg-black/30 p-3.5 rounded-2xl border border-gray-200 dark:border-emerald-900 flex items-center gap-3">
+                        {getCustomerAvatar(selectedOrderForSlip) ? (
+                          <div className="relative shrink-0">
+                            <img
+                              src={getCustomerAvatar(selectedOrderForSlip)}
+                              alt={selectedOrderForSlip.customerName || 'Customer'}
+                              className="w-12 h-12 rounded-full object-cover border-2 border-emerald-500/50 shadow-sm shrink-0 bg-white dark:bg-black/40"
+                              onError={(e) => {
+                                e.currentTarget.style.display = 'none';
+                                const sibling = e.currentTarget.nextElementSibling;
+                                if (sibling) sibling.style.display = 'flex';
+                              }}
+                            />
+                            <div
+                              style={{ display: 'none' }}
+                              className="w-12 h-12 rounded-full bg-gradient-to-br from-emerald-600 to-teal-800 text-white font-black text-sm flex items-center justify-center border-2 border-emerald-500/40 shadow-sm shrink-0 select-none"
+                            >
+                              {getCustomerInitials(selectedOrderForSlip.customerName)}
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="w-12 h-12 rounded-full bg-gradient-to-br from-emerald-600 to-teal-800 text-white font-black text-sm flex items-center justify-center border-2 border-emerald-500/40 shadow-sm shrink-0 select-none">
+                            {getCustomerInitials(selectedOrderForSlip.customerName)}
+                          </div>
+                        )}
+                        <div className="min-w-0">
+                          <p className="font-bold text-gray-900 dark:text-emerald-100 text-sm">{selectedOrderForSlip.customerName} ({selectedOrderForSlip.customerPhone})</p>
+                          {selectedOrderForSlip.customerEmail && (
+                            <p className="text-[11px] text-gray-500 font-mono">{selectedOrderForSlip.customerEmail}</p>
+                          )}
+                          <p className="text-gray-600 dark:text-emerald-300 text-xs mt-0.5"><strong>Address:</strong> {selectedOrderForSlip.deliveryAddress}</p>
+                        </div>
                       </div>
 
                       <table className="w-full border rounded-xl overflow-hidden text-left">
@@ -3525,6 +3679,16 @@ export default function SellerDashboardPage() {
                             </tr>
                           ))}
                         </tbody>
+                        <tfoot>
+                          <tr className="bg-gray-100 font-bold border-t">
+                            <td colSpan={3} className="p-2 text-right text-gray-700">
+                              {isBangla ? 'সেলার পণ্যের সাবটোটাল:' : 'Seller Items Subtotal:'}
+                            </td>
+                            <td className="p-2 text-right font-black text-brand-900">
+                              ৳ {selectedOrderForSlip.sellerTotal != null ? selectedOrderForSlip.sellerTotal : selectedOrderForSlip.totalAmount}
+                            </td>
+                          </tr>
+                        </tfoot>
                       </table>
                     </div>
                   </div>
