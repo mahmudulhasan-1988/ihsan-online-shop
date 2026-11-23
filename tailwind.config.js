@@ -29,7 +29,9 @@ module.exports = {
         }
       },
       fontFamily: {
-        sans: ['Hind Siliguri', 'Inter', 'system-ui', 'sans-serif'],
+        sans: ['Noto Serif Bengali', 'Roboto', 'system-ui', 'sans-serif'],
+        serif: ['Noto Serif Bengali', 'Roboto', 'serif'],
+        bangla: ['Noto Serif Bengali', 'Roboto', 'serif', 'sans-serif'],
       },
     },
   },
