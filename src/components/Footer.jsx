@@ -143,7 +143,7 @@ export default function Footer() {
 
             <div className="flex items-start gap-3 text-xs sm:text-sm text-gray-400">
               <MapPin className="w-4 h-4 text-secondary flex-shrink-0 mt-0.5" />
-              <span>{isBangla ? 'মিরপুর ডিওএইচএস, ঢাকা - ১২১৬, বাংলাদেশ' : 'Square Mastarbari, Jamirdia, Bhaluka, Mymensingh, Bangladesh'}</span>
+              <span>{isBangla ? 'জামিরদিয়া, স্কায়ার মাস্টারবাড়ী, ভালুকা, ময়মনসিংহ' : 'Jamirdia, Square Mastarbari, Bhaluka, Mymensingh, Bangladesh'}</span>
             </div>
           </div>
 
