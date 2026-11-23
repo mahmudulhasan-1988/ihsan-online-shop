@@ -237,7 +237,7 @@ export default function FastOrderModal() {
     >
       <div
         data-lenis-prevent="true"
-        className="bg-white dark:bg-[#112318] rounded-3xl max-w-xl w-full max-h-[92vh] flex flex-col shadow-2xl border border-emerald-200 dark:border-[#1d3b28] animate-in zoom-in-95 duration-200 transition-colors lenis-prevent"
+        className="bg-white dark:bg-[#112318] rounded-2xl sm:rounded-3xl max-w-xl w-full max-h-[92dvh] sm:max-h-[88vh] flex flex-col shadow-2xl border border-emerald-200 dark:border-[#1d3b28] animate-in zoom-in-95 duration-200 transition-colors lenis-prevent my-auto"
       >
 
         {/* Sticky Modal Header */}

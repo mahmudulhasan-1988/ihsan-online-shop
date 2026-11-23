@@ -37,7 +37,7 @@ export default function MobileBottomNav() {
   ];
 
   return (
-    <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-gray-200 shadow-2xl py-2 px-3">
+    <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-[#0c1a11] border-t border-gray-200 dark:border-emerald-950/80 shadow-2xl py-2 px-3 pb-[calc(0.5rem+env(safe-area-inset-bottom,0px))] transition-colors">
       <div className="flex items-center justify-around">
         {navItems.map((item, idx) => {
           const isActive = item.href && pathname === item.href;
@@ -47,7 +47,7 @@ export default function MobileBottomNav() {
               <button
                 key={idx}
                 onClick={item.action}
-                className="flex flex-col items-center justify-center text-gray-600 hover:text-brand-900 transition-colors p-1"
+                className="flex flex-col items-center justify-center text-gray-600 dark:text-gray-300 hover:text-brand-900 dark:hover:text-emerald-400 transition-colors p-1"
               >
                 {item.icon}
                 <span className="text-[10px] font-semibold mt-1">{item.label}</span>
@@ -60,7 +60,7 @@ export default function MobileBottomNav() {
               key={idx}
               href={item.href}
               className={`flex flex-col items-center justify-center p-1 transition-colors ${
-                isActive ? 'text-brand-900 font-bold scale-105' : 'text-gray-600 hover:text-brand-900'
+                isActive ? 'text-brand-900 dark:text-emerald-400 font-bold scale-105' : 'text-gray-600 dark:text-gray-300 hover:text-brand-900 dark:hover:text-emerald-400'
               }`}
             >
               {item.icon}

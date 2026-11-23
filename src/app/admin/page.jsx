@@ -5190,30 +5190,32 @@ export default function AdminDashboardPage() {
                       </div>
 
                       {/* Items Table */}
-                      <table className="w-full text-left text-xs border border-gray-200 rounded-xl overflow-hidden">
-                        <thead className="bg-emerald-900 text-white font-bold">
-                          <tr>
-                            <th className="p-2.5">SL</th>
-                            <th className="p-2.5">Item Description</th>
-                            <th className="p-2.5 text-center">Weight/Unit</th>
-                            <th className="p-2.5 text-center">Qty</th>
-                            <th className="p-2.5 text-right">Unit Price</th>
-                            <th className="p-2.5 text-right">Total</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-200">
-                          {selectedOrderForInvoice.items?.map((item, idx) => (
-                            <tr key={idx} className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                              <td className="p-2.5 font-bold">{idx + 1}</td>
-                              <td className="p-2.5 font-bold">{item.name}</td>
-                              <td className="p-2.5 text-center">{item.weight || 'Std'}</td>
-                              <td className="p-2.5 text-center font-bold">×{item.quantity}</td>
-                              <td className="p-2.5 text-right">৳ {item.price}</td>
-                              <td className="p-2.5 text-right font-black text-emerald-900">৳ {item.price * item.quantity}</td>
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-left text-xs border border-gray-200 rounded-xl overflow-hidden min-w-[500px] sm:min-w-0">
+                          <thead className="bg-emerald-900 text-white font-bold">
+                            <tr>
+                              <th className="p-2.5">SL</th>
+                              <th className="p-2.5">Item Description</th>
+                              <th className="p-2.5 text-center">Weight/Unit</th>
+                              <th className="p-2.5 text-center">Qty</th>
+                              <th className="p-2.5 text-right">Unit Price</th>
+                              <th className="p-2.5 text-right">Total</th>
                             </tr>
-                          ))}
-                        </tbody>
-                      </table>
+                          </thead>
+                          <tbody className="divide-y divide-gray-200">
+                            {selectedOrderForInvoice.items?.map((item, idx) => (
+                              <tr key={idx} className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                                <td className="p-2.5 font-bold">{idx + 1}</td>
+                                <td className="p-2.5 font-bold">{item.name}</td>
+                                <td className="p-2.5 text-center">{item.weight || 'Std'}</td>
+                                <td className="p-2.5 text-center font-bold">×{item.quantity}</td>
+                                <td className="p-2.5 text-right">৳ {item.price}</td>
+                                <td className="p-2.5 text-right font-black text-emerald-900">৳ {item.price * item.quantity}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
 
                       {/* Total Calculations */}
                       <div className="flex justify-end">

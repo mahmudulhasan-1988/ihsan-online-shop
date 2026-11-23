@@ -31,8 +31,8 @@ export default function TrustBadges() {
   ];
 
   return (
-    <div className="max-w-7xl mx-auto px-4 my-6 sm:my-8">
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 bg-white dark:bg-[#112318] p-5 sm:p-7 rounded-3xl shadow-sm border border-[#e4ede5] dark:border-[#1e3b29]">
+    <div className="max-w-7xl mx-auto px-3 sm:px-4 my-6 sm:my-8">
+      <div className="grid grid-cols-1 min-[420px]:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 bg-white dark:bg-[#112318] p-4 sm:p-6 md:p-7 rounded-3xl shadow-sm border border-[#e4ede5] dark:border-[#1e3b29]">
         {badges.map((badge, idx) => (
           <div key={idx} className="flex items-center gap-3 p-2 group hover:bg-emerald-50/50 dark:hover:bg-[#173323]/50 rounded-2xl transition-colors">
             <div className="p-3 bg-[#f2f7f3] dark:bg-[#152e20] rounded-2xl group-hover:scale-110 group-hover:bg-emerald-100 dark:group-hover:bg-emerald-900/40 transition-all flex-shrink-0 border border-emerald-100 dark:border-[#22442e]">

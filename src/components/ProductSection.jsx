@@ -44,9 +44,9 @@ export default function ProductSection({
   };
 
   return (
-    <section className="max-w-7xl mx-auto px-4 my-8 sm:my-14">
+    <section className="max-w-7xl mx-auto px-3 sm:px-4 my-6 sm:my-12">
       {/* Section Header */}
-      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3 mb-5 pb-3 border-b border-[#e5eee6] dark:border-[#1c3826]">
+      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3 mb-4 sm:mb-5 pb-3 border-b border-[#e5eee6] dark:border-[#1c3826]">
         <div>
           {displayBadge && (
             <span className="inline-flex items-center gap-1.5 text-[11px] font-bold text-brand-900 dark:text-emerald-300 bg-emerald-100/90 dark:bg-[#183925] px-3 py-0.5 rounded-full mb-2 border border-emerald-200/80 dark:border-[#254b32]">
@@ -76,7 +76,7 @@ export default function ProductSection({
 
       {/* Category Cover Showcase Banner */}
       {coverImage && (
-        <div className="relative mb-6 rounded-3xl overflow-hidden shadow-md border border-gray-200/80 dark:border-emerald-900/40 h-32 sm:h-44 md:h-52 group">
+        <div className="relative mb-4 sm:mb-6 rounded-2xl sm:rounded-3xl overflow-hidden shadow-md border border-gray-200/80 dark:border-emerald-900/40 h-28 min-[400px]:h-36 sm:h-44 md:h-52 group">
           <img
             src={coverImage}
             alt={displayTitle}
@@ -116,7 +116,7 @@ export default function ProductSection({
       )}
 
       {/* Grid of Product Cards (Exactly 4 Cards displayed) */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-6">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2.5 sm:gap-4 md:gap-6">
         {currentProducts.map((product) => (
           <ProductCard key={product.id || product._id} product={product} />
         ))}

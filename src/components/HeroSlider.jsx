@@ -214,7 +214,7 @@ export default function HeroSlider({ banners = [] }) {
           {slides.map((slide, index) => (
             <div
               key={slide.id || index}
-              className="w-full flex-shrink-0 min-h-[580px] sm:min-h-[640px] lg:min-h-[680px] text-white relative flex items-center overflow-hidden py-10 sm:py-16"
+              className="w-full flex-shrink-0 min-h-[460px] sm:min-h-[520px] md:min-h-[580px] lg:min-h-[660px] text-white relative flex items-center overflow-hidden py-8 sm:py-12 md:py-16"
             >
               {/* 🌟 FULL WIDTH & FULL HEIGHT BACKGROUND IMAGE */}
               <div className="absolute inset-0 w-full h-full pointer-events-none">
@@ -237,13 +237,13 @@ export default function HeroSlider({ banners = [] }) {
               <div className="absolute inset-0 opacity-[0.04] bg-[radial-gradient(#ffffff_1.5px,transparent_1.5px)] [background-size:28px_28px] pointer-events-none" />
 
               {/* Slide Content */}
-              <div className="max-w-7xl mx-auto px-6 sm:px-12 lg:px-16 w-full relative z-10 flex items-center">
+              <div className="max-w-7xl mx-auto px-4 sm:px-10 lg:px-16 w-full relative z-10 flex items-center">
 
                 {/* Text & Actions */}
-                <div className="max-w-3xl lg:max-w-4xl space-y-5 sm:space-y-6 text-center lg:text-left">
+                <div className="max-w-3xl lg:max-w-4xl space-y-4 sm:space-y-6 text-center lg:text-left">
 
                   {/* Top Badge, Discount & Rating */}
-                  <div className="flex flex-wrap items-center justify-center lg:justify-start gap-3">
+                  <div className="flex flex-wrap items-center justify-center lg:justify-start gap-2 sm:gap-3">
                     {slide.badge && (
                       <div className="inline-flex items-center gap-2 bg-white/20 backdrop-blur-md border border-white/30 text-white text-xs sm:text-sm font-bold px-4 py-1.5 rounded-full shadow-lg">
                         <Sparkles className="w-4 h-4 text-amber-300 animate-pulse" />
@@ -268,12 +268,12 @@ export default function HeroSlider({ banners = [] }) {
                   </div>
 
                   {/* Main Title */}
-                  <h1 className="text-3xl sm:text-5xl lg:text-6xl font-black tracking-tight leading-[1.18] text-white drop-shadow-xl">
+                  <h1 className="text-2xl min-[400px]:text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-black tracking-tight leading-[1.18] text-white drop-shadow-xl">
                     {slide.title}
                   </h1>
 
                   {/* Subtitle */}
-                  <p className="text-emerald-100/90 text-sm sm:text-lg lg:text-xl max-w-2xl font-normal leading-relaxed drop-shadow">
+                  <p className="text-emerald-100/90 text-xs sm:text-base md:text-lg lg:text-xl max-w-2xl font-normal leading-relaxed drop-shadow">
                     {slide.subtitle}
                   </p>
 
@@ -313,9 +313,9 @@ export default function HeroSlider({ banners = [] }) {
                     {slide.productData ? (
                       <button
                         onClick={() => openFastOrder(slide.productData)}
-                        className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-gradient-to-r from-amber-400 via-secondary to-yellow-400 hover:from-amber-500 hover:to-yellow-500 text-brand-950 font-black px-8 py-4 rounded-2xl shadow-xl hover:shadow-amber-500/25 transition-all transform hover:-translate-y-0.5 active:scale-95 text-sm sm:text-base"
+                        className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-gradient-to-r from-amber-400 via-secondary to-yellow-400 hover:from-amber-500 hover:to-yellow-500 text-brand-950 font-black px-6 sm:px-8 py-3 sm:py-4 rounded-xl sm:rounded-2xl shadow-xl hover:shadow-amber-500/25 transition-all transform hover:-translate-y-0.5 active:scale-95 text-xs sm:text-base"
                       >
-                        <Zap className="w-5 h-5 fill-brand-950" />
+                        <Zap className="w-4 h-4 sm:w-5 sm:h-5 fill-brand-950" />
                         <span>{isBangla ? '১-ক্লিক ফাস্ট অর্ডার' : '1-Click Fast Order'}</span>
                       </button>
                     ) : null}
@@ -323,11 +323,11 @@ export default function HeroSlider({ banners = [] }) {
                     {/* CTA 2: Explore Button */}
                     <Link
                       href={slide.link || '/products'}
-                      className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-white/20 hover:bg-white/30 backdrop-blur-md text-white font-bold px-7 py-4 rounded-2xl border border-white/25 transition-all text-sm sm:text-base shadow-lg"
+                      className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-white/20 hover:bg-white/30 backdrop-blur-md text-white font-bold px-5 sm:px-7 py-3 sm:py-4 rounded-xl sm:rounded-2xl border border-white/25 transition-all text-xs sm:text-base shadow-lg"
                     >
-                      <ShoppingBag className="w-5 h-5" />
+                      <ShoppingBag className="w-4 h-4 sm:w-5 sm:h-5" />
                       <span>{slide.buttonText || (isBangla ? 'পণ্য দেখুন' : 'Explore')}</span>
-                      <ArrowRight className="w-5 h-5 ml-1" />
+                      <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5 ml-1" />
                     </Link>
                   </div>
 
@@ -341,18 +341,18 @@ export default function HeroSlider({ banners = [] }) {
         {/* Navigation Arrow Buttons */}
         <button
           onClick={prevSlide}
-          className="absolute left-3 sm:left-6 top-1/2 -translate-y-1/2 p-3.5 sm:p-4 bg-black/50 hover:bg-black/80 text-white rounded-2xl backdrop-blur-md border border-white/25 transition-all transform hover:scale-110 active:scale-95 z-20 shadow-xl"
+          className="absolute left-2 sm:left-6 top-1/2 -translate-y-1/2 p-2 sm:p-3.5 bg-black/50 hover:bg-black/80 text-white rounded-xl sm:rounded-2xl backdrop-blur-md border border-white/25 transition-all transform active:scale-95 z-20 shadow-xl"
           aria-label="Previous Slide"
         >
-          <ChevronLeft className="w-6 h-6 sm:w-7 sm:h-7" />
+          <ChevronLeft className="w-5 h-5 sm:w-7 sm:h-7" />
         </button>
 
         <button
           onClick={nextSlide}
-          className="absolute right-3 sm:right-6 top-1/2 -translate-y-1/2 p-3.5 sm:p-4 bg-black/50 hover:bg-black/80 text-white rounded-2xl backdrop-blur-md border border-white/25 transition-all transform hover:scale-110 active:scale-95 z-20 shadow-xl"
+          className="absolute right-2 sm:right-6 top-1/2 -translate-y-1/2 p-2 sm:p-3.5 bg-black/50 hover:bg-black/80 text-white rounded-xl sm:rounded-2xl backdrop-blur-md border border-white/25 transition-all transform active:scale-95 z-20 shadow-xl"
           aria-label="Next Slide"
         >
-          <ChevronRight className="w-6 h-6 sm:w-7 sm:h-7" />
+          <ChevronRight className="w-5 h-5 sm:w-7 sm:h-7" />
         </button>
 
         {/* Dynamic Progress Bar (Timer Indicator) */}

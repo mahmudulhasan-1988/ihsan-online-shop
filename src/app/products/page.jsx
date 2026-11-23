@@ -652,9 +652,9 @@ function ProductsContent() {
 
             {/* 📦 PRODUCTS GRID OR EMPTY STATE */}
             {loading ? (
-              <ProductGridSkeleton count={6} className="grid-cols-2 md:grid-cols-3 xl:grid-cols-3 gap-4 sm:gap-6" />
+              <ProductGridSkeleton count={6} className="grid-cols-2 md:grid-cols-3 xl:grid-cols-3 gap-2.5 sm:gap-4 md:gap-6" />
             ) : products.length > 0 ? (
-              <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-3 gap-4 sm:gap-6">
+              <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-3 gap-2.5 sm:gap-4 md:gap-6">
                 {products.map((product) => (
                   <ProductCard key={product.id || product._id} product={product} />
                 ))}

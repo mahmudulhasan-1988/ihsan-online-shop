@@ -15,7 +15,7 @@ export default function FloatingCartButton() {
   if (isDashboard) return null;
 
   return (
-    <aside aria-label="Quick Shopping Cart" className="fixed right-2 sm:right-4 top-[38%] -translate-y-1/2 z-40 print:hidden">
+    <aside aria-label="Quick Shopping Cart" className="hidden sm:block fixed right-2 sm:right-4 top-[38%] -translate-y-1/2 z-40 print:hidden">
       <button
         onClick={openCartDrawer}
         className="group relative flex flex-col items-center bg-gradient-to-b from-brand-900 via-brand-800 to-emerald-950 dark:from-[#11281c] dark:via-[#0d1e15] dark:to-[#07130d] text-white p-2.5 sm:p-3 rounded-2xl shadow-2xl border-2 border-emerald-500/40 hover:border-secondary hover:shadow-emerald-900/40 hover:scale-105 transition-all duration-300 backdrop-blur-md"

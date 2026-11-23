@@ -216,30 +216,30 @@ export default function Header() {
     <header className="sticky top-0 z-40 bg-white/95 dark:bg-[#0d1c13]/95 backdrop-blur-md shadow-sm border-b border-[#e7eee8] dark:border-[#1b3626] transition-colors duration-300">
 
       {/* Top Announcement Bar */}
-      <div className="bg-gradient-to-r from-brand-950 via-brand-900 to-emerald-950 text-white text-xs sm:text-sm py-1.5 sm:py-2 px-4">
+      <div className="bg-gradient-to-r from-brand-950 via-brand-900 to-emerald-950 text-white text-xs sm:text-sm py-1.5 sm:py-2 px-3 sm:px-4">
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-1.5">
 
           <div className="flex items-center gap-2 font-medium">
-            <span className="bg-secondary text-brand-950 text-[10px] sm:text-[11px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider shadow-sm">
+            <span className="bg-secondary text-brand-950 text-[10px] sm:text-[11px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider shadow-sm flex-shrink-0">
               {isBangla ? 'অফার' : 'OFFER'}
             </span>
-            <span className="text-emerald-100/90 text-xs truncate">
+            <span className="text-emerald-100/90 text-xs truncate max-w-[220px] min-[420px]:max-w-[320px] sm:max-w-none">
               {t('offerText')}
             </span>
           </div>
 
           {/* Top Quick Actions (Track, Hotline, Language, Theme) */}
-          <div className="flex items-center gap-3 sm:gap-5 text-emerald-100 text-xs">
+          <div className="flex items-center gap-2 sm:gap-5 text-emerald-100 text-xs">
 
             <Link href="/track-order" className="hover:text-white flex items-center gap-1 transition-colors">
-              <Truck className="w-3.5 h-3.5 text-secondary" />
+              <Truck className="w-3.5 h-3.5 text-secondary flex-shrink-0" />
               <span>{t('trackOrder')}</span>
             </Link>
 
             <span className="opacity-40 hidden sm:inline">|</span>
 
-            <a href="tel:09611-562080" className="hover:text-white flex items-center gap-1 font-semibold transition-colors">
-              <PhoneCall className="w-3.5 h-3.5 text-secondary animate-pulse" />
+            <a href="tel:09611-562080" className="hidden min-[480px]:flex hover:text-white items-center gap-1 font-semibold transition-colors">
+              <PhoneCall className="w-3.5 h-3.5 text-secondary animate-pulse flex-shrink-0" />
               <span>{t('hotline')}: 09611-562080</span>
             </a>
 
@@ -249,7 +249,7 @@ export default function Header() {
               className="flex items-center gap-1 px-2.5 py-0.5 bg-white/10 hover:bg-white/20 rounded-full border border-white/15 transition-all text-[11px] font-bold"
               title={isBangla ? 'Switch to English' : 'বাংলায় পরিবর্তন করুন'}
             >
-              <Globe className="w-3 h-3 text-secondary" />
+              <Globe className="w-3 h-3 text-secondary flex-shrink-0" />
               <span>{isBangla ? 'English' : 'বাংলা'}</span>
             </button>
 
@@ -268,8 +268,8 @@ export default function Header() {
       </div>
 
       {/* Main Navigation Header */}
-      <div className="max-w-7xl mx-auto px-4 py-2.5 sm:py-3.5">
-        <div className="flex items-center justify-between gap-3 sm:gap-6">
+      <div className="max-w-7xl mx-auto px-3 sm:px-4 py-2 sm:py-3.5">
+        <div className="flex items-center justify-between gap-2 sm:gap-6">
 
           {/* Mobile Menu Trigger */}
           <button

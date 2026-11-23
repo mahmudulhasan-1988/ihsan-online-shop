@@ -22,10 +22,18 @@ export const metadata = {
   },
 };
 
+export const viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 5,
+  viewportFit: 'cover',
+};
+
 export default function RootLayout({ children }) {
   return (
     <html lang="bn" data-theme="ihsan" className="scroll-smooth">
       <head>
+        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, viewport-fit=cover" />
         <link rel="icon" href="/favicon.ico" sizes="any" />
         <link rel="icon" type="image/png" href="https://i.ibb.co.com/7dMKpCNL/Ihsan-Logo.png" />
         <link rel="apple-touch-icon" href="https://i.ibb.co.com/7dMKpCNL/Ihsan-Logo.png" />
@@ -45,7 +53,7 @@ export default function RootLayout({ children }) {
               <FloatingCartButton />
               <AiChatWidget />
               <Header />
-              <main className="flex-1">{children}</main>
+              <main className="flex-1 pb-16 md:pb-0">{children}</main>
               <Footer />
               <CartDrawer />
               <FastOrderModal />

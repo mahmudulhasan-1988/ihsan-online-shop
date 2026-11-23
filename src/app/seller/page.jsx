@@ -3660,36 +3660,38 @@ export default function SellerDashboardPage() {
                         </div>
                       </div>
 
-                      <table className="w-full border rounded-xl overflow-hidden text-left">
-                        <thead className="bg-gray-100 font-bold">
-                          <tr>
-                            <th className="p-2">Item</th>
-                            <th className="p-2 text-center">Unit</th>
-                            <th className="p-2 text-center">Qty</th>
-                            <th className="p-2 text-right">Price</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y">
-                          {selectedOrderForSlip.items?.map((it, idx) => (
-                            <tr key={idx}>
-                              <td className="p-2 font-bold">{it.name}</td>
-                              <td className="p-2 text-center">{it.weight || 'Std'}</td>
-                              <td className="p-2 text-center font-black">×{it.quantity}</td>
-                              <td className="p-2 text-right">৳ {it.price}</td>
+                      <div className="overflow-x-auto">
+                        <table className="w-full border rounded-xl overflow-hidden text-left min-w-[360px] sm:min-w-0">
+                          <thead className="bg-gray-100 font-bold">
+                            <tr>
+                              <th className="p-2">Item</th>
+                              <th className="p-2 text-center">Unit</th>
+                              <th className="p-2 text-center">Qty</th>
+                              <th className="p-2 text-right">Price</th>
                             </tr>
-                          ))}
-                        </tbody>
-                        <tfoot>
-                          <tr className="bg-gray-100 font-bold border-t">
-                            <td colSpan={3} className="p-2 text-right text-gray-700">
-                              {isBangla ? 'সেলার পণ্যের সাবটোটাল:' : 'Seller Items Subtotal:'}
-                            </td>
-                            <td className="p-2 text-right font-black text-brand-900">
-                              ৳ {selectedOrderForSlip.sellerTotal != null ? selectedOrderForSlip.sellerTotal : selectedOrderForSlip.totalAmount}
-                            </td>
-                          </tr>
-                        </tfoot>
-                      </table>
+                          </thead>
+                          <tbody className="divide-y">
+                            {selectedOrderForSlip.items?.map((it, idx) => (
+                              <tr key={idx}>
+                                <td className="p-2 font-bold">{it.name}</td>
+                                <td className="p-2 text-center">{it.weight || 'Std'}</td>
+                                <td className="p-2 text-center font-black">×{it.quantity}</td>
+                                <td className="p-2 text-right">৳ {it.price}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                          <tfoot>
+                            <tr className="bg-gray-100 font-bold border-t">
+                              <td colSpan={3} className="p-2 text-right text-gray-700">
+                                {isBangla ? 'সেলার পণ্যের সাবটোটাল:' : 'Seller Items Subtotal:'}
+                              </td>
+                              <td className="p-2 text-right font-black text-brand-900">
+                                ৳ {selectedOrderForSlip.sellerTotal != null ? selectedOrderForSlip.sellerTotal : selectedOrderForSlip.totalAmount}
+                              </td>
+                            </tr>
+                          </tfoot>
+                        </table>
+                      </div>
                     </div>
                   </div>
                 </div>
