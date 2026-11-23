@@ -76,6 +76,13 @@ export default function CustomerDashboardPage() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [loading, setLoading] = useState(true);
 
+  // Close sidebar by default on mobile screens
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.innerWidth < 1024) {
+      setIsSidebarOpen(false);
+    }
+  }, []);
+
   // Data States
   const [myOrders, setMyOrders] = useState([]);
   const [addresses, setAddresses] = useState([]);
@@ -428,7 +435,12 @@ export default function CustomerDashboardPage() {
               return (
                 <button
                   key={item.id}
-                  onClick={() => setActiveMenu(item.id)}
+                  onClick={() => {
+                    setActiveMenu(item.id);
+                    if (typeof window !== 'undefined' && window.innerWidth < 1024) {
+                      setIsSidebarOpen(false);
+                    }
+                  }}
                   className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-2xl font-bold text-xs sm:text-sm transition-all ${
                     isActive
                       ? 'bg-brand-900 text-white shadow-md dark:bg-emerald-600'
@@ -477,8 +489,8 @@ export default function CustomerDashboardPage() {
               className="flex items-center justify-center gap-1.5 py-2 px-2 rounded-xl text-[11px] font-bold bg-slate-100 dark:bg-emerald-950 text-slate-700 dark:text-emerald-300 hover:bg-slate-200 transition-all text-center"
               title="Back to Home"
             >
-              <span>🏠</span>
-              <span className={!isSidebarOpen ? 'lg:hidden' : ''}>Home</span>
+              <Home className="w-3.5 h-3.5 text-emerald-600" />
+              <span className={!isSidebarOpen ? 'lg:hidden' : ''}>{isBangla ? 'হোম' : 'Home'}</span>
             </Link>
             <button
               onClick={() => {
@@ -489,85 +501,98 @@ export default function CustomerDashboardPage() {
               title="Logout"
             >
               <span>🚪</span>
-              <span className={!isSidebarOpen ? 'lg:hidden' : ''}>Logout</span>
+              <span className={!isSidebarOpen ? 'lg:hidden' : ''}>{isBangla ? 'লগআউট' : 'Logout'}</span>
             </button>
           </div>
         </div>
       </aside>
 
+      {/* 🔵 Mobile Sidebar Backdrop Overlay */}
+      {isSidebarOpen && (
+        <div
+          className="fixed inset-0 bg-black/60 backdrop-blur-xs z-30 lg:hidden transition-opacity duration-300"
+          onClick={() => setIsSidebarOpen(false)}
+          aria-label="Close sidebar overlay"
+        />
+      )}
+
       {/* 🔵 Customer Workspace */}
       <div className={`flex-1 flex flex-col min-w-0 transition-all duration-300 ${isSidebarOpen ? 'lg:pl-72' : 'lg:pl-20'}`}>
         
         {/* Top Header */}
-        <header className="h-16 bg-white/90 dark:bg-[#112318]/90 backdrop-blur-md border-b border-[#e0ebe2] dark:border-[#1d3b28] px-4 sm:px-8 flex items-center justify-between sticky top-0 z-30">
-          <div className="flex items-center gap-3">
+        <header className="h-14 sm:h-16 bg-white/95 dark:bg-[#112318]/95 backdrop-blur-md border-b border-[#e0ebe2] dark:border-[#1d3b28] px-3 sm:px-6 flex items-center justify-between sticky top-0 z-20">
+          <div className="flex items-center gap-1.5 sm:gap-3 min-w-0">
             <button
               onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-              className="p-2 rounded-xl border border-gray-200 dark:border-emerald-900 text-gray-700 dark:text-emerald-300 hover:bg-gray-50"
+              className="p-1.5 sm:p-2 rounded-xl border border-gray-200 dark:border-emerald-900 text-gray-700 dark:text-emerald-300 hover:bg-gray-100 dark:hover:bg-emerald-950 transition-colors flex-shrink-0"
+              aria-label="Toggle Sidebar"
             >
-              <Menu className="w-5 h-5" />
+              <Menu className="w-4 h-4 sm:w-5 sm:h-5" />
             </button>
-            <span className="text-xs font-bold text-brand-900 dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-950 px-3 py-1 rounded-full">
+            <span className="text-xs font-bold text-brand-900 dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-950 px-2 sm:px-3 py-1 rounded-xl truncate max-w-[120px] xs:max-w-[170px] sm:max-w-none">
               {navMenuItems.find((m) => m.id === activeMenu)?.label}
             </span>
             <button
               onClick={() => loadUserData(true)}
               disabled={loading}
-              className="px-3 py-1.5 text-xs font-bold text-emerald-800 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-950/60 rounded-xl border border-emerald-300 dark:border-emerald-800 transition-all flex items-center gap-1.5 shadow-sm active:scale-95"
-              title="Refresh Data"
+              className="p-1.5 sm:px-2.5 sm:py-1.5 text-xs font-bold text-emerald-800 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-950/60 rounded-xl border border-emerald-300 dark:border-emerald-800 transition-all flex items-center gap-1 flex-shrink-0 shadow-sm"
+              title={isBangla ? 'ডাটা রিফ্রেশ করুন' : 'Refresh Data'}
             >
-              <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin text-emerald-600' : ''}`} />
-              <span className="hidden sm:inline">{isBangla ? 'রিফ্রেশ' : 'Refresh'}</span>
+              <RefreshCw className={`w-3.5 h-3.5 sm:w-4 sm:h-4 ${loading ? 'animate-spin text-emerald-600' : ''}`} />
+              <span className="hidden md:inline">{isBangla ? 'রিফ্রেশ' : 'Refresh'}</span>
             </button>
           </div>
 
-          <div className="flex items-center gap-2 sm:gap-3">
+          <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
             {/* 🌙 / ☀️ Theme Toggle Button in Navbar */}
             <button
               type="button"
               onClick={toggleTheme}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-2xl bg-emerald-50 hover:bg-emerald-100 dark:bg-black/40 dark:hover:bg-emerald-950 text-emerald-900 dark:text-emerald-200 border border-emerald-200/80 dark:border-emerald-900/60 text-xs font-bold transition-all shadow-sm active:scale-95"
+              className="p-1.5 sm:px-2.5 sm:py-1.5 rounded-xl sm:rounded-2xl bg-emerald-50 hover:bg-emerald-100 dark:bg-black/40 dark:hover:bg-emerald-950 text-emerald-900 dark:text-emerald-200 border border-emerald-200/80 dark:border-emerald-900/60 text-xs font-bold transition-all shadow-sm active:scale-95 flex items-center gap-1.5"
               title={theme === 'dark' ? (isBangla ? 'লাইট মোড অন করুন' : 'Switch to Light Mode') : (isBangla ? 'ডার্ক মোড অন করুন' : 'Switch to Dark Mode')}
             >
               {theme === 'dark' ? (
                 <>
-                  <Sun className="w-4 h-4 text-amber-400" />
-                  <span className="hidden sm:inline text-[11px] font-extrabold">{isBangla ? 'লাইট' : 'Light'}</span>
+                  <Sun className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-400" />
+                  <span className="hidden md:inline text-[11px] font-extrabold">{isBangla ? 'লাইট' : 'Light'}</span>
                 </>
               ) : (
                 <>
-                  <Moon className="w-4 h-4 text-emerald-700" />
-                  <span className="hidden sm:inline text-[11px] font-extrabold">{isBangla ? 'ডার্ক' : 'Dark'}</span>
+                  <Moon className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-700" />
+                  <span className="hidden md:inline text-[11px] font-extrabold">{isBangla ? 'ডার্ক' : 'Dark'}</span>
                 </>
               )}
             </button>
 
-            <div className="flex items-center gap-2 bg-emerald-100 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800 px-3 py-1.5 rounded-2xl">
+            <div className="hidden sm:flex items-center gap-1.5 bg-emerald-100 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800 px-2.5 py-1 rounded-xl sm:rounded-2xl">
               {user?.avatar ? (
-                <img src={user.avatar} alt="User Avatar" className="w-5 h-5 rounded-full object-cover border border-emerald-400" />
+                <img src={user.avatar} alt="User Avatar" className="w-4 h-4 sm:w-5 sm:h-5 rounded-full object-cover border border-emerald-400" />
               ) : (
-                <div className="w-5 h-5 rounded-full bg-brand-800 text-white flex items-center justify-center text-[10px] font-bold">
+                <div className="w-4 h-4 sm:w-5 sm:h-5 rounded-full bg-brand-800 text-white flex items-center justify-center text-[9px] font-bold">
                   {(user?.name || 'U').charAt(0).toUpperCase()}
                 </div>
               )}
-              <span className="text-[10px] text-gray-500 dark:text-gray-400 font-semibold">{user?.name || 'Customer'}:</span>
-              <span className="text-xs font-black uppercase text-brand-900 dark:text-emerald-300">
+              <span className="text-[10px] text-gray-500 dark:text-gray-400 font-semibold truncate max-w-[80px]">{user?.name || 'Customer'}:</span>
+              <span className="text-[10px] sm:text-xs font-black uppercase text-brand-900 dark:text-emerald-300">
                 {user?.role || 'CUSTOMER'}
               </span>
             </div>
 
             <Link
               href="/"
-              className="text-xs font-bold bg-gray-100 dark:bg-emerald-950 text-gray-800 dark:text-emerald-200 hover:bg-gray-200 px-3 py-2 rounded-xl transition-all"
+              className="p-1.5 sm:px-2.5 sm:py-1.5 text-xs font-bold bg-gray-100 hover:bg-gray-200 dark:bg-emerald-950 dark:hover:bg-emerald-900 text-gray-800 dark:text-emerald-200 rounded-xl transition-all flex items-center gap-1"
+              title={isBangla ? 'হোমপেজ' : 'Store'}
             >
-              🏪 {isBangla ? 'হোমপেজ' : 'Store'}
+              <Home className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-600" />
+              <span className="hidden xs:inline">{isBangla ? 'হোম' : 'Store'}</span>
             </Link>
 
             {/* Master Admin Switch */}
             {user?.role === 'admin' && (
               <Link
                 href="/admin"
-                className="text-xs font-bold bg-purple-700 hover:bg-purple-800 text-white px-3 py-2 rounded-xl transition-all shadow-sm"
+                className="text-[11px] sm:text-xs font-bold bg-purple-700 hover:bg-purple-800 text-white px-2 sm:px-3 py-1.5 rounded-xl transition-all shadow-sm"
+                title={isBangla ? 'এডমিন ড্যাশবোর্ড' : 'Admin'}
               >
                 {isBangla ? 'এডমিন' : 'Admin'}
               </Link>
@@ -575,9 +600,10 @@ export default function CustomerDashboardPage() {
 
             <Link
               href="/products"
-              className="text-xs font-bold bg-secondary hover:bg-gold-600 text-brand-950 px-3.5 py-2 rounded-xl transition-all shadow-sm"
+              className="text-[11px] sm:text-xs font-bold bg-secondary hover:bg-gold-600 text-brand-950 px-2.5 sm:px-3.5 py-1.5 rounded-xl transition-all shadow-sm flex items-center gap-1 flex-shrink-0"
             >
-              {isBangla ? '🛒 কেনাকাটা করুন' : 'Shop Now'}
+              <span>🛒</span>
+              <span className="hidden xs:inline">{isBangla ? 'কেনাকাটা' : 'Shop'}</span>
             </Link>
           </div>
         </header>

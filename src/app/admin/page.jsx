@@ -182,6 +182,12 @@ export default function AdminDashboardPage() {
   const [isSavingAdminProfile, setIsSavingAdminProfile] = useState(false);
 
   useEffect(() => {
+    if (typeof window !== 'undefined' && window.innerWidth < 1024) {
+      setIsSidebarOpen(false);
+    }
+  }, []);
+
+  useEffect(() => {
     if (user) {
       setAdminProfile(prev => ({
         ...prev,
@@ -1684,6 +1690,9 @@ export default function AdminDashboardPage() {
                   onClick={() => {
                     setActiveMenu(item.id);
                     setActiveSubTab('all');
+                    if (typeof window !== 'undefined' && window.innerWidth < 1024) {
+                      setIsSidebarOpen(false);
+                    }
                   }}
                   className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-2xl font-bold text-xs sm:text-sm transition-all ${
                     isActive
@@ -1755,32 +1764,42 @@ export default function AdminDashboardPage() {
         </div>
       </aside>
 
+      {/* 🔴 Mobile Sidebar Backdrop Overlay */}
+      {isSidebarOpen && (
+        <div
+          className="fixed inset-0 bg-black/60 backdrop-blur-xs z-30 lg:hidden transition-opacity duration-300"
+          onClick={() => setIsSidebarOpen(false)}
+          aria-label="Close sidebar overlay"
+        />
+      )}
+
       {/* 🔴 Main Content Area */}
       <div className={`flex-1 flex flex-col min-w-0 transition-all duration-300 ${isSidebarOpen ? 'lg:pl-72' : 'lg:pl-20'}`}>
         
         {/* Top Navbar */}
-        <header className="h-16 bg-white/90 dark:bg-[#112318]/90 backdrop-blur-md border-b border-[#e0ebe2] dark:border-[#1d3b28] px-4 sm:px-8 flex items-center justify-between sticky top-0 z-30">
-          <div className="flex items-center gap-3">
+        <header className="h-14 sm:h-16 bg-white/95 dark:bg-[#112318]/95 backdrop-blur-md border-b border-[#e0ebe2] dark:border-[#1d3b28] px-3 sm:px-6 flex items-center justify-between sticky top-0 z-20">
+          <div className="flex items-center gap-1.5 sm:gap-3 min-w-0">
             <button
               onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-              className="p-2 rounded-xl border border-gray-200 dark:border-emerald-900 text-gray-700 dark:text-emerald-300 hover:bg-gray-50 dark:hover:bg-emerald-950"
+              className="p-1.5 sm:p-2 rounded-xl border border-gray-200 dark:border-emerald-900 text-gray-700 dark:text-emerald-300 hover:bg-gray-100 dark:hover:bg-emerald-950 transition-colors flex-shrink-0"
+              aria-label="Toggle Sidebar"
             >
-              <Menu className="w-5 h-5" />
+              <Menu className="w-4 h-4 sm:w-5 sm:h-5" />
             </button>
             
             {/* Active User Info near Refresh */}
-            <div className="flex items-center gap-2 bg-emerald-50/80 dark:bg-black/30 border border-emerald-200/70 dark:border-[#21432e] px-2.5 py-1 rounded-2xl">
+            <div className="flex items-center gap-1.5 sm:gap-2 bg-emerald-50/80 dark:bg-black/30 border border-emerald-200/70 dark:border-[#21432e] px-2 py-1 rounded-xl sm:rounded-2xl min-w-0">
               {user?.avatar ? (
-                <img src={user.avatar} alt="User" className="w-6 h-6 rounded-full object-cover" />
+                <img src={user.avatar} alt="User" className="w-5 h-5 sm:w-6 sm:h-6 rounded-full object-cover flex-shrink-0" />
               ) : (
-                <div className="w-6 h-6 rounded-full bg-brand-800 text-white flex items-center justify-center text-[10px] font-bold">
+                <div className="w-5 h-5 sm:w-6 sm:h-6 rounded-full bg-brand-800 text-white flex items-center justify-center text-[10px] font-bold flex-shrink-0">
                   {user?.name?.charAt(0) || 'U'}
                 </div>
               )}
-              <span className="text-xs font-bold text-gray-800 dark:text-emerald-100 max-w-[120px] truncate hidden sm:inline">
+              <span className="text-xs font-bold text-gray-800 dark:text-emerald-100 max-w-[90px] sm:max-w-[130px] truncate hidden xs:inline">
                 {user?.name || 'Admin'}
               </span>
-              <span className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded-full ${
+              <span className={`text-[8.5px] sm:text-[9px] font-black uppercase px-1.5 py-0.5 rounded-full flex-shrink-0 ${
                 user?.role === 'admin'
                   ? 'bg-purple-600 text-white'
                   : user?.role === 'seller'
@@ -1794,53 +1813,56 @@ export default function AdminDashboardPage() {
             <button
               onClick={handleRefreshData}
               disabled={loading}
-              className="p-2 text-xs font-bold bg-emerald-50 dark:bg-emerald-950 text-brand-900 dark:text-emerald-300 rounded-xl hover:bg-emerald-100 flex items-center gap-1.5 transition-colors border border-emerald-200 dark:border-emerald-900"
-              title="Refresh Data"
+              className="p-1.5 sm:px-2.5 sm:py-1.5 text-xs font-bold bg-emerald-50 dark:bg-emerald-950 text-brand-900 dark:text-emerald-300 rounded-xl hover:bg-emerald-100 flex items-center gap-1.5 transition-colors border border-emerald-200 dark:border-emerald-900 flex-shrink-0"
+              title={isBangla ? 'ডাটা রিফ্রেশ করুন' : 'Refresh Data'}
             >
-              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin text-emerald-600' : ''}`} />
-              <span className="hidden sm:inline">{isBangla ? 'রিফ্রেশ' : 'Refresh'}</span>
+              <RefreshCw className={`w-3.5 h-3.5 sm:w-4 sm:h-4 ${loading ? 'animate-spin text-emerald-600' : ''}`} />
+              <span className="hidden md:inline">{isBangla ? 'রিফ্রেশ' : 'Refresh'}</span>
             </button>
           </div>
 
-          <div className="flex items-center gap-2 sm:gap-3">
+          <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
             {/* 🌙 / ☀️ Theme Toggle Button in Admin Navbar */}
             <button
               type="button"
               onClick={toggleTheme}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-2xl bg-emerald-50 hover:bg-emerald-100 dark:bg-black/40 dark:hover:bg-emerald-950 text-emerald-900 dark:text-emerald-200 border border-emerald-200/80 dark:border-emerald-900/60 text-xs font-bold transition-all shadow-sm active:scale-95"
+              className="p-1.5 sm:px-2.5 sm:py-1.5 rounded-xl sm:rounded-2xl bg-emerald-50 hover:bg-emerald-100 dark:bg-black/40 dark:hover:bg-emerald-950 text-emerald-900 dark:text-emerald-200 border border-emerald-200/80 dark:border-emerald-900/60 text-xs font-bold transition-all shadow-sm active:scale-95 flex items-center gap-1.5"
               title={theme === 'dark' ? (isBangla ? 'লাইট মোড অন করুন' : 'Switch to Light Mode') : (isBangla ? 'ডার্ক মোড অন করুন' : 'Switch to Dark Mode')}
             >
               {theme === 'dark' ? (
                 <>
-                  <Sun className="w-4 h-4 text-amber-400" />
-                  <span className="hidden sm:inline text-[11px] font-extrabold">{isBangla ? 'লাইট' : 'Light'}</span>
+                  <Sun className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-400" />
+                  <span className="hidden md:inline text-[11px] font-extrabold">{isBangla ? 'লাইট' : 'Light'}</span>
                 </>
               ) : (
                 <>
-                  <Moon className="w-4 h-4 text-emerald-700" />
-                  <span className="hidden sm:inline text-[11px] font-extrabold">{isBangla ? 'ডার্ক' : 'Dark'}</span>
+                  <Moon className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-700" />
+                  <span className="hidden md:inline text-[11px] font-extrabold">{isBangla ? 'ডার্ক' : 'Dark'}</span>
                 </>
               )}
             </button>
 
             <Link
               href="/"
-              className="text-xs font-bold bg-gray-100 dark:bg-emerald-950 text-gray-800 dark:text-emerald-200 hover:bg-gray-200 px-3 py-2 rounded-xl transition-all flex items-center gap-1"
+              className="p-1.5 sm:px-2.5 sm:py-1.5 text-xs font-bold bg-gray-100 hover:bg-gray-200 dark:bg-emerald-950 dark:hover:bg-emerald-900 text-gray-800 dark:text-emerald-200 rounded-xl transition-all flex items-center gap-1"
+              title={isBangla ? 'স্টোর ভিউ' : 'Storefront'}
             >
-              <Home className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">{isBangla ? 'স্টোর ভিউ' : 'Storefront'}</span>
+              <Home className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-600" />
+              <span className="hidden sm:inline">{isBangla ? 'স্টোর ভিউ' : 'Store'}</span>
             </Link>
 
             <Link
               href="/seller"
-              className="text-xs font-bold bg-amber-500 hover:bg-amber-600 text-brand-950 px-3 py-2 rounded-xl transition-all shadow-sm"
+              className="text-[11px] sm:text-xs font-bold bg-amber-500 hover:bg-amber-600 text-brand-950 px-2 sm:px-3 py-1.5 rounded-xl transition-all shadow-sm"
+              title={isBangla ? 'সেলার ড্যাশবোর্ড' : 'Seller Dashboard'}
             >
               {isBangla ? 'সেলার' : 'Seller'}
             </Link>
 
             <Link
               href="/dashboard"
-              className="text-xs font-bold bg-brand-900 hover:bg-brand-800 text-white px-3 py-2 rounded-xl transition-all shadow-sm"
+              className="text-[11px] sm:text-xs font-bold bg-brand-900 hover:bg-brand-800 text-white px-2 sm:px-3 py-1.5 rounded-xl transition-all shadow-sm"
+              title={isBangla ? 'কাস্টমার ড্যাশবোর্ড' : 'Customer Dashboard'}
             >
               {isBangla ? 'কাস্টমার' : 'Customer'}
             </Link>
